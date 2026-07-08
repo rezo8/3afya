@@ -1,0 +1,236 @@
+/**
+ * Shared API contract types between the afya backend (apps/api) and web (apps/web).
+ * Keep this dependency-free — it is consumed as raw TypeScript source by both apps.
+ *
+ * Model summary (all rows are user-scoped):
+ *  - Exercises are a shared library, reused across program days.
+ *  - Each exercise has a measurement KIND that decides what a set records:
+ *      weighted → weight (lb) × reps   (bench press)
+ *      reps     → reps / count only    (pull-ups, soccer drills)
+ *      time     → duration in seconds  (planks, timed holds)
+ *  - A program is a set of named days in a rotation order (not weekday-pinned).
+ *  - A day holds ordered exercises with targets (sets × reps, or sets × time).
+ *    No planned weight — working weight lives in logged sets and "today"
+ *    pre-fills it from the last session.
+ *  - Fuel is logged per entry (add/remove) against a daily protein/calorie target.
+ */
+
+/** Standard JSON error body returned by the API. */
+export interface ApiErrorBody {
+  error: string;
+  message?: string;
+}
+
+/** How an exercise is measured — decides which fields a set records. */
+export type ExerciseKind = "weighted" | "reps" | "time";
+
+// ---------------------------------------------------------------------------
+// Exercise library
+// ---------------------------------------------------------------------------
+
+export interface Exercise {
+  id: string;
+  name: string;
+  kind: ExerciseKind;
+  createdAt: string;
+}
+
+export interface CreateExerciseBody {
+  name: string;
+  kind?: ExerciseKind;
+}
+
+// ---------------------------------------------------------------------------
+// Program (rotation of days → ordered exercises)
+// ---------------------------------------------------------------------------
+
+export interface ProgramExercise {
+  id: string;
+  exerciseId: string;
+  /** Denormalized from the exercise for convenient rendering. */
+  name: string;
+  kind: ExerciseKind;
+  position: number;
+  targetSets: number;
+  /** Target reps for weighted/reps kinds. */
+  targetReps: number;
+  /** Target hold in seconds for the time kind (null otherwise). */
+  targetDurationSec: number | null;
+}
+
+export interface ProgramDay {
+  id: string;
+  name: string;
+  /** Position in the rotation (0-based). "Next up" = the day after the last session's. */
+  position: number;
+  exercises: ProgramExercise[];
+}
+
+export interface Program {
+  id: string;
+  name: string;
+  isActive: boolean;
+  days: ProgramDay[];
+}
+
+export interface CreateProgramBody {
+  name: string;
+}
+export interface CreateDayBody {
+  name: string;
+}
+export interface AddDayExerciseBody {
+  exerciseId: string;
+  targetSets?: number;
+  targetReps?: number;
+  targetDurationSec?: number | null;
+}
+export interface UpdateDayExerciseBody {
+  targetSets?: number;
+  targetReps?: number;
+  targetDurationSec?: number | null;
+  position?: number;
+}
+/** New order of day ids, or of exercise ids within a day. */
+export interface ReorderBody {
+  order: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Sessions + logged sets
+// ---------------------------------------------------------------------------
+
+export interface SetLog {
+  id: string;
+  exerciseId: string;
+  setNumber: number;
+  /** Pounds — used by the weighted kind (0 for others). */
+  weight: number;
+  /** Reps — used by weighted/reps kinds (0 for time). */
+  reps: number;
+  /** Seconds — used by the time kind (0 for others). */
+  durationSec: number;
+  completedAt: string;
+}
+
+export interface WorkoutSession {
+  id: string;
+  dayId: string | null;
+  dayName: string | null;
+  performedAt: string;
+  sets: SetLog[];
+}
+
+export interface StartSessionBody {
+  /** Omit to start the next-up rotation day; pass a dayId to override. */
+  dayId?: string | null;
+}
+export interface LogSetBody {
+  exerciseId: string;
+  setNumber: number;
+  /** Send the fields relevant to the exercise's kind; the rest default to 0. */
+  weight?: number;
+  reps?: number;
+  durationSec?: number;
+}
+
+/** One exercise on today's session, with last-session numbers pre-filled. */
+export interface TodayExercise {
+  exerciseId: string;
+  name: string;
+  kind: ExerciseKind;
+  targetSets: number;
+  targetReps: number;
+  targetDurationSec: number | null;
+  /** From the most recent logged set of this exercise, or null if never done. */
+  lastWeight: number | null;
+  lastReps: number | null;
+  lastDurationSec: number | null;
+  /** Sets already logged in the in-progress session. */
+  loggedSets: SetLog[];
+}
+
+/** The Today screen payload: next-up day + per-exercise history + any live session. */
+export interface TodayResponse {
+  day: { id: string; name: string; position: number } | null;
+  session: { id: string; performedAt: string } | null;
+  exercises: TodayExercise[];
+}
+
+// ---------------------------------------------------------------------------
+// Fuel (protein / calorie targets)
+// ---------------------------------------------------------------------------
+
+export interface FuelEntry {
+  id: string;
+  label: string;
+  proteinG: number;
+  calories: number;
+  loggedAt: string;
+}
+
+export interface NutritionTarget {
+  proteinG: number;
+  calories: number;
+}
+
+export interface FuelDay {
+  /** Local calendar date, YYYY-MM-DD. */
+  date: string;
+  target: NutritionTarget;
+  entries: FuelEntry[];
+  totals: { proteinG: number; calories: number };
+}
+
+export interface AddFuelEntryBody {
+  label: string;
+  proteinG: number;
+  calories: number;
+}
+
+// ---------------------------------------------------------------------------
+// Body metrics + trends
+// ---------------------------------------------------------------------------
+
+export type BodyMetricKind = "weight" | "resting_hr" | "sleep_hours" | "body_fat";
+
+export interface BodyMetric {
+  id: string;
+  kind: BodyMetricKind;
+  value: number;
+  measuredAt: string;
+}
+
+export interface AddBodyMetricBody {
+  kind: BodyMetricKind;
+  value: number;
+  measuredAt?: string;
+}
+
+/** A single point on a trend line. */
+export interface TrendPoint {
+  /** ISO date the point is anchored to. */
+  date: string;
+  value: number;
+}
+
+/** What a progress trend measures, chosen by the exercise's kind. */
+export type ProgressMetric = "est1rm" | "reps" | "time";
+
+/** Progress over time for one exercise — best set per session, metric by kind. */
+export interface ProgressTrend {
+  exerciseId: string;
+  name: string;
+  kind: ExerciseKind;
+  metric: ProgressMetric;
+  /** Display unit for the values: "lb" | "reps" | "s". */
+  unit: string;
+  points: TrendPoint[];
+}
+
+/** Item in the trends exercise picker. */
+export interface TrendExercise {
+  id: string;
+  name: string;
+  kind: ExerciseKind;
+}

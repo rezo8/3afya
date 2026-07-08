@@ -3,69 +3,104 @@
 > عافية — well-being, vitality. A personal, self-hostable workout & health
 > tracker: log what you've done, and keep a living reference for your health.
 
-Track workouts, movement, and health markers over time; look back and see the
-trend. Built to the same blueprint as [mi7rab](https://github.com/rezo8/mi7rab)
-and deployed on the same GCP pattern, sharing one Postgres instance across my
-personal apps.
+Track your workout program and eating over time; look back and see the trend.
+Built to the same blueprint as [mi7rab](https://github.com/rezo8/mi7rab) —
+pnpm + Turborepo, Hono + Drizzle + Postgres, Better Auth with Redis sessions,
+React + Vite + Tailwind.
 
-> **Status:** repo initialized. The full scaffold is built out in a follow-up
-> session — see [Plan](#plan) below.
+> **Status:** full scaffold built and running locally. Runs entirely on your
+> machine (Docker Postgres + Redis). Cloud deploy is deferred — see
+> [Later](#later-deploy).
 
-## Planned stack (mirrors mi7rab)
+## Stack
 
-| Layer    | Choice                                                                      |
-| -------- | --------------------------------------------------------------------------- |
-| Monorepo | pnpm workspaces + Turborepo (Node 22, ESM)                                  |
-| Frontend | React + Vite + TS · TanStack Router + Query · Tailwind v4                   |
-| Backend  | Hono · Drizzle ORM · node-postgres → **Postgres**                           |
-| Auth     | **Better Auth** (email + password, sessions in Redis)                       |
-| Cache    | **Redis** (Upstash in prod) — sessions, rate limiting                       |
-| Deploy   | Docker → Cloud Build → **Artifact Registry → Cloud Run**; secrets in Secret Manager |
-| Data     | **Cloud SQL (Postgres)** — a shared instance across personal apps           |
+| Layer    | Choice                                                            |
+| -------- | ---------------------------------------------------------------- |
+| Monorepo | pnpm workspaces + Turborepo (Node 22, ESM), scope `@afya/*`      |
+| Frontend | React + Vite + TS · TanStack Router + Query · Tailwind v4        |
+| Backend  | Hono · Drizzle ORM · node-postgres → **Postgres**                |
+| Auth     | **Better Auth** (email + password, sessions in Redis)           |
+| Cache    | **Redis** — sessions, rate limiting                              |
+| Local    | **Docker Compose** — Postgres + Redis                            |
+
+## Quickstart
+
+Prereqs: Node 22, pnpm, Docker.
+
+```bash
+# 1. Local Postgres (5435) + Redis (6380) — ports chosen to avoid clashing with mi7rab
+docker compose up -d
+
+# 2. API env (dotenv loads it from apps/api)
+cp .env.example apps/api/.env      # then set a real BETTER_AUTH_SECRET
+
+# 3. Install, migrate, seed demo data
+pnpm install
+pnpm --filter @afya/api db:migrate
+pnpm --filter @afya/api db:seed     # optional: a demo account with history
+
+# 4. Run both apps
+pnpm dev                            # api → :3001, web → :5174
+```
+
+Open **http://localhost:5174**. Sign up, or use the seeded demo login:
+
+```
+afya@local.dev  /  afya-dev-123
+```
+
+### Ports (all offset from mi7rab's)
+
+| Service  | 3afya | mi7rab |
+| -------- | ----- | ------ |
+| Web      | 5174  | 5173   |
+| API      | 3001  | 3000   |
+| Postgres | 5435  | 5433   |
+| Redis    | 6380  | 6379   |
+
+## Structure
 
 ```
 apps/
-  api/   Hono backend — auth, tracking API, Drizzle schema + migrations
-  web/   React app — log entries, dashboards, trends
+  api/   Hono backend — auth, tracker API, Drizzle schema + migrations
+  web/   React app — Today, Program builder, Trends, History
 packages/
-  shared/         API contract types      eslint-config/  shared lint config
-  tsconfig/       shared TS configs
+  shared/         API contract types (@afya/shared)
+  eslint-config/  shared lint config      tsconfig/  shared TS configs
 ```
 
-Code packages use the ASCII scope `@afya/*` (e.g. `@afya/api`, `@afya/web`),
-mirroring how mi7rab's repo is `mi7rab` but its packages are `@mihrab/*`.
+## Data model
 
-## Shared database plan
+All rows are user-scoped.
 
-The goal is **one Cloud SQL (Postgres) instance shared across my personal
-apps** — this health tracker plus a future **wallet** app — each with its own
-logical database on that instance, to avoid paying for an instance per app.
+- **Exercises** are a shared **library**, reused across program days. Each has a
+  measurement **kind** that decides what a set records:
+  - `weighted` → weight (lb) × reps — e.g. bench press
+  - `reps` → a count only — e.g. pull-ups, soccer drills
+  - `time` → a duration — e.g. planks, timed holds
+- A **program** is a set of named **days** in a rotation order (not weekday-
+  pinned); "Today" is the next day after your last session.
+- A day holds ordered exercises with targets (sets × reps, or sets × time) — no
+  planned weight. Working weight lives in **logged sets**; Today pre-fills it
+  from your last session so you can beat it.
+- **Fuel** is logged per entry (add/remove) against a daily protein/calorie
+  target. **Body metrics** (weight, resting HR, sleep…) trend over time.
 
-Two options for the follow-up session to decide (needs `gcloud` access):
+Estimated 1RM trends use the Epley formula on the best set per session.
 
-1. **Reuse mi7rab's existing Cloud SQL instance** (`mi7rab:us-central1:mi7rab-db`)
-   — add a new `afya` database + user to it. Cheapest, nothing new to provision.
-2. **Create a dedicated shared instance** for personal apps and point mi7rab,
-   3afya, and the future wallet at it (one database each). Cleaner separation,
-   a small migration for mi7rab.
+## Design
 
-Either way: **separate databases per app on one instance**, not shared tables.
+Frontend direction is **"Vitality"** — a warm, dark, mobile-first world with an
+espresso ground and a marigold accent; the working-set number is the signature.
+The design was prototyped before implementation
+([clickable prototype](https://claude.ai/code/artifact/0b48935e-66cd-4b5d-95c3-eb48859a6e79)).
 
-## Domain
+## Later: deploy
 
-mi7rab serves `ribhielzaru.com`. This would likely live on a subdomain
-(e.g. `afya.ribhielzaru.com`) via a Cloud Run domain mapping.
-
-## Plan
-
-- [ ] Scaffold the pnpm + Turborepo monorepo (copy structure from mi7rab)
-- [ ] `apps/api`: Hono + Drizzle + Better Auth + Redis + zod env validation
-- [ ] Schema: users (Better Auth) + workouts / exercises / sets / health metrics
-- [ ] `apps/web`: React + Vite + Tailwind — log a workout, view history & trends
-- [ ] `packages/shared`, `packages/eslint-config`, `packages/tsconfig`
-- [ ] `docker-compose.yml` (Postgres + Redis) for local dev
-- [ ] GCP: `Dockerfile`, `cloudbuild.yaml`, `deploy/setup.sh` (adapt from mi7rab)
-- [ ] Decide + wire the shared-database strategy (see above)
+A future session can add the GCP path (Cloud Run + Artifact Registry + Secret
+Manager, adapted from mi7rab), reusing one shared Cloud SQL instance across
+personal apps with a separate logical database per app. Not needed to run
+locally.
 
 ## License
 

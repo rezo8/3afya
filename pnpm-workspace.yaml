@@ -1,0 +1,15 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  # Unused optional adapters pulled in transitively by better-auth (we use
+  # Drizzle + pg), so their native/postinstall builds are not needed.
+  '@prisma/client': false
+  better-sqlite3: false
+  esbuild: true
+
+# Allow these native/postinstall build scripts to run (pnpm 10+ blocks them by default).
+onlyBuiltDependencies:
+  - esbuild
+  - "@tailwindcss/oxide"

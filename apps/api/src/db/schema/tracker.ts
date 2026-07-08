@@ -1,0 +1,210 @@
+import { relations } from "drizzle-orm";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  integer,
+  real,
+  uuid,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+import type { BodyMetricKind, ExerciseKind } from "@afya/shared";
+import { user } from "./auth";
+
+/**
+ * Tracker schema. Everything is user-scoped via a `user_id` FK to Better Auth's
+ * `user` table. IDs on our own rows are UUIDs; `user_id` is text to match the
+ * auth table's id type.
+ *
+ * Shape mirrors the settled model:
+ *   exercise (library) ← program_exercise → program_day → program
+ *   workout_session → set_log  (set_log.weight is the source of truth for the
+ *   "last session" pre-fill and every strength trend)
+ *   fuel_entry + nutrition_target, body_metric
+ */
+
+// --- Exercise library ------------------------------------------------------
+
+export const exercise = pgTable(
+  "exercise",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    kind: text("kind").$type<ExerciseKind>().default("weighted").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("exercise_user_name_idx").on(t.userId, t.name)],
+);
+
+// --- Program → days → exercises --------------------------------------------
+
+export const program = pgTable(
+  "program",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (t) => [index("program_user_idx").on(t.userId)],
+);
+
+export const programDay = pgTable(
+  "program_day",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => program.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // Rotation order (0-based). "Next up" = the day after the last session's day.
+    position: integer("position").default(0).notNull(),
+  },
+  (t) => [index("program_day_program_idx").on(t.programId)],
+);
+
+export const programExercise = pgTable(
+  "program_exercise",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dayId: uuid("day_id")
+      .notNull()
+      .references(() => programDay.id, { onDelete: "cascade" }),
+    exerciseId: uuid("exercise_id")
+      .notNull()
+      .references(() => exercise.id, { onDelete: "cascade" }),
+    position: integer("position").default(0).notNull(),
+    targetSets: integer("target_sets").default(3).notNull(),
+    targetReps: integer("target_reps").default(8).notNull(),
+    // Target hold in seconds for the "time" kind; null for weighted/reps.
+    targetDurationSec: integer("target_duration_sec"),
+  },
+  (t) => [index("program_exercise_day_idx").on(t.dayId)],
+);
+
+// --- Sessions + logged sets ------------------------------------------------
+
+export const workoutSession = pgTable(
+  "workout_session",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Nullable: a freeform session isn't tied to a program day, and we keep the
+    // session if the day is later deleted.
+    dayId: uuid("day_id").references(() => programDay.id, { onDelete: "set null" }),
+    performedAt: timestamp("performed_at").defaultNow().notNull(),
+    note: text("note"),
+  },
+  (t) => [index("session_user_performed_idx").on(t.userId, t.performedAt)],
+);
+
+export const setLog = pgTable(
+  "set_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => workoutSession.id, { onDelete: "cascade" }),
+    exerciseId: uuid("exercise_id")
+      .notNull()
+      .references(() => exercise.id, { onDelete: "cascade" }),
+    setNumber: integer("set_number").notNull(),
+    // Which fields matter depends on the exercise kind:
+    //   weighted → weight + reps · reps → reps · time → durationSec
+    weight: real("weight").default(0).notNull(),
+    reps: integer("reps").default(0).notNull(),
+    durationSec: integer("duration_sec").default(0).notNull(),
+    completedAt: timestamp("completed_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("set_log_session_idx").on(t.sessionId),
+    // Drives the "last session" pre-fill and the per-exercise strength trends.
+    index("set_log_exercise_completed_idx").on(t.exerciseId, t.completedAt),
+  ],
+);
+
+// --- Fuel (protein / calorie targets) --------------------------------------
+
+export const fuelEntry = pgTable(
+  "fuel_entry",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    proteinG: real("protein_g").default(0).notNull(),
+    calories: integer("calories").default(0).notNull(),
+    loggedAt: timestamp("logged_at").defaultNow().notNull(),
+  },
+  (t) => [index("fuel_entry_user_logged_idx").on(t.userId, t.loggedAt)],
+);
+
+export const nutritionTarget = pgTable("nutrition_target", {
+  // One row per user.
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  proteinG: integer("protein_g").default(180).notNull(),
+  calories: integer("calories").default(2600).notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+// --- Body metrics ----------------------------------------------------------
+
+export const bodyMetric = pgTable(
+  "body_metric",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<BodyMetricKind>().notNull(),
+    value: real("value").notNull(),
+    measuredAt: timestamp("measured_at").defaultNow().notNull(),
+  },
+  (t) => [index("body_metric_user_kind_idx").on(t.userId, t.kind, t.measuredAt)],
+);
+
+// --- Relations (for convenient nested queries) -----------------------------
+
+export const programRelations = relations(program, ({ many }) => ({
+  days: many(programDay),
+}));
+
+export const programDayRelations = relations(programDay, ({ one, many }) => ({
+  program: one(program, { fields: [programDay.programId], references: [program.id] }),
+  exercises: many(programExercise),
+}));
+
+export const programExerciseRelations = relations(programExercise, ({ one }) => ({
+  day: one(programDay, { fields: [programExercise.dayId], references: [programDay.id] }),
+  exercise: one(exercise, { fields: [programExercise.exerciseId], references: [exercise.id] }),
+}));
+
+export const workoutSessionRelations = relations(workoutSession, ({ one, many }) => ({
+  day: one(programDay, { fields: [workoutSession.dayId], references: [programDay.id] }),
+  sets: many(setLog),
+}));
+
+export const setLogRelations = relations(setLog, ({ one }) => ({
+  session: one(workoutSession, { fields: [setLog.sessionId], references: [workoutSession.id] }),
+  exercise: one(exercise, { fields: [setLog.exerciseId], references: [exercise.id] }),
+}));

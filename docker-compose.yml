@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: afya-postgres
+    environment:
+      POSTGRES_USER: afya
+      POSTGRES_PASSWORD: afya
+      POSTGRES_DB: afya
+    # Host port 5435 avoids clashing with mi7rab (5433) and other local Postgres.
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U afya -d afya"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: afya-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    # Host port 6380 avoids clashing with mi7rab (6379).
+    ports:
+      - "6380:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:

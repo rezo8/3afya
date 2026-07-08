@@ -1,0 +1,10 @@
+# generated — never format (avoids noisy diffs / regeneration conflicts)
+**/*.gen.ts
+apps/web/src/routeTree.gen.ts
+apps/api/drizzle/
+
+# build output, deps, lockfile
+**/dist/
+.turbo/
+node_modules/
+pnpm-lock.yaml

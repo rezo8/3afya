@@ -1,0 +1,320 @@
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Exercise, ExerciseKind, Program, ProgramDay, TodayResponse } from "@afya/shared";
+import { api } from "@/lib/api/client";
+
+const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
+
+const KIND_OPTIONS: { value: ExerciseKind; label: string }[] = [
+  { value: "weighted", label: "Weight × reps" },
+  { value: "reps", label: "Reps" },
+  { value: "time", label: "Time" },
+];
+
+export function ProgramScreen() {
+  const qc = useQueryClient();
+  const programsQ = useQuery({ queryKey: ["programs"], queryFn: () => api.get<Program[]>("/api/programs") });
+  const libraryQ = useQuery({ queryKey: ["exercises"], queryFn: () => api.get<Exercise[]>("/api/exercises") });
+  const todayQ = useQuery({ queryKey: ["today"], queryFn: () => api.get<TodayResponse>("/api/sessions/today") });
+
+  const program = programsQ.data?.[0] ?? null;
+  const [selDayId, setSelDayId] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
+  const [addEx, setAddEx] = useState("");
+  const [newExKind, setNewExKind] = useState<ExerciseKind>("weighted");
+
+  useEffect(() => {
+    if (program && (!selDayId || !program.days.some((d) => d.id === selDayId))) {
+      setSelDayId(program.days[0]?.id ?? null);
+    }
+  }, [program, selDayId]);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["programs"] });
+    qc.invalidateQueries({ queryKey: ["exercises"] });
+    qc.invalidateQueries({ queryKey: ["today"] });
+  };
+
+  const createProgram = useMutation({
+    mutationFn: (name: string) => api.post<Program>("/api/programs", { name }),
+    onSuccess: () => invalidate(),
+  });
+  const addDay = useMutation({
+    mutationFn: (name: string) => api.post<ProgramDay>(`/api/programs/${program!.id}/days`, { name }),
+    onSuccess: (day) => {
+      setSelDayId(day.id);
+      invalidate();
+    },
+  });
+  const renameDay = useMutation({
+    mutationFn: ({ dayId, name }: { dayId: string; name: string }) => api.patch(`/api/programs/days/${dayId}`, { name }),
+    onSuccess: () => invalidate(),
+  });
+  const deleteDay = useMutation({
+    mutationFn: (dayId: string) => api.delete(`/api/programs/days/${dayId}`),
+    onSuccess: () => invalidate(),
+  });
+  const reorderDays = useMutation({
+    mutationFn: (order: string[]) => api.post(`/api/programs/${program!.id}/days/reorder`, { order }),
+    onSuccess: () => invalidate(),
+  });
+  const addExercise = useMutation({
+    mutationFn: async ({ dayId, name, kind }: { dayId: string; name: string; kind: ExerciseKind }) => {
+      const trimmed = name.trim();
+      let ex = libraryQ.data?.find((e) => e.name.toLowerCase() === trimmed.toLowerCase());
+      if (!ex) ex = await api.post<Exercise>("/api/exercises", { name: trimmed, kind });
+      return api.post(`/api/programs/days/${dayId}/exercises`, { exerciseId: ex.id });
+    },
+    onSuccess: () => invalidate(),
+  });
+  const addExerciseById = useMutation({
+    mutationFn: ({ dayId, exerciseId }: { dayId: string; exerciseId: string }) =>
+      api.post(`/api/programs/days/${dayId}/exercises`, { exerciseId }),
+    onSuccess: () => invalidate(),
+  });
+  const updateEx = useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: { targetSets?: number; targetReps?: number; targetDurationSec?: number };
+    }) => api.patch(`/api/programs/day-exercises/${id}`, patch),
+    onSuccess: () => invalidate(),
+  });
+  const deleteEx = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/programs/day-exercises/${id}`),
+    onSuccess: () => invalidate(),
+  });
+  const reorderEx = useMutation({
+    mutationFn: ({ dayId, order }: { dayId: string; order: string[] }) =>
+      api.post(`/api/programs/days/${dayId}/exercises/reorder`, { order }),
+    onSuccess: () => invalidate(),
+  });
+
+  if (programsQ.isLoading) return <p className="center-note">Loading program…</p>;
+
+  if (!program) {
+    return (
+      <>
+        <div className="view-head">
+          <p className="eyebrow">Program</p>
+          <h1>New program</h1>
+        </div>
+        <section className="empty-state">
+          <h2>Name your program</h2>
+          <p>A program is a set of days you rotate through — Push, Pull, Legs, whatever you run.</p>
+          <div className="addex" style={{ width: "100%" }}>
+            <input
+              placeholder="e.g. PPL — Summer '26"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && newName.trim() && createProgram.mutate(newName.trim())}
+            />
+            <button onClick={() => newName.trim() && createProgram.mutate(newName.trim())}>Create</button>
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  const days = program.days;
+  const nextDayId = todayQ.data?.day?.id ?? null;
+  const selDay = days.find((d) => d.id === selDayId) ?? days[0] ?? null;
+  const selIdx = selDay ? days.findIndex((d) => d.id === selDay.id) : -1;
+
+  function moveDay(dir: -1 | 1) {
+    if (selIdx < 0) return;
+    const j = selIdx + dir;
+    if (j < 0 || j >= days.length) return;
+    const order = days.map((d) => d.id);
+    [order[selIdx], order[j]] = [order[j]!, order[selIdx]!];
+    reorderDays.mutate(order);
+  }
+  function moveEx(dayId: string, exOrder: string[], i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= exOrder.length) return;
+    const order = [...exOrder];
+    [order[i], order[j]] = [order[j]!, order[i]!];
+    reorderEx.mutate({ dayId, order });
+  }
+
+  const inDay = new Set(selDay?.exercises.map((e) => e.exerciseId));
+  const suggestions = (libraryQ.data ?? []).filter((e) => !inDay.has(e.id)).slice(0, 8);
+
+  return (
+    <>
+      <div className="view-head">
+        <p className="eyebrow">Program</p>
+        <h1>{program.name}</h1>
+      </div>
+
+      {days.length > 0 && (
+        <div className="rotation">
+          {days.map((d, i) => (
+            <div key={d.id} style={{ display: "contents" }}>
+              <div className={`rot-seg${d.id === nextDayId ? " next" : ""}`}>
+                <span className="rn">{i + 1}</span>
+                <span className="rnm">{d.name}</span>
+                {d.id === nextDayId && <span className="rot-tag">next</span>}
+              </div>
+              {i < days.length - 1 && <span className="rot-arrow">→</span>}
+            </div>
+          ))}
+          <span className="rot-arrow">⟳</span>
+        </div>
+      )}
+
+      <div className="day-chips">
+        {days.map((d, i) => (
+          <button key={d.id} className={`day-chip${d.id === selDay?.id ? " sel" : ""}`} onClick={() => setSelDayId(d.id)}>
+            <span className="badge">{String.fromCharCode(65 + i)}</span>
+            {d.name}
+          </button>
+        ))}
+        <button className="day-chip add" onClick={() => addDay.mutate("New day")}>
+          + Day
+        </button>
+      </div>
+
+      {selDay && (
+        <div className="day-editor">
+          <div className="de-head">
+            <input
+              key={selDay.id}
+              defaultValue={selDay.name}
+              aria-label="Day name"
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v && v !== selDay.name) renameDay.mutate({ dayId: selDay.id, name: v });
+              }}
+            />
+            <button className="de-del" onClick={() => deleteDay.mutate(selDay.id)}>
+              Delete day
+            </button>
+          </div>
+
+          <div className="de-rot">
+            <p className="eyebrow" style={{ marginBottom: 8 }}>
+              Rotation position
+            </p>
+            <div className="rot-move">
+              <button onClick={() => moveDay(-1)} disabled={selIdx <= 0}>
+                ‹ Earlier
+              </button>
+              <span className="rot-pos">
+                {selIdx + 1} of {days.length}
+              </span>
+              <button onClick={() => moveDay(1)} disabled={selIdx >= days.length - 1}>
+                Later ›
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <p className="eyebrow" style={{ marginBottom: 8 }}>
+              Exercises
+            </p>
+            <ul className="pex-list">
+              {selDay.exercises.map((ex, i) => {
+                const order = selDay.exercises.map((x) => x.id);
+                return (
+                  <li key={ex.id} className="pex">
+                    <div className="pex-ord">
+                      <button className="ord" disabled={i === 0} onClick={() => moveEx(selDay.id, order, i, -1)}>
+                        ↑
+                      </button>
+                      <button className="ord" disabled={i === selDay.exercises.length - 1} onClick={() => moveEx(selDay.id, order, i, 1)}>
+                        ↓
+                      </button>
+                    </div>
+                    <div className="pex-body">
+                      <div className="pex-top">
+                        <span className="pex-name">
+                          {ex.name}
+                          {ex.kind !== "weighted" && <span className="kind-tag">{ex.kind === "time" ? "time" : "reps"}</span>}
+                        </span>
+                        <button className="pex-del" aria-label="Remove" onClick={() => deleteEx.mutate(ex.id)}>
+                          ×
+                        </button>
+                      </div>
+                      <div className="pex-ctl">
+                        <div className="ctl">
+                          <span className="ctl-lbl">Sets</span>
+                          <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetSets: Math.max(1, ex.targetSets - 1) } })}>−</button>
+                          <b>{ex.targetSets}</b>
+                          <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetSets: ex.targetSets + 1 } })}>+</button>
+                        </div>
+                        {ex.kind === "time" ? (
+                          <div className="ctl">
+                            <span className="ctl-lbl">Time</span>
+                            <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetDurationSec: Math.max(5, (ex.targetDurationSec ?? 30) - 5) } })}>−</button>
+                            <b>{fmtDur(ex.targetDurationSec ?? 30)}</b>
+                            <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetDurationSec: (ex.targetDurationSec ?? 30) + 5 } })}>+</button>
+                          </div>
+                        ) : (
+                          <div className="ctl">
+                            <span className="ctl-lbl">Reps</span>
+                            <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetReps: Math.max(1, ex.targetReps - 1) } })}>−</button>
+                            <b>{ex.targetReps}</b>
+                            <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetReps: ex.targetReps + 1 } })}>+</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <div>
+            <p className="eyebrow" style={{ marginBottom: 8 }}>
+              Add exercise
+            </p>
+            <div className="lift-select" style={{ margin: "0 0 8px" }}>
+              {KIND_OPTIONS.map((k) => (
+                <button key={k.value} className={`ls${newExKind === k.value ? " on" : ""}`} onClick={() => setNewExKind(k.value)}>
+                  {k.label}
+                </button>
+              ))}
+            </div>
+            <div className="addex">
+              <input
+                placeholder="Name a new exercise…"
+                value={addEx}
+                onChange={(e) => setAddEx(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && addEx.trim()) {
+                    addExercise.mutate({ dayId: selDay.id, name: addEx, kind: newExKind });
+                    setAddEx("");
+                  }
+                }}
+              />
+              <button
+                onClick={() => {
+                  if (addEx.trim()) {
+                    addExercise.mutate({ dayId: selDay.id, name: addEx, kind: newExKind });
+                    setAddEx("");
+                  }
+                }}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
+          {suggestions.length > 0 && (
+            <div className="ex-suggest">
+              {suggestions.map((e) => (
+                <button key={e.id} onClick={() => addExerciseById.mutate({ dayId: selDay.id, exerciseId: e.id })}>
+                  + {e.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}

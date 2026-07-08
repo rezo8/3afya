@@ -1,0 +1,7 @@
+{
+  "extends": "@afya/tsconfig/node.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src", "drizzle.config.ts"]
+}
