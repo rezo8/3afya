@@ -54,8 +54,13 @@ export interface ProgramExercise {
   targetSets: number;
   /** Target reps for weighted/reps kinds. */
   targetReps: number;
+  targetRepsMax: number | null;
   /** Target hold in seconds for the time kind (null otherwise). */
   targetDurationSec: number | null;
+  restSec: number | null;
+  note: string | null;
+  supersetGroup: string | null;
+  section: string | null;
 }
 
 export interface ProgramDay {
@@ -63,6 +68,8 @@ export interface ProgramDay {
   name: string;
   /** Position in the rotation (0-based). "Next up" = the day after the last session's. */
   position: number;
+  warmup: string | null;
+  cooldown: string | null;
   exercises: ProgramExercise[];
 }
 
@@ -79,16 +86,31 @@ export interface CreateProgramBody {
 export interface CreateDayBody {
   name: string;
 }
+export interface UpdateDayBody {
+  name?: string;
+  warmup?: string | null;
+  cooldown?: string | null;
+}
 export interface AddDayExerciseBody {
   exerciseId: string;
   targetSets?: number;
   targetReps?: number;
+  targetRepsMax?: number | null;
   targetDurationSec?: number | null;
+  restSec?: number | null;
+  note?: string | null;
+  supersetGroup?: string | null;
+  section?: string | null;
 }
 export interface UpdateDayExerciseBody {
   targetSets?: number;
   targetReps?: number;
+  targetRepsMax?: number | null;
   targetDurationSec?: number | null;
+  restSec?: number | null;
+  note?: string | null;
+  supersetGroup?: string | null;
+  section?: string | null;
   position?: number;
 }
 /** New order of day ids, or of exercise ids within a day. */
@@ -133,6 +155,11 @@ export interface LogSetBody {
   reps?: number;
   durationSec?: number;
 }
+export interface UpdateSetBody {
+  weight?: number;
+  reps?: number;
+  durationSec?: number;
+}
 
 /** One exercise on today's session, with last-session numbers pre-filled. */
 export interface TodayExercise {
@@ -141,7 +168,12 @@ export interface TodayExercise {
   kind: ExerciseKind;
   targetSets: number;
   targetReps: number;
+  targetRepsMax: number | null;
   targetDurationSec: number | null;
+  restSec: number | null;
+  note: string | null;
+  supersetGroup: string | null;
+  section: string | null;
   /** From the most recent logged set of this exercise, or null if never done. */
   lastWeight: number | null;
   lastReps: number | null;

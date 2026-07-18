@@ -71,6 +71,8 @@ export const programDay = pgTable(
     name: text("name").notNull(),
     // Rotation order (0-based). "Next up" = the day after the last session's day.
     position: integer("position").default(0).notNull(),
+    warmup: text("warmup"),
+    cooldown: text("cooldown"),
   },
   (t) => [index("program_day_program_idx").on(t.programId)],
 );
@@ -88,8 +90,13 @@ export const programExercise = pgTable(
     position: integer("position").default(0).notNull(),
     targetSets: integer("target_sets").default(3).notNull(),
     targetReps: integer("target_reps").default(8).notNull(),
+    targetRepsMax: integer("target_reps_max"),
     // Target hold in seconds for the "time" kind; null for weighted/reps.
     targetDurationSec: integer("target_duration_sec"),
+    restSec: integer("rest_sec"),
+    note: text("note"),
+    supersetGroup: text("superset_group"),
+    section: text("section"),
   },
   (t) => [index("program_exercise_day_idx").on(t.dayId)],
 );

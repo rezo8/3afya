@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Exercise, ExerciseKind, Program, ProgramDay, TodayResponse } from "@afya/shared";
+import type { Exercise, ExerciseKind, Program, ProgramDay, TodayResponse, UpdateDayBody, UpdateDayExerciseBody } from "@afya/shared";
 import { api } from "@/lib/api/client";
 
 const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
@@ -72,14 +72,12 @@ export function ProgramScreen() {
       api.post(`/api/programs/days/${dayId}/exercises`, { exerciseId }),
     onSuccess: () => invalidate(),
   });
+  const updateDay = useMutation({
+    mutationFn: ({ dayId, patch }: { dayId: string; patch: UpdateDayBody }) => api.patch(`/api/programs/days/${dayId}`, patch),
+    onSuccess: () => invalidate(),
+  });
   const updateEx = useMutation({
-    mutationFn: ({
-      id,
-      patch,
-    }: {
-      id: string;
-      patch: { targetSets?: number; targetReps?: number; targetDurationSec?: number };
-    }) => api.patch(`/api/programs/day-exercises/${id}`, patch),
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateDayExerciseBody }) => api.patch(`/api/programs/day-exercises/${id}`, patch),
     onSuccess: () => invalidate(),
   });
   const deleteEx = useMutation({
@@ -211,20 +209,49 @@ export function ProgramScreen() {
             </div>
           </div>
 
+          <div className="de-block">
+            <p className="eyebrow">Warm-up</p>
+            <textarea
+              key={`${selDay.id}:wu`}
+              defaultValue={selDay.warmup ?? ""}
+              placeholder="Warm-up — mobility, light prep sets…"
+              onBlur={(e) => {
+                const v = e.target.value.trim() || null;
+                if (v !== (selDay.warmup ?? null)) updateDay.mutate({ dayId: selDay.id, patch: { warmup: v } });
+              }}
+            />
+          </div>
+
           <div>
             <p className="eyebrow" style={{ marginBottom: 8 }}>
               Exercises
             </p>
             <ul className="pex-list">
-              {selDay.exercises.map((ex, i) => {
-                const order = selDay.exercises.map((x) => x.id);
-                return (
-                  <li key={ex.id} className="pex">
+              {selDay.exercises.flatMap((ex, i, list) => {
+                const order = list.map((x) => x.id);
+                const prev = list[i - 1];
+                const next = list[i + 1];
+                const g = ex.supersetGroup;
+                const inSS = !!g && (prev?.supersetGroup === g || next?.supersetGroup === g);
+                const ssStart = inSS && prev?.supersetGroup !== g;
+                const showSection = i === 0 || prev?.section !== ex.section;
+                return [
+                  showSection ? (
+                    <li key={`sec-${ex.id}`} className="pex-section">
+                      {ex.section || "Exercises"}
+                    </li>
+                  ) : null,
+                  ssStart ? (
+                    <li key={`ss-${ex.id}`} className="ss-head">
+                      Superset {g}
+                    </li>
+                  ) : null,
+                  <li key={ex.id} className={`pex${inSS ? " in-ss" : ""}`}>
                     <div className="pex-ord">
                       <button className="ord" disabled={i === 0} onClick={() => moveEx(selDay.id, order, i, -1)}>
                         ↑
                       </button>
-                      <button className="ord" disabled={i === selDay.exercises.length - 1} onClick={() => moveEx(selDay.id, order, i, 1)}>
+                      <button className="ord" disabled={i === list.length - 1} onClick={() => moveEx(selDay.id, order, i, 1)}>
                         ↓
                       </button>
                     </div>
@@ -258,12 +285,76 @@ export function ProgramScreen() {
                             <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetReps: Math.max(1, ex.targetReps - 1) } })}>−</button>
                             <b>{ex.targetReps}</b>
                             <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetReps: ex.targetReps + 1 } })}>+</button>
+                            {ex.targetRepsMax == null ? (
+                              <button className="ctl-add" onClick={() => updateEx.mutate({ id: ex.id, patch: { targetRepsMax: ex.targetReps + 2 } })}>
+                                + range
+                              </button>
+                            ) : (
+                              <>
+                                <span className="ctl-to">–</span>
+                                <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetRepsMax: Math.max(ex.targetReps, ex.targetRepsMax! - 1) } })}>−</button>
+                                <b>{ex.targetRepsMax}</b>
+                                <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetRepsMax: ex.targetRepsMax! + 1 } })}>+</button>
+                                <button className="ctl-clear" aria-label="Clear range" onClick={() => updateEx.mutate({ id: ex.id, patch: { targetRepsMax: null } })}>
+                                  ✕
+                                </button>
+                              </>
+                            )}
                           </div>
                         )}
+                        <div className="ctl">
+                          <span className="ctl-lbl">Rest</span>
+                          {ex.restSec == null ? (
+                            <button className="ctl-add" onClick={() => updateEx.mutate({ id: ex.id, patch: { restSec: 60 } })}>
+                              + rest
+                            </button>
+                          ) : (
+                            <>
+                              <button onClick={() => updateEx.mutate({ id: ex.id, patch: { restSec: Math.max(0, ex.restSec! - 15) } })}>−</button>
+                              <b>{ex.restSec}s</b>
+                              <button onClick={() => updateEx.mutate({ id: ex.id, patch: { restSec: ex.restSec! + 15 } })}>+</button>
+                              <button className="ctl-clear" aria-label="Clear rest" onClick={() => updateEx.mutate({ id: ex.id, patch: { restSec: null } })}>
+                                ✕
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <input
+                        className="pex-note"
+                        key={`${ex.id}:note`}
+                        defaultValue={ex.note ?? ""}
+                        placeholder="Note / coaching cue…"
+                        onBlur={(e) => {
+                          const v = e.target.value.trim();
+                          if (v !== (ex.note ?? "")) updateEx.mutate({ id: ex.id, patch: { note: v || null } });
+                        }}
+                      />
+                      <div className="pex-meta">
+                        <input
+                          className="pex-tag-in"
+                          key={`${ex.id}:sec`}
+                          defaultValue={ex.section ?? ""}
+                          placeholder="Section"
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v !== (ex.section ?? "")) updateEx.mutate({ id: ex.id, patch: { section: v || null } });
+                          }}
+                        />
+                        <input
+                          className="pex-tag-in"
+                          key={`${ex.id}:ss`}
+                          defaultValue={ex.supersetGroup ?? ""}
+                          placeholder="Superset"
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v !== (ex.supersetGroup ?? "")) updateEx.mutate({ id: ex.id, patch: { supersetGroup: v || null } });
+                          }}
+                        />
                       </div>
                     </div>
-                  </li>
-                );
+                  </li>,
+                ];
               })}
             </ul>
           </div>
@@ -313,6 +404,19 @@ export function ProgramScreen() {
               ))}
             </div>
           )}
+
+          <div className="de-block">
+            <p className="eyebrow">Cool-down</p>
+            <textarea
+              key={`${selDay.id}:cd`}
+              defaultValue={selDay.cooldown ?? ""}
+              placeholder="Cool-down — stretches, breathing…"
+              onBlur={(e) => {
+                const v = e.target.value.trim() || null;
+                if (v !== (selDay.cooldown ?? null)) updateDay.mutate({ dayId: selDay.id, patch: { cooldown: v } });
+              }}
+            />
+          </div>
         </div>
       )}
     </>

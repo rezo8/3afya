@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq, ne } from "drizzle-orm";
-import type { LogSetBody, SetLog, StartSessionBody, TodayResponse, WorkoutSession } from "@afya/shared";
+import type { LogSetBody, SetLog, StartSessionBody, TodayResponse, UpdateSetBody, WorkoutSession } from "@afya/shared";
 import { db } from "../db";
 import { exercise, program, programDay, programExercise, setLog, workoutSession } from "../db/schema/tracker";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
@@ -77,39 +77,53 @@ async function lastSetFor(userId: string, exerciseId: string, excludeSessionId?:
   return row?.set ?? null;
 }
 
-/** Today screen payload: next-up day + per-exercise history + any live session. */
-app.get("/today", async (c) => {
-  const userId = c.get("userId");
-  const state = await rotationState(userId);
-  if (!state.currentDay) {
-    return c.json({ day: null, session: null, exercises: [] } satisfies TodayResponse);
-  }
+async function ownedDay(userId: string, dayId: string) {
+  const [row] = await db
+    .select({ day: programDay })
+    .from(programDay)
+    .innerJoin(program, eq(programDay.programId, program.id))
+    .where(and(eq(programDay.id, dayId), eq(program.userId, userId)))
+    .limit(1);
+  return row?.day ?? null;
+}
 
+async function todaySessionForDay(userId: string, dayId: string) {
+  const [row] = await db
+    .select()
+    .from(workoutSession)
+    .where(and(eq(workoutSession.userId, userId), eq(workoutSession.dayId, dayId)))
+    .orderBy(desc(workoutSession.performedAt))
+    .limit(1);
+  return row && isToday(row.performedAt) ? row : null;
+}
+
+async function buildDayExercises(userId: string, dayId: string, session: typeof workoutSession.$inferSelect | null) {
   const dayExercises = await db
     .select({ pe: programExercise, ex: exercise })
     .from(programExercise)
     .innerJoin(exercise, eq(programExercise.exerciseId, exercise.id))
-    .where(eq(programExercise.dayId, state.currentDay.id))
+    .where(eq(programExercise.dayId, dayId))
     .orderBy(asc(programExercise.position));
 
-  const liveSets = state.session
-    ? await db
-        .select()
-        .from(setLog)
-        .where(eq(setLog.sessionId, state.session.id))
-        .orderBy(asc(setLog.setNumber))
+  const liveSets = session
+    ? await db.select().from(setLog).where(eq(setLog.sessionId, session.id)).orderBy(asc(setLog.setNumber))
     : [];
 
-  const exercises = await Promise.all(
+  return Promise.all(
     dayExercises.map(async ({ pe, ex }) => {
-      const last = await lastSetFor(userId, ex.id, state.session?.id);
+      const last = await lastSetFor(userId, ex.id, session?.id);
       return {
         exerciseId: ex.id,
         name: ex.name,
         kind: ex.kind,
         targetSets: pe.targetSets,
         targetReps: pe.targetReps,
+        targetRepsMax: pe.targetRepsMax,
         targetDurationSec: pe.targetDurationSec,
+        restSec: pe.restSec,
+        note: pe.note,
+        supersetGroup: pe.supersetGroup,
+        section: pe.section,
         lastWeight: last?.weight ?? null,
         lastReps: last?.reps ?? null,
         lastDurationSec: last?.durationSec ?? null,
@@ -117,25 +131,58 @@ app.get("/today", async (c) => {
       };
     }),
   );
+}
 
+/** Next-up rotation day payload: per-exercise history + any live session. */
+app.get("/today", async (c) => {
+  const userId = c.get("userId");
+  const state = await rotationState(userId);
+  if (!state.currentDay) {
+    return c.json({ day: null, session: null, exercises: [] } satisfies TodayResponse);
+  }
+  const exercises = await buildDayExercises(userId, state.currentDay.id, state.session);
   return c.json({
     day: { id: state.currentDay.id, name: state.currentDay.name, position: state.currentDay.position },
-    session: state.session
-      ? { id: state.session.id, performedAt: state.session.performedAt.toISOString() }
-      : null,
+    session: state.session ? { id: state.session.id, performedAt: state.session.performedAt.toISOString() } : null,
     exercises,
   } satisfies TodayResponse);
 });
 
-/** Find-or-create today's session (for the next-up day, or an explicit override). */
+/** A specific chosen day's payload — drives the pick-a-day session screen. */
+app.get("/day/:dayId", async (c) => {
+  const userId = c.get("userId");
+  const day = await ownedDay(userId, c.req.param("dayId"));
+  if (!day) return c.json({ error: "not_found" }, 404);
+  const session = await todaySessionForDay(userId, day.id);
+  const exercises = await buildDayExercises(userId, day.id, session);
+  return c.json({
+    day: { id: day.id, name: day.name, position: day.position },
+    session: session ? { id: session.id, performedAt: session.performedAt.toISOString() } : null,
+    exercises,
+  } satisfies TodayResponse);
+});
+
+/** Find-or-create today's session (for an explicit day, or the next-up day). */
 app.post("/", async (c) => {
   const userId = c.get("userId");
   const body = await c.req.json<StartSessionBody>().catch(() => null);
+
+  if (body?.dayId) {
+    const day = await ownedDay(userId, body.dayId);
+    if (!day) return c.json({ error: "bad_request", message: "Unknown day." }, 400);
+    const existing = await todaySessionForDay(userId, day.id);
+    if (existing) {
+      return c.json({ id: existing.id, dayId: existing.dayId, performedAt: existing.performedAt.toISOString() });
+    }
+    const [row] = await db.insert(workoutSession).values({ userId, dayId: day.id }).returning();
+    return c.json({ id: row!.id, dayId: row!.dayId, performedAt: row!.performedAt.toISOString() }, 201);
+  }
+
   const state = await rotationState(userId);
   if (state.session) {
     return c.json({ id: state.session.id, dayId: state.session.dayId, performedAt: state.session.performedAt.toISOString() });
   }
-  const dayId = body?.dayId ?? state.currentDay?.id ?? null;
+  const dayId = state.currentDay?.id ?? null;
   const [row] = await db.insert(workoutSession).values({ userId, dayId }).returning();
   return c.json({ id: row!.id, dayId: row!.dayId, performedAt: row!.performedAt.toISOString() }, 201);
 });
@@ -174,6 +221,64 @@ app.post("/:id/sets", async (c) => {
     })
     .returning();
   return c.json(toSet(row!), 201);
+});
+
+/** Edit a logged set (e.g. fix a wrong weight) in a session the user owns. */
+app.patch("/:id/sets/:setId", async (c) => {
+  const userId = c.get("userId");
+  const [session] = await db
+    .select()
+    .from(workoutSession)
+    .where(and(eq(workoutSession.id, c.req.param("id")), eq(workoutSession.userId, userId)))
+    .limit(1);
+  if (!session) return c.json({ error: "not_found" }, 404);
+
+  const body = await c.req.json<UpdateSetBody>().catch(() => null);
+  if (!body) return c.json({ error: "bad_request" }, 400);
+  const patch: Partial<typeof setLog.$inferInsert> = {};
+  if (typeof body.weight === "number") patch.weight = Math.max(0, body.weight);
+  if (typeof body.reps === "number") patch.reps = Math.max(0, Math.round(body.reps));
+  if (typeof body.durationSec === "number") patch.durationSec = Math.max(0, Math.round(body.durationSec));
+  if (!Object.keys(patch).length) return c.json({ error: "bad_request" }, 400);
+
+  const [row] = await db
+    .update(setLog)
+    .set(patch)
+    .where(and(eq(setLog.id, c.req.param("setId")), eq(setLog.sessionId, session.id)))
+    .returning();
+  if (!row) return c.json({ error: "not_found" }, 404);
+  return c.json(toSet(row));
+});
+
+/** Remove a logged set, then re-sequence that exercise's set numbers to stay 1..n. */
+app.delete("/:id/sets/:setId", async (c) => {
+  const userId = c.get("userId");
+  const [session] = await db
+    .select()
+    .from(workoutSession)
+    .where(and(eq(workoutSession.id, c.req.param("id")), eq(workoutSession.userId, userId)))
+    .limit(1);
+  if (!session) return c.json({ error: "not_found" }, 404);
+
+  const [deleted] = await db
+    .delete(setLog)
+    .where(and(eq(setLog.id, c.req.param("setId")), eq(setLog.sessionId, session.id)))
+    .returning();
+  if (!deleted) return c.json({ error: "not_found" }, 404);
+
+  const remaining = await db
+    .select()
+    .from(setLog)
+    .where(and(eq(setLog.sessionId, session.id), eq(setLog.exerciseId, deleted.exerciseId)))
+    .orderBy(asc(setLog.setNumber), asc(setLog.completedAt));
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < remaining.length; i++) {
+      if (remaining[i]!.setNumber !== i + 1) {
+        await tx.update(setLog).set({ setNumber: i + 1 }).where(eq(setLog.id, remaining[i]!.id));
+      }
+    }
+  });
+  return c.json({ ok: true });
 });
 
 /** Recent sessions with their sets — powers History. */

@@ -8,6 +8,7 @@ import type {
   Program,
   ProgramDay,
   ReorderBody,
+  UpdateDayBody,
   UpdateDayExerciseBody,
 } from "@afya/shared";
 import { db } from "../db";
@@ -46,13 +47,20 @@ type FullDay = {
   id: string;
   name: string;
   position: number;
+  warmup: string | null;
+  cooldown: string | null;
   exercises: {
     id: string;
     exerciseId: string;
     position: number;
     targetSets: number;
     targetReps: number;
+    targetRepsMax: number | null;
     targetDurationSec: number | null;
+    restSec: number | null;
+    note: string | null;
+    supersetGroup: string | null;
+    section: string | null;
     exercise: { name: string; kind: ExerciseKind };
   }[];
 };
@@ -61,6 +69,8 @@ const toDay = (d: FullDay): ProgramDay => ({
   id: d.id,
   name: d.name,
   position: d.position,
+  warmup: d.warmup,
+  cooldown: d.cooldown,
   exercises: d.exercises.map((e) => ({
     id: e.id,
     exerciseId: e.exerciseId,
@@ -69,7 +79,12 @@ const toDay = (d: FullDay): ProgramDay => ({
     position: e.position,
     targetSets: e.targetSets,
     targetReps: e.targetReps,
+    targetRepsMax: e.targetRepsMax,
     targetDurationSec: e.targetDurationSec,
+    restSec: e.restSec,
+    note: e.note,
+    supersetGroup: e.supersetGroup,
+    section: e.section,
   })),
 });
 
@@ -139,16 +154,26 @@ app.post("/:id/days", async (c) => {
     .insert(programDay)
     .values({ programId, name, position: existing.length })
     .returning();
-  return c.json({ id: row!.id, name: row!.name, position: row!.position, exercises: [] } satisfies ProgramDay, 201);
+  return c.json(
+    { id: row!.id, name: row!.name, position: row!.position, warmup: row!.warmup, cooldown: row!.cooldown, exercises: [] } satisfies ProgramDay,
+    201,
+  );
 });
 
 app.patch("/days/:dayId", async (c) => {
   const day = await ownedDay(c.get("userId"), c.req.param("dayId"));
   if (!day) return c.json({ error: "not_found" }, 404);
-  const body = await c.req.json<{ name?: string }>().catch(() => null);
-  const name = body?.name?.trim();
-  if (!name) return c.json({ error: "bad_request", message: "A day name is required." }, 400);
-  await db.update(programDay).set({ name }).where(eq(programDay.id, day.id));
+  const body = await c.req.json<UpdateDayBody>().catch(() => null);
+  if (!body) return c.json({ error: "bad_request" }, 400);
+  const patch: Partial<typeof programDay.$inferInsert> = {};
+  if (body.name !== undefined) {
+    const name = body.name.trim();
+    if (!name) return c.json({ error: "bad_request", message: "A day name is required." }, 400);
+    patch.name = name;
+  }
+  if (body.warmup !== undefined) patch.warmup = body.warmup === null ? null : body.warmup.trim() || null;
+  if (body.cooldown !== undefined) patch.cooldown = body.cooldown === null ? null : body.cooldown.trim() || null;
+  if (Object.keys(patch).length) await db.update(programDay).set(patch).where(eq(programDay.id, day.id));
   return c.json({ ok: true });
 });
 
@@ -208,7 +233,12 @@ app.post("/days/:dayId/exercises", async (c) => {
       position: existing.length,
       targetSets: body.targetSets ?? 3,
       targetReps: body.targetReps ?? (ex.kind === "time" ? 0 : 8),
+      targetRepsMax: body.targetRepsMax ?? null,
       targetDurationSec,
+      restSec: body.restSec ?? null,
+      note: body.note?.trim() || null,
+      supersetGroup: body.supersetGroup?.trim() || null,
+      section: body.section?.trim() || null,
     })
     .returning();
   return c.json(
@@ -220,7 +250,12 @@ app.post("/days/:dayId/exercises", async (c) => {
       position: row!.position,
       targetSets: row!.targetSets,
       targetReps: row!.targetReps,
+      targetRepsMax: row!.targetRepsMax,
       targetDurationSec: row!.targetDurationSec,
+      restSec: row!.restSec,
+      note: row!.note,
+      supersetGroup: row!.supersetGroup,
+      section: row!.section,
     },
     201,
   );
@@ -234,8 +269,15 @@ app.patch("/day-exercises/:id", async (c) => {
   const patch: Partial<typeof programExercise.$inferInsert> = {};
   if (typeof body.targetSets === "number") patch.targetSets = Math.max(1, Math.round(body.targetSets));
   if (typeof body.targetReps === "number") patch.targetReps = Math.max(1, Math.round(body.targetReps));
+  if (body.targetRepsMax !== undefined)
+    patch.targetRepsMax = body.targetRepsMax === null ? null : Math.max(1, Math.round(body.targetRepsMax));
   if (body.targetDurationSec !== undefined)
     patch.targetDurationSec = body.targetDurationSec === null ? null : Math.max(1, Math.round(body.targetDurationSec));
+  if (body.restSec !== undefined) patch.restSec = body.restSec === null ? null : Math.max(0, Math.round(body.restSec));
+  if (body.note !== undefined) patch.note = body.note === null ? null : body.note.trim() || null;
+  if (body.supersetGroup !== undefined)
+    patch.supersetGroup = body.supersetGroup === null ? null : body.supersetGroup.trim() || null;
+  if (body.section !== undefined) patch.section = body.section === null ? null : body.section.trim() || null;
   if (typeof body.position === "number") patch.position = Math.max(0, Math.round(body.position));
   if (Object.keys(patch).length) await db.update(programExercise).set(patch).where(eq(programExercise.id, pe.id));
   return c.json({ ok: true });

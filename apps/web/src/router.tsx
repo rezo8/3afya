@@ -3,7 +3,8 @@ import { authClient } from "@/lib/auth/auth-client";
 import { AppLayout } from "@/app/AppLayout";
 import { SignInScreen } from "@/screens/auth/SignInScreen";
 import { SignUpScreen } from "@/screens/auth/SignUpScreen";
-import { TodayScreen } from "@/screens/today/TodayScreen";
+import { StartScreen } from "@/screens/start/StartScreen";
+import { SessionScreen } from "@/screens/session/SessionScreen";
 import { ProgramScreen } from "@/screens/program/ProgramScreen";
 import { TrendsScreen } from "@/screens/trends/TrendsScreen";
 import { HistoryScreen } from "@/screens/history/HistoryScreen";
@@ -53,7 +54,8 @@ const appRoute = createRoute({
   beforeLoad: requireUser,
   component: AppLayout,
 });
-const todayRoute = createRoute({ getParentRoute: () => appRoute, path: "/", component: TodayScreen });
+const startRoute = createRoute({ getParentRoute: () => appRoute, path: "/", component: StartScreen });
+const sessionRoute = createRoute({ getParentRoute: () => appRoute, path: "/session/$dayId", component: SessionScreen });
 const programRoute = createRoute({ getParentRoute: () => appRoute, path: "/program", component: ProgramScreen });
 const trendsRoute = createRoute({ getParentRoute: () => appRoute, path: "/trends", component: TrendsScreen });
 const historyRoute = createRoute({ getParentRoute: () => appRoute, path: "/history", component: HistoryScreen });
@@ -61,7 +63,7 @@ const historyRoute = createRoute({ getParentRoute: () => appRoute, path: "/histo
 const routeTree = rootRoute.addChildren([
   signInRoute,
   signUpRoute,
-  appRoute.addChildren([todayRoute, programRoute, trendsRoute, historyRoute]),
+  appRoute.addChildren([startRoute, sessionRoute, programRoute, trendsRoute, historyRoute]),
 ]);
 
 export const router = createRouter({ routeTree, defaultPreload: "intent", scrollRestoration: true });
