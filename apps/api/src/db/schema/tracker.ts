@@ -11,7 +11,6 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { BodyMetricKind, ExerciseKind } from "@afya/shared";
-import { user } from "./auth";
 
 /**
  * Tracker schema. Everything is user-scoped via a `user_id` FK to Better Auth's
@@ -31,9 +30,7 @@ export const exercise = pgTable(
   "exercise",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     name: text("name").notNull(),
     kind: text("kind").$type<ExerciseKind>().default("weighted").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -47,9 +44,7 @@ export const program = pgTable(
   "program",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     name: text("name").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -107,9 +102,7 @@ export const workoutSession = pgTable(
   "workout_session",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     // Nullable: a freeform session isn't tied to a program day, and we keep the
     // session if the day is later deleted.
     dayId: uuid("day_id").references(() => programDay.id, { onDelete: "set null" }),
@@ -150,9 +143,7 @@ export const fuelEntry = pgTable(
   "fuel_entry",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     label: text("label").notNull(),
     proteinG: real("protein_g").default(0).notNull(),
     calories: integer("calories").default(0).notNull(),
@@ -163,9 +154,7 @@ export const fuelEntry = pgTable(
 
 export const nutritionTarget = pgTable("nutrition_target", {
   // One row per user.
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => user.id, { onDelete: "cascade" }),
+  userId: text("user_id").primaryKey(),
   proteinG: integer("protein_g").default(180).notNull(),
   calories: integer("calories").default(2600).notNull(),
   updatedAt: timestamp("updated_at")
@@ -180,9 +169,7 @@ export const bodyMetric = pgTable(
   "body_metric",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
     kind: text("kind").$type<BodyMetricKind>().notNull(),
     value: real("value").notNull(),
     measuredAt: timestamp("measured_at").defaultNow().notNull(),

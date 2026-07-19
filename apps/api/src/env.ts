@@ -10,6 +10,7 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
 
   DATABASE_URL: z.string().min(1),
+  AUTH_DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
 
   BETTER_AUTH_SECRET: z.string().min(32, "must be at least 32 characters"),

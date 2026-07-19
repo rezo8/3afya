@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db } from "./db";
+import { authDb } from "./db";
 import { redis } from "./redis/client";
 import { env } from "./env";
 
@@ -14,7 +14,7 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
 
-  database: drizzleAdapter(db, { provider: "pg" }),
+  database: drizzleAdapter(authDb, { provider: "pg" }),
 
   emailAndPassword: {
     enabled: true,
@@ -60,7 +60,7 @@ export const auth = betterAuth({
 
   advanced: {
     useSecureCookies: env.NODE_ENV === "production",
-    cookiePrefix: "afya",
+    cookiePrefix: "mihrab",
     defaultCookieAttributes: {
       httpOnly: true,
       sameSite: "lax",

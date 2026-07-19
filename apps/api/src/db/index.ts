@@ -12,3 +12,9 @@ export const db = drizzle(pool, {
 });
 
 export type Db = typeof db;
+
+export const authPool = new Pool({ connectionString: env.AUTH_DATABASE_URL });
+
+export const authDb = drizzle(authPool, {
+  schema: { ...authSchema },
+});
