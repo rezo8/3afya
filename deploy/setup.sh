@@ -17,7 +17,7 @@ echo "==> Creating the afya domain database + user on $SQL_INSTANCE ..."
 gcloud sql databases create "$AFYA_DB" --instance="$SQL_INSTANCE" --project="$PROJECT" \
   || echo "  (database already exists — continuing)"
 
-AFYA_DB_PASS="$(openssl rand -base64 24)"
+AFYA_DB_PASS="$(openssl rand -hex 24)"
 gcloud sql users create "$AFYA_DB_USER" --instance="$SQL_INSTANCE" --password="$AFYA_DB_PASS" --project="$PROJECT" \
   || echo "  (user already exists — set AFYA_DB_PASS to its real password before continuing)"
 
