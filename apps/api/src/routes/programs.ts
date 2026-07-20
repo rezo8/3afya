@@ -10,6 +10,7 @@ import type {
   ReorderBody,
   UpdateDayBody,
   UpdateDayExerciseBody,
+  UpdateProgramBody,
 } from "@afya/shared";
 import { db } from "../db";
 import { exercise, program, programDay, programExercise } from "../db/schema/tracker";
@@ -125,6 +126,19 @@ app.post("/", async (c) => {
     .values({ userId: c.get("userId"), name })
     .returning();
   return c.json({ id: row!.id, name: row!.name, isActive: row!.isActive, days: [] } satisfies Program, 201);
+});
+
+app.patch("/:id", async (c) => {
+  const body = await c.req.json<UpdateProgramBody>().catch(() => null);
+  const name = body?.name?.trim();
+  if (!name) return c.json({ error: "bad_request", message: "A program name is required." }, 400);
+  const [row] = await db
+    .update(program)
+    .set({ name })
+    .where(and(eq(program.id, c.req.param("id")), eq(program.userId, c.get("userId"))))
+    .returning();
+  if (!row) return c.json({ error: "not_found" }, 404);
+  return c.json({ id: row.id, name: row.name, isActive: row.isActive });
 });
 
 app.delete("/:id", async (c) => {

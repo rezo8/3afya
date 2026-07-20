@@ -2072,6 +2072,33 @@ svg.chart {
   color: var(--cream);
 }
 
+/* ---- BODY ---- */
+.bm-log {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 4px;
+}
+.bm-val {
+  font-family: var(--display);
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  min-width: 92px;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+.bm-val .u {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--taupe);
+  margin-left: 4px;
+}
+.bm-save {
+  margin-left: auto;
+  padding: 12px 22px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   .view.active {

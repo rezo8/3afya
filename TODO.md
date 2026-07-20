@@ -21,9 +21,11 @@ Out of scope: social feed / following / sharing (solo depth is the differentiato
     table). Weighted tracks est 1RM / heaviest / best volume; reps → most reps;
     time → longest hold. Helpers in `apps/api/src/records.ts`.
   - More accurate once #4 (warmup flag) lands (exclude warmups from PR math).
-- [ ] **2. Body-metric logging UI + body dashboard** · `nutrition/body` · S–M · quick win
-  - Log weight / resting HR / sleep / body-fat + trends. Backend already done
-    (`routes/metrics.ts`); the web app never POSTs to it. Pure frontend + wiring.
+- [x] **2. Body-metric logging UI + body dashboard** · `nutrition/body` · S–M ✅ done
+  - New **Body** tab/screen: log weight / resting HR / sleep (stepper + trend line
+    per metric) against the existing `routes/metrics.ts`. Bodyweight chart moved
+    out of Trends. (Body fat available in backend but not surfaced, by choice.)
+  - Also added: **edit program name** (PATCH /api/programs/:id) in the builder.
 - [ ] **3. Muscle-group taxonomy + shipped exercise catalog** · `logging` · M–L · FOUNDATIONAL
   - Add `muscleGroup` (+ optional `equipment`) to `exercise`; ship a curated
     catalog so real users don't start empty. Unlocks #5. Needs a migration.

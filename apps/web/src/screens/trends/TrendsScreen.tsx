@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { BodyMetric, ExerciseRecords, PrEntry, ProgressTrend, TrendExercise } from "@afya/shared";
+import type { ExerciseRecords, PrEntry, ProgressTrend, TrendExercise } from "@afya/shared";
 import { api } from "@/lib/api/client";
 import { PR_LABEL } from "@/lib/pr";
 import { LineChart } from "@/components/charts/LineChart";
@@ -43,10 +43,6 @@ export function TrendsScreen() {
     queryFn: () => api.get<ProgressTrend>(`/api/trends/progress?exerciseId=${liftId}`),
     enabled: !!liftId,
   });
-  const bwQ = useQuery({
-    queryKey: ["metrics", "weight"],
-    queryFn: () => api.get<BodyMetric[]>("/api/metrics?kind=weight"),
-  });
   const fuelQ = useQuery({
     queryKey: ["fuel", "history"],
     queryFn: () => api.get<FuelHistory>("/api/fuel/history?days=7"),
@@ -57,7 +53,6 @@ export function TrendsScreen() {
   });
 
   const [progReadout, setProgReadout] = useState<string | null>(null);
-  const [bwReadout, setBwReadout] = useState<string | null>(null);
   const [fuelReadout, setFuelReadout] = useState<string | null>(null);
   const [fuelKind, setFuelKind] = useState<"protein" | "cal">("protein");
 
@@ -69,12 +64,6 @@ export function TrendsScreen() {
   const progLabels = prog?.points.map((p) => shortDate(p.date)) ?? [];
   const progNow = progVals.at(-1);
   const progDelta = progVals.length > 1 ? progNow! - progVals[0]! : 0;
-
-  const bw = bwQ.data ?? [];
-  const bwVals = bw.map((m) => m.value);
-  const bwLabels = bw.map((m) => shortDate(m.measuredAt));
-  const bwNow = bwVals.at(-1);
-  const bwDelta = bwVals.length > 1 ? +(bwNow! - bwVals[0]!).toFixed(1) : 0;
 
   const fuel = fuelQ.data;
   const fuelVals = fuel ? fuel.days.map((d) => (fuelKind === "protein" ? Math.round(d.proteinG) : Math.round(d.calories))) : [];
@@ -150,27 +139,6 @@ export function TrendsScreen() {
               color="#f2a43c"
               onHover={(_i, v, l) => setProgReadout(`${l} · ${fmtVal(v)}`)}
               onLeave={() => setProgReadout(null)}
-            />
-          </div>
-
-          <div className="card">
-            <div className="card-head">
-              <p className="eyebrow">Bodyweight</p>
-              <span className="readout">{bwReadout ?? `${bw.length} entries`}</span>
-            </div>
-            <div className="metric-big">
-              <span className="v">{bwNow ?? "—"}</span>
-              <span className="u">lb</span>
-              <span className={`d${bwDelta > 0 ? "" : " flat"}`}>
-                {bwVals.length > 1 ? `${bwDelta > 0 ? "↑ +" : "↓ "}${bwDelta} lb overall` : "log your weight to trend"}
-              </span>
-            </div>
-            <LineChart
-              data={bwVals}
-              labels={bwLabels}
-              color="#a6bd6a"
-              onHover={(_i, v, l) => setBwReadout(`${l} · ${v} lb`)}
-              onLeave={() => setBwReadout(null)}
             />
           </div>
 

@@ -5,6 +5,7 @@ const TABS = [
   { to: "/program", label: "Program", exact: false },
   { to: "/trends", label: "Trends", exact: false },
   { to: "/history", label: "History", exact: false },
+  { to: "/body", label: "Body", exact: false },
 ] as const;
 
 export function TabBar() {

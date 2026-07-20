@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Exercise, ExerciseKind, Program, ProgramDay, TodayResponse, UpdateDayBody, UpdateDayExerciseBody } from "@afya/shared";
+import type { Exercise, ExerciseKind, Program, ProgramDay, TodayResponse, UpdateDayBody, UpdateDayExerciseBody, UpdateProgramBody } from "@afya/shared";
 import { api } from "@/lib/api/client";
 
 const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
@@ -20,6 +20,7 @@ export function ProgramScreen() {
   const program = programsQ.data?.[0] ?? null;
   const [selDayId, setSelDayId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
+  const [progName, setProgName] = useState("");
   const [addEx, setAddEx] = useState("");
   const [newExKind, setNewExKind] = useState<ExerciseKind>("weighted");
 
@@ -29,6 +30,10 @@ export function ProgramScreen() {
     }
   }, [program, selDayId]);
 
+  useEffect(() => {
+    if (program) setProgName(program.name);
+  }, [program?.id, program?.name]);
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["programs"] });
     qc.invalidateQueries({ queryKey: ["exercises"] });
@@ -37,6 +42,10 @@ export function ProgramScreen() {
 
   const createProgram = useMutation({
     mutationFn: (name: string) => api.post<Program>("/api/programs", { name }),
+    onSuccess: () => invalidate(),
+  });
+  const renameProgram = useMutation({
+    mutationFn: (name: string) => api.patch(`/api/programs/${program!.id}`, { name } satisfies UpdateProgramBody),
     onSuccess: () => invalidate(),
   });
   const addDay = useMutation({
@@ -144,7 +153,21 @@ export function ProgramScreen() {
     <>
       <div className="view-head">
         <p className="eyebrow">Program</p>
-        <h1>{program.name}</h1>
+        <div className="prog-name">
+          <input
+            aria-label="Program name"
+            value={progName}
+            onChange={(e) => setProgName(e.target.value)}
+            onBlur={() => {
+              const n = progName.trim();
+              if (!n) return setProgName(program.name);
+              if (n !== program.name) renameProgram.mutate(n);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+          />
+        </div>
       </div>
 
       {days.length > 0 && (

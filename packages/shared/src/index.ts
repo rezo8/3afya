@@ -83,6 +83,9 @@ export interface Program {
 export interface CreateProgramBody {
   name: string;
 }
+export interface UpdateProgramBody {
+  name?: string;
+}
 export interface CreateDayBody {
   name: string;
 }
