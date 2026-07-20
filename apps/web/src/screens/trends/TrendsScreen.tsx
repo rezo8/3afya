@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { BodyMetric, ProgressTrend, TrendExercise } from "@afya/shared";
+import type { BodyMetric, ExerciseRecords, PrEntry, ProgressTrend, TrendExercise } from "@afya/shared";
 import { api } from "@/lib/api/client";
+import { PR_LABEL } from "@/lib/pr";
 import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
 
@@ -18,6 +19,13 @@ const METRIC_LABEL: Record<ProgressTrend["metric"], string> = {
   est1rm: "Estimated 1RM",
   reps: "Best set",
   time: "Best hold",
+};
+
+const fmtRecord = (r: PrEntry) => {
+  if (r.kind === "duration") return fmtDur(r.value);
+  if (r.kind === "reps") return `${r.value} reps`;
+  if (r.kind === "weight") return `${r.value} lb`;
+  return `${Math.round(r.value).toLocaleString()} lb`;
 };
 
 export function TrendsScreen() {
@@ -42,6 +50,10 @@ export function TrendsScreen() {
   const fuelQ = useQuery({
     queryKey: ["fuel", "history"],
     queryFn: () => api.get<FuelHistory>("/api/fuel/history?days=7"),
+  });
+  const recordsQ = useQuery({
+    queryKey: ["records"],
+    queryFn: () => api.get<ExerciseRecords[]>("/api/records"),
   });
 
   const [progReadout, setProgReadout] = useState<string | null>(null);
@@ -87,6 +99,30 @@ export function TrendsScreen() {
         </section>
       ) : (
         <>
+          {recordsQ.data && recordsQ.data.length > 0 && (
+            <div className="card">
+              <div className="card-head">
+                <p className="eyebrow">Records</p>
+                <span className="readout">🏆 all-time bests</span>
+              </div>
+              <ul className="rec-list">
+                {recordsQ.data.map((ex) => (
+                  <li key={ex.exerciseId} className="rec-ex">
+                    <span className="rec-name">{ex.name}</span>
+                    <div className="rec-prs">
+                      {ex.records.map((r) => (
+                        <span key={r.kind} className="rec-pr">
+                          <span className="rec-pr-k">{PR_LABEL[r.kind]}</span>
+                          <span className="rec-pr-v">{fmtRecord(r)}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="card">
             <div className="card-head">
               <p className="eyebrow">{prog ? METRIC_LABEL[prog.metric] : "Progress"}</p>

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import type { LogSetBody, TodayExercise, TodayResponse, UpdateSetBody } from "@afya/shared";
+import type { CreateExerciseBody, Exercise, LoggedSetResult, LogSetBody, PrKind, TodayExercise, TodayResponse, UpdateSetBody } from "@afya/shared";
 import { api } from "@/lib/api/client";
+import { PR_LABEL } from "@/lib/pr";
 import { RestBar, useRestTimer } from "./RestTimer";
 
 type Work = Record<string, { weight: number; reps: number; durationSec: number }>;
@@ -19,7 +20,28 @@ export function SessionScreen() {
   });
   const [work, setWork] = useState<Work>({});
   const [override, setOverride] = useState<string | null>(null);
+  const [extras, setExtras] = useState<Exercise[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newKind, setNewKind] = useState<Exercise["kind"]>("weighted");
+  const [prBanner, setPrBanner] = useState<{ prs: PrKind[]; name: string } | null>(null);
+  const [prSets, setPrSets] = useState<Set<string>>(new Set());
   const rest = useRestTimer();
+  const libraryQ = useQuery({ queryKey: ["exercises"], queryFn: () => api.get<Exercise[]>("/api/exercises") });
+
+  useEffect(() => {
+    setExtras([]);
+    setShowAdd(false);
+    setOverride(null);
+    setPrBanner(null);
+    setPrSets(new Set());
+  }, [dayId]);
+
+  useEffect(() => {
+    if (!prBanner) return;
+    const t = setTimeout(() => setPrBanner(null), 4500);
+    return () => clearTimeout(t);
+  }, [prBanner]);
 
   useEffect(() => {
     if (!data) return;
@@ -43,12 +65,19 @@ export function SessionScreen() {
     qc.invalidateQueries({ queryKey: ["today"] });
   };
   const logSet = useMutation({
-    mutationFn: async (body: LogSetBody) => {
+    mutationFn: async ({ body }: { body: LogSetBody; name: string }) => {
       let sid = data?.session?.id;
       if (!sid) sid = (await api.post<{ id: string }>("/api/sessions", { dayId })).id;
-      return api.post(`/api/sessions/${sid}/sets`, body);
+      return api.post<LoggedSetResult>(`/api/sessions/${sid}/sets`, body);
     },
-    onSuccess: invalidate,
+    onSuccess: (result, vars) => {
+      invalidate();
+      if (result.prs.length) {
+        setPrBanner({ prs: result.prs, name: vars.name });
+        setPrSets((prev) => new Set(prev).add(result.set.id));
+        navigator.vibrate?.([40, 40, 120]);
+      }
+    },
   });
   const editSet = useMutation({
     mutationFn: ({ setId, patch }: { setId: string; patch: UpdateSetBody }) => api.patch(`/api/sessions/${data!.session!.id}/sets/${setId}`, patch),
@@ -57,6 +86,10 @@ export function SessionScreen() {
   const deleteSet = useMutation({
     mutationFn: (setId: string) => api.delete(`/api/sessions/${data!.session!.id}/sets/${setId}`),
     onSuccess: invalidate,
+  });
+  const createEx = useMutation({
+    mutationFn: (body: CreateExerciseBody) => api.post<Exercise>("/api/exercises", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["exercises"] }),
   });
 
   if (isLoading) return <p className="center-note">Loading…</p>;
@@ -73,14 +106,53 @@ export function SessionScreen() {
     );
   }
 
-  const exercises = data.exercises;
-  const isDone = (e: TodayExercise) => e.loggedSets.length >= e.targetSets;
-  const doneCount = exercises.filter(isDone).length;
+  const serverIds = new Set(data.exercises.map((e) => e.exerciseId));
+  const pending: TodayExercise[] = extras
+    .filter((ex) => !serverIds.has(ex.id))
+    .map((ex) => ({
+      exerciseId: ex.id,
+      name: ex.name,
+      kind: ex.kind,
+      fromProgram: false,
+      targetSets: 0,
+      targetReps: 0,
+      targetRepsMax: null,
+      targetDurationSec: null,
+      restSec: null,
+      note: null,
+      supersetGroup: null,
+      section: null,
+      lastWeight: null,
+      lastReps: null,
+      lastDurationSec: null,
+      loggedSets: [],
+    }));
+  const exercises = [...data.exercises, ...pending];
+  const programExercises = exercises.filter((e) => e.fromProgram);
+  const addedExercises = exercises.filter((e) => !e.fromProgram);
+
+  const isDone = (e: TodayExercise) => e.fromProgram && e.loggedSets.length >= e.targetSets;
+  const doneCount = programExercises.filter(isDone).length;
   const activeId =
     override && exercises.some((e) => e.exerciseId === override)
       ? override
       : (exercises.find((e) => !isDone(e))?.exerciseId ?? null);
   const active = exercises.find((e) => e.exerciseId === activeId) ?? null;
+
+  const addExercise = (ex: Exercise) => {
+    setExtras((xs) => (xs.some((x) => x.id === ex.id) ? xs : [...xs, ex]));
+    setWork((wk) => (wk[ex.id] ? wk : { ...wk, [ex.id]: { weight: 45, reps: 8, durationSec: 30 } }));
+    setOverride(ex.id);
+    setShowAdd(false);
+  };
+  const createAndAdd = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    addExercise(await createEx.mutateAsync({ name, kind: newKind }));
+    setNewName("");
+  };
+  const inSession = new Set(exercises.map((e) => e.exerciseId));
+  const library = (libraryQ.data ?? []).filter((ex) => !inSession.has(ex.id));
 
   const setWorkFor = (id: string, patch: Partial<Work[string]>) => setWork((wk) => ({ ...wk, [id]: { ...wk[id]!, ...patch } }));
 
@@ -96,8 +168,8 @@ export function SessionScreen() {
     } else {
       body.durationSec = wk.durationSec;
     }
-    logSet.mutate(body);
-    setOverride(null);
+    logSet.mutate({ body, name: active.name });
+    setOverride(active.fromProgram ? null : active.exerciseId);
     rest.start(active.restSec ?? 90);
   }
 
@@ -166,19 +238,38 @@ export function SessionScreen() {
         <i style={{ width: `${exercises.length ? (doneCount / exercises.length) * 100 : 0}%` }} />
       </div>
 
+      {prBanner && (
+        <div className="pr-banner" role="status">
+          <span className="pr-trophy">🏆</span>
+          <span className="pr-text">
+            <b>New PR</b> · {prBanner.name} · {prBanner.prs.map((k) => PR_LABEL[k]).join(" · ")}
+          </span>
+        </div>
+      )}
+
       {active ? (
         <div className="setcard">
-          <p className="eyebrow">{activeDone ? "Done · edit below" : `Now · set ${active.loggedSets.length + 1} of ${active.targetSets}`}</p>
-          <h2 className="lift">{active.name}</h2>
-          <p className="set-target">
-            {active.targetSets} ×{" "}
-            {active.kind === "time"
-              ? fmtDur(active.targetDurationSec ?? 0)
-              : active.targetRepsMax
-                ? `${active.targetReps}–${active.targetRepsMax}`
-                : active.targetReps}
-            {active.restSec != null ? ` · rest ${active.restSec}s` : ""}
+          <p className="eyebrow">
+            {active.fromProgram
+              ? activeDone
+                ? "Done · edit below"
+                : `Now · set ${active.loggedSets.length + 1} of ${active.targetSets}`
+              : `Added · set ${active.loggedSets.length + 1}`}
           </p>
+          <h2 className="lift">{active.name}</h2>
+          {active.fromProgram ? (
+            <p className="set-target">
+              {active.targetSets} ×{" "}
+              {active.kind === "time"
+                ? fmtDur(active.targetDurationSec ?? 0)
+                : active.targetRepsMax
+                  ? `${active.targetReps}–${active.targetRepsMax}`
+                  : active.targetReps}
+              {active.restSec != null ? ` · rest ${active.restSec}s` : ""}
+            </p>
+          ) : (
+            <p className="set-target">Added to this session</p>
+          )}
           {active.note && <p className="set-note">{active.note}</p>}
 
           {!activeDone && w && (
@@ -250,7 +341,7 @@ export function SessionScreen() {
               </div>
 
               <div className="pips">
-                {Array.from({ length: active.targetSets }).map((_, i) => (
+                {Array.from({ length: active.fromProgram ? active.targetSets : active.loggedSets.length + 1 }).map((_, i) => (
                   <span
                     key={i}
                     className={`pip${i < active.loggedSets.length ? " done" : i === active.loggedSets.length ? " active" : ""}`}
@@ -314,6 +405,11 @@ export function SessionScreen() {
                         </>
                       )}
                     </div>
+                    {prSets.has(s.id) && (
+                      <span className="ls-pr" title="Personal record">
+                        🏆
+                      </span>
+                    )}
                     <button className="ls-del" aria-label="Remove set" onClick={() => deleteSet.mutate(s.id)}>
                       ×
                     </button>
@@ -337,7 +433,7 @@ export function SessionScreen() {
       <div className="lifts">
         <p className="eyebrow section-eyebrow">This day</p>
         <ul>
-          {exercises.map((e) => {
+          {programExercises.map((e) => {
             const done = isDone(e);
             return (
               <li key={e.exerciseId}>
@@ -352,6 +448,70 @@ export function SessionScreen() {
             );
           })}
         </ul>
+      </div>
+
+      {addedExercises.length > 0 && (
+        <div className="lifts">
+          <p className="eyebrow section-eyebrow">Added this session</p>
+          <ul>
+            {addedExercises.map((e) => (
+              <li key={e.exerciseId}>
+                <button className={`row${e.exerciseId === activeId ? " is-active" : ""}`} onClick={() => setOverride(e.exerciseId)}>
+                  <span className="mark" />
+                  <span className="rname">{e.name}</span>
+                  <span className="rmeta">
+                    {rowMeta(e)} · <b>{e.loggedSets.length}</b> {e.loggedSets.length === 1 ? "set" : "sets"}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="add-ex">
+        {showAdd ? (
+          <div className="add-ex-panel">
+            <div className="add-ex-head">
+              <p className="eyebrow">Add to this session</p>
+              <button className="add-ex-close" onClick={() => setShowAdd(false)}>
+                Close
+              </button>
+            </div>
+            {library.length > 0 && (
+              <div className="ex-suggest">
+                {library.map((ex) => (
+                  <button key={ex.id} onClick={() => addExercise(ex)}>
+                    {ex.name}
+                    <span className="kind-tag">{ex.kind}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="add-ex-new">
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="New exercise name"
+                onKeyDown={(e) => e.key === "Enter" && createAndAdd()}
+              />
+              <div className="seg">
+                {(["weighted", "reps", "time"] as const).map((k) => (
+                  <button key={k} className={newKind === k ? "on" : ""} onClick={() => setNewKind(k)}>
+                    {k}
+                  </button>
+                ))}
+              </div>
+              <button className="add-ex-create" disabled={!newName.trim() || createEx.isPending} onClick={createAndAdd}>
+                {createEx.isPending ? "…" : "Add"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button className="add-ex-open" onClick={() => setShowAdd(true)}>
+            ＋ Add an exercise
+          </button>
+        )}
       </div>
 
       {rest.state && (

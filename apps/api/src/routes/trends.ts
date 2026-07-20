@@ -4,12 +4,10 @@ import type { ProgressMetric, ProgressTrend, TrendExercise, TrendPoint } from "@
 import { db } from "../db";
 import { exercise, setLog, workoutSession } from "../db/schema/tracker";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
+import { epley } from "../records";
 
 const app = new Hono<AuthedEnv>();
 app.use("*", requireAuth);
-
-/** Epley estimate: 1RM ≈ w · (1 + reps/30). */
-const epley = (weight: number, reps: number) => (weight > 0 ? weight * (1 + reps / 30) : 0);
 
 /** Exercises that have at least one logged set — the picker list for trends. */
 app.get("/exercises", async (c) => {

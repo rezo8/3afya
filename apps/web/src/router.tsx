@@ -8,6 +8,7 @@ import { SessionScreen } from "@/screens/session/SessionScreen";
 import { ProgramScreen } from "@/screens/program/ProgramScreen";
 import { TrendsScreen } from "@/screens/trends/TrendsScreen";
 import { HistoryScreen } from "@/screens/history/HistoryScreen";
+import { SessionDetailScreen } from "@/screens/history/SessionDetailScreen";
 
 const rootRoute = createRootRoute({ component: RootComponent });
 
@@ -59,11 +60,12 @@ const sessionRoute = createRoute({ getParentRoute: () => appRoute, path: "/sessi
 const programRoute = createRoute({ getParentRoute: () => appRoute, path: "/program", component: ProgramScreen });
 const trendsRoute = createRoute({ getParentRoute: () => appRoute, path: "/trends", component: TrendsScreen });
 const historyRoute = createRoute({ getParentRoute: () => appRoute, path: "/history", component: HistoryScreen });
+const sessionDetailRoute = createRoute({ getParentRoute: () => appRoute, path: "/history/$sessionId", component: SessionDetailScreen });
 
 const routeTree = rootRoute.addChildren([
   signInRoute,
   signUpRoute,
-  appRoute.addChildren([startRoute, sessionRoute, programRoute, trendsRoute, historyRoute]),
+  appRoute.addChildren([startRoute, sessionRoute, programRoute, trendsRoute, historyRoute, sessionDetailRoute]),
 ]);
 
 export const router = createRouter({ routeTree, defaultPreload: "intent", scrollRestoration: true });

@@ -11,6 +11,7 @@ import sessions from "./routes/sessions";
 import fuel from "./routes/fuel";
 import metrics from "./routes/metrics";
 import trends from "./routes/trends";
+import records from "./routes/records";
 
 export const app = new Hono();
 
@@ -43,6 +44,7 @@ api.route("/sessions", sessions);
 api.route("/fuel", fuel);
 api.route("/metrics", metrics);
 api.route("/trends", trends);
+api.route("/records", records);
 app.route("/api", api);
 
 if (env.NODE_ENV === "production") {

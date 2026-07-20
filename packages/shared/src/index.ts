@@ -135,12 +135,46 @@ export interface SetLog {
   completedAt: string;
 }
 
-export interface WorkoutSession {
+export interface SessionExercise {
+  exerciseId: string;
+  name: string;
+  kind: ExerciseKind;
+  fromProgram: boolean;
+  sets: SetLog[];
+}
+
+export interface SessionDetail {
   id: string;
   dayId: string | null;
   dayName: string | null;
   performedAt: string;
-  sets: SetLog[];
+  note: string | null;
+  exercises: SessionExercise[];
+  records?: ExerciseRecords[];
+}
+
+export type PrKind = "est1rm" | "weight" | "volume" | "reps" | "duration";
+
+export interface PrEntry {
+  kind: PrKind;
+  value: number;
+  setId: string;
+  weight: number;
+  reps: number;
+  durationSec: number;
+  achievedAt: string;
+}
+
+export interface ExerciseRecords {
+  exerciseId: string;
+  name: string;
+  kind: ExerciseKind;
+  records: PrEntry[];
+}
+
+export interface LoggedSetResult {
+  set: SetLog;
+  prs: PrKind[];
 }
 
 export interface StartSessionBody {
@@ -166,6 +200,7 @@ export interface TodayExercise {
   exerciseId: string;
   name: string;
   kind: ExerciseKind;
+  fromProgram: boolean;
   targetSets: number;
   targetReps: number;
   targetRepsMax: number | null;

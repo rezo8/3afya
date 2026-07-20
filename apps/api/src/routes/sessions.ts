@@ -1,9 +1,21 @@
 import { Hono } from "hono";
-import { and, asc, desc, eq, ne } from "drizzle-orm";
-import type { LogSetBody, SetLog, StartSessionBody, TodayResponse, UpdateSetBody, WorkoutSession } from "@afya/shared";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
+import type {
+  ExerciseKind,
+  ExerciseRecords,
+  LoggedSetResult,
+  LogSetBody,
+  SessionDetail,
+  SessionExercise,
+  SetLog,
+  StartSessionBody,
+  TodayResponse,
+  UpdateSetBody,
+} from "@afya/shared";
 import { db } from "../db";
 import { exercise, program, programDay, programExercise, setLog, workoutSession } from "../db/schema/tracker";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
+import { computeRecords, detectPrs, type RecordSet } from "../records";
 
 const app = new Hono<AuthedEnv>();
 app.use("*", requireAuth);
@@ -24,6 +36,40 @@ const toSet = (r: typeof setLog.$inferSelect): SetLog => ({
   durationSec: r.durationSec,
   completedAt: r.completedAt.toISOString(),
 });
+
+type ExMeta = { name: string; kind: ExerciseKind };
+
+async function exerciseMeta(userId: string, ids: string[]): Promise<Map<string, ExMeta>> {
+  const map = new Map<string, ExMeta>();
+  if (!ids.length) return map;
+  const rows = await db
+    .select({ id: exercise.id, name: exercise.name, kind: exercise.kind })
+    .from(exercise)
+    .where(and(eq(exercise.userId, userId), inArray(exercise.id, ids)));
+  for (const r of rows) map.set(r.id, { name: r.name, kind: r.kind });
+  return map;
+}
+
+function groupSets(
+  rows: (typeof setLog.$inferSelect)[],
+  meta: Map<string, ExMeta>,
+  programIds: Set<string>,
+): SessionExercise[] {
+  const ordered = [...rows].sort((a, b) => a.completedAt.getTime() - b.completedAt.getTime());
+  const groups = new Map<string, SessionExercise>();
+  for (const r of ordered) {
+    const m = meta.get(r.exerciseId);
+    if (!m) continue;
+    let g = groups.get(r.exerciseId);
+    if (!g) {
+      g = { exerciseId: r.exerciseId, name: m.name, kind: m.kind, fromProgram: programIds.has(r.exerciseId), sets: [] };
+      groups.set(r.exerciseId, g);
+    }
+    g.sets.push(toSet(r));
+  }
+  for (const g of groups.values()) g.sets.sort((a, b) => a.setNumber - b.setNumber);
+  return [...groups.values()];
+}
 
 /**
  * Work out where the user is in their rotation:
@@ -109,13 +155,16 @@ async function buildDayExercises(userId: string, dayId: string, session: typeof 
     ? await db.select().from(setLog).where(eq(setLog.sessionId, session.id)).orderBy(asc(setLog.setNumber))
     : [];
 
-  return Promise.all(
+  const programIds = new Set(dayExercises.map(({ ex }) => ex.id));
+
+  const planned = await Promise.all(
     dayExercises.map(async ({ pe, ex }) => {
       const last = await lastSetFor(userId, ex.id, session?.id);
       return {
         exerciseId: ex.id,
         name: ex.name,
         kind: ex.kind,
+        fromProgram: true,
         targetSets: pe.targetSets,
         targetReps: pe.targetReps,
         targetRepsMax: pe.targetRepsMax,
@@ -131,6 +180,36 @@ async function buildDayExercises(userId: string, dayId: string, session: typeof 
       };
     }),
   );
+
+  const adhocIds = [...new Set(liveSets.map((s) => s.exerciseId).filter((id) => !programIds.has(id)))];
+  const adhocMeta = await exerciseMeta(userId, adhocIds);
+  const adhoc = await Promise.all(
+    adhocIds.map(async (id) => {
+      const m = adhocMeta.get(id);
+      const loggedSets = liveSets.filter((s) => s.exerciseId === id).map(toSet);
+      const last = await lastSetFor(userId, id, session?.id);
+      return {
+        exerciseId: id,
+        name: m?.name ?? "Exercise",
+        kind: m?.kind ?? ("weighted" as ExerciseKind),
+        fromProgram: false,
+        targetSets: loggedSets.length,
+        targetReps: 0,
+        targetRepsMax: null,
+        targetDurationSec: null,
+        restSec: null,
+        note: null,
+        supersetGroup: null,
+        section: null,
+        lastWeight: last?.weight ?? null,
+        lastReps: last?.reps ?? null,
+        lastDurationSec: last?.durationSec ?? null,
+        loggedSets,
+      };
+    }),
+  );
+
+  return [...planned, ...adhoc];
 }
 
 /** Next-up rotation day payload: per-exercise history + any live session. */
@@ -220,7 +299,20 @@ app.post("/:id/sets", async (c) => {
       durationSec: Math.max(0, Math.round(body.durationSec ?? 0)),
     })
     .returning();
-  return c.json(toSet(row!), 201);
+
+  const priorSets = await db
+    .select({ id: setLog.id, weight: setLog.weight, reps: setLog.reps, durationSec: setLog.durationSec, completedAt: setLog.completedAt })
+    .from(setLog)
+    .innerJoin(workoutSession, eq(setLog.sessionId, workoutSession.id))
+    .where(and(eq(workoutSession.userId, userId), eq(setLog.exerciseId, ex.id), ne(setLog.id, row!.id)));
+  const prs = detectPrs(ex.kind, priorSets, {
+    id: row!.id,
+    weight: row!.weight,
+    reps: row!.reps,
+    durationSec: row!.durationSec,
+    completedAt: row!.completedAt,
+  });
+  return c.json({ set: toSet(row!), prs } satisfies LoggedSetResult, 201);
 });
 
 /** Edit a logged set (e.g. fix a wrong weight) in a session the user owns. */
@@ -281,23 +373,95 @@ app.delete("/:id/sets/:setId", async (c) => {
   return c.json({ ok: true });
 });
 
-/** Recent sessions with their sets — powers History. */
+async function programIdsForDays(dayIds: string[]): Promise<Map<string, Set<string>>> {
+  const byDay = new Map<string, Set<string>>();
+  if (!dayIds.length) return byDay;
+  const rows = await db
+    .select({ dayId: programExercise.dayId, exerciseId: programExercise.exerciseId })
+    .from(programExercise)
+    .where(inArray(programExercise.dayId, dayIds));
+  for (const r of rows) {
+    let set = byDay.get(r.dayId);
+    if (!set) byDay.set(r.dayId, (set = new Set()));
+    set.add(r.exerciseId);
+  }
+  return byDay;
+}
+
 app.get("/", async (c) => {
+  const userId = c.get("userId");
   const limit = Math.min(90, Math.max(1, Number(c.req.query("limit")) || 30));
   const sessions = await db.query.workoutSession.findMany({
-    where: eq(workoutSession.userId, c.get("userId")),
+    where: eq(workoutSession.userId, userId),
     orderBy: desc(workoutSession.performedAt),
     limit,
-    with: { day: true, sets: { orderBy: asc(setLog.setNumber) } },
+    with: { day: true, sets: true },
   });
-  const out: WorkoutSession[] = sessions.map((s) => ({
+
+  const allExerciseIds = [...new Set(sessions.flatMap((s) => s.sets.map((r) => r.exerciseId)))];
+  const meta = await exerciseMeta(userId, allExerciseIds);
+  const dayIds = [...new Set(sessions.map((s) => s.dayId).filter((id): id is string => !!id))];
+  const programByDay = await programIdsForDays(dayIds);
+
+  const out: SessionDetail[] = sessions.map((s) => ({
     id: s.id,
     dayId: s.dayId,
     dayName: s.day?.name ?? null,
     performedAt: s.performedAt.toISOString(),
-    sets: (s.sets as (typeof setLog.$inferSelect)[]).map(toSet),
+    note: s.note,
+    exercises: groupSets(s.sets, meta, (s.dayId && programByDay.get(s.dayId)) || new Set()),
   }));
   return c.json(out);
+});
+
+app.get("/:id", async (c) => {
+  const userId = c.get("userId");
+  const [session] = await db
+    .select()
+    .from(workoutSession)
+    .where(and(eq(workoutSession.id, c.req.param("id")), eq(workoutSession.userId, userId)))
+    .limit(1);
+  if (!session) return c.json({ error: "not_found" }, 404);
+
+  const sets = await db.select().from(setLog).where(eq(setLog.sessionId, session.id));
+  const meta = await exerciseMeta(userId, [...new Set(sets.map((r) => r.exerciseId))]);
+  const programByDay = session.dayId ? await programIdsForDays([session.dayId]) : new Map();
+  const programIds: Set<string> = (session.dayId && programByDay.get(session.dayId)) || new Set();
+
+  let dayName: string | null = null;
+  if (session.dayId) {
+    const [day] = await db.select({ name: programDay.name }).from(programDay).where(eq(programDay.id, session.dayId)).limit(1);
+    dayName = day?.name ?? null;
+  }
+
+  const exIds = [...new Set(sets.map((r) => r.exerciseId))];
+  const allTimeSets = exIds.length
+    ? await db
+        .select({ exerciseId: setLog.exerciseId, id: setLog.id, weight: setLog.weight, reps: setLog.reps, durationSec: setLog.durationSec, completedAt: setLog.completedAt })
+        .from(setLog)
+        .innerJoin(workoutSession, eq(setLog.sessionId, workoutSession.id))
+        .where(and(eq(workoutSession.userId, userId), inArray(setLog.exerciseId, exIds)))
+    : [];
+  const records: ExerciseRecords[] = [];
+  for (const id of exIds) {
+    const m = meta.get(id);
+    if (!m) continue;
+    const recs = computeRecords(
+      m.kind,
+      allTimeSets.filter((s) => s.exerciseId === id) as RecordSet[],
+    );
+    if (recs.length) records.push({ exerciseId: id, name: m.name, kind: m.kind, records: recs });
+  }
+
+  return c.json({
+    id: session.id,
+    dayId: session.dayId,
+    dayName,
+    performedAt: session.performedAt.toISOString(),
+    note: session.note,
+    exercises: groupSets(sets, meta, programIds),
+    records,
+  } satisfies SessionDetail);
 });
 
 export default app;

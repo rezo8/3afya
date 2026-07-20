@@ -1,16 +1,33 @@
 import { useQuery } from "@tanstack/react-query";
-import type { WorkoutSession } from "@afya/shared";
+import { Link } from "@tanstack/react-router";
+import type { SessionDetail } from "@afya/shared";
 import { api } from "@/lib/api/client";
 
 const WD = ["M", "T", "W", "T", "F", "S", "S"];
 const localDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const volume = (s: WorkoutSession) => s.sets.reduce((sum, x) => sum + x.weight * x.reps, 0);
+const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
+const allSets = (s: SessionDetail) => s.exercises.flatMap((e) => e.sets);
+const volume = (s: SessionDetail) => allSets(s).reduce((sum, x) => sum + x.weight * x.reps, 0);
+
+function summarize(s: SessionDetail): string {
+  const sets = allSets(s);
+  if (!sets.length) return "No sets";
+  const exCount = s.exercises.length;
+  const lead = `${exCount} ${exCount === 1 ? "exercise" : "exercises"} · ${sets.length} ${sets.length === 1 ? "set" : "sets"}`;
+  const vol = volume(s);
+  if (vol > 0) return `${lead} · ${Math.round(vol).toLocaleString()} lb`;
+  const totalReps = sets.reduce((n, x) => n + x.reps, 0);
+  if (totalReps > 0) return `${lead} · ${totalReps} reps`;
+  const totalTime = sets.reduce((n, x) => n + x.durationSec, 0);
+  if (totalTime > 0) return `${lead} · ${fmtDur(totalTime)}`;
+  return lead;
+}
 
 export function HistoryScreen() {
   const { data, isLoading } = useQuery({
     queryKey: ["sessions"],
-    queryFn: () => api.get<WorkoutSession[]>("/api/sessions?limit=90"),
+    queryFn: () => api.get<SessionDetail[]>("/api/sessions?limit=90"),
   });
 
   if (isLoading) return <p className="center-note">Loading history…</p>;
@@ -101,13 +118,20 @@ export function HistoryScreen() {
           <p className="center-note">No sessions logged yet — head to Today and start your first.</p>
         ) : (
           <ul className="sess-list">
-            {sessions.slice(0, 8).map((s) => (
-              <li key={s.id} className="sess">
-                <span className="sdate">
-                  {new Date(s.performedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                </span>
-                <span className="sname">{s.dayName ?? "Workout"}</span>
-                <span className="svol">{Math.round(volume(s)).toLocaleString()} lb</span>
+            {sessions.map((s) => (
+              <li key={s.id}>
+                <Link to="/history/$sessionId" params={{ sessionId: s.id }} className="sess">
+                  <span className="sdate">
+                    {new Date(s.performedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                  <span className="sbody">
+                    <span className="sname">{s.dayName ?? "Freeform"}</span>
+                    <span className="ssum">{summarize(s)}</span>
+                  </span>
+                  <span className="schev" aria-hidden="true">
+                    ›
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>
