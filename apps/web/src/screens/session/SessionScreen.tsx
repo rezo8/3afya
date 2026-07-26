@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import type { CreateExerciseBody, Exercise, LoggedSetResult, LogSetBody, PrKind, TodayExercise, TodayResponse, UpdateSetBody } from "@afya/shared";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/errors";
 import { PR_LABEL } from "@/lib/pr";
 import { useRestTimer } from "./RestTimer";
 
@@ -26,6 +28,7 @@ export function SessionScreen() {
   const [newKind, setNewKind] = useState<Exercise["kind"]>("weighted");
   const [prBanner, setPrBanner] = useState<{ prs: PrKind[]; name: string } | null>(null);
   const [prSets, setPrSets] = useState<Set<string>>(new Set());
+  const [mutError, setMutError] = useState<{ message: string; retry: () => void } | null>(null);
   const rest = useRestTimer();
   const libraryQ = useQuery({ queryKey: ["exercises"], queryFn: () => api.get<Exercise[]>("/api/exercises") });
 
@@ -35,6 +38,7 @@ export function SessionScreen() {
     setOverride(null);
     setPrBanner(null);
     setPrSets(new Set());
+    setMutError(null);
   }, [dayId]);
 
   useEffect(() => {
@@ -71,6 +75,7 @@ export function SessionScreen() {
       return api.post<LoggedSetResult>(`/api/sessions/${sid}/sets`, body);
     },
     onSuccess: (result, vars) => {
+      setMutError(null);
       invalidate();
       if (result.prs.length) {
         setPrBanner({ prs: result.prs, name: vars.name });
@@ -78,18 +83,39 @@ export function SessionScreen() {
         navigator.vibrate?.([40, 40, 120]);
       }
     },
+    onError: (err, vars) => {
+      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); logSet.mutate(vars); } });
+    },
   });
   const editSet = useMutation({
     mutationFn: ({ setId, patch }: { setId: string; patch: UpdateSetBody }) => api.patch(`/api/sessions/${data!.session!.id}/sets/${setId}`, patch),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setMutError(null);
+      invalidate();
+    },
+    onError: (err, vars) => {
+      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); editSet.mutate(vars); } });
+    },
   });
   const deleteSet = useMutation({
     mutationFn: (setId: string) => api.delete(`/api/sessions/${data!.session!.id}/sets/${setId}`),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setMutError(null);
+      invalidate();
+    },
+    onError: (err, vars) => {
+      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); deleteSet.mutate(vars); } });
+    },
   });
   const createEx = useMutation({
     mutationFn: (body: CreateExerciseBody) => api.post<Exercise>("/api/exercises", body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["exercises"] }),
+    onSuccess: () => {
+      setMutError(null);
+      qc.invalidateQueries({ queryKey: ["exercises"] });
+    },
+    onError: (err, vars) => {
+      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); createEx.mutate(vars); } });
+    },
   });
 
   if (isLoading) return <p className="center-note">Loading…</p>;
@@ -148,8 +174,12 @@ export function SessionScreen() {
   const createAndAdd = async () => {
     const name = newName.trim();
     if (!name) return;
-    addExercise(await createEx.mutateAsync({ name, kind: newKind }));
-    setNewName("");
+    try {
+      addExercise(await createEx.mutateAsync({ name, kind: newKind }));
+      setNewName("");
+    } catch {
+      // onError above already surfaced the banner; nothing else to do here.
+    }
   };
   const inSession = new Set(exercises.map((e) => e.exerciseId));
   const library = (libraryQ.data ?? []).filter((ex) => !inSession.has(ex.id));
@@ -270,6 +300,8 @@ export function SessionScreen() {
           </span>
         </div>
       )}
+
+      {mutError && <ErrorBanner message={mutError.message} onRetry={mutError.retry} />}
 
       {active ? (
         <div className="setcard">
