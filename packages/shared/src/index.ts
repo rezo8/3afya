@@ -33,6 +33,7 @@ export interface Exercise {
   name: string;
   kind: ExerciseKind;
   createdAt: string;
+  archivedAt: string | null;
 }
 
 export interface CreateExerciseBody {

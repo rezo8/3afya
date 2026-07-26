@@ -22,6 +22,13 @@
       "when": 1784476634273,
       "tag": "0002_pink_malice",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785082300649,
+      "tag": "0003_red_klaw",
+      "breakpoints": true
     }
   ]
 }
