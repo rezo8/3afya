@@ -497,6 +497,11 @@ body {
   border-color: var(--marigold);
   box-shadow: 0 0 0 3px rgba(242, 164, 60, 0.12);
 }
+.warmup-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 10px;
+}
 .log {
   width: 100%;
   appearance: none;
@@ -1282,6 +1287,16 @@ body {
   background: var(--marigold);
   color: var(--espresso);
 }
+.ls-warmup-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+.ls-warmup-btn.on {
+  background: var(--marigold-dim);
+  color: var(--cream);
+}
 .ls-del {
   appearance: none;
   border: none;
@@ -2055,6 +2070,18 @@ svg.chart {
 .ls-pr {
   font-size: 14px;
   line-height: 1;
+  flex: none;
+}
+.ls-warmup-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--taupe);
+  background: var(--surface-hi);
+  border: 1px solid var(--line-hi);
+  border-radius: 5px;
+  padding: 1px 5px;
   flex: none;
 }
 .sd-set.pr {

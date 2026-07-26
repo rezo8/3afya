@@ -17,6 +17,7 @@ function bestSetIndex(e: SessionExercise): number {
   let best = -1;
   let bestScore = -Infinity;
   e.sets.forEach((s, i) => {
+    if (s.isWarmup) return;
     const v = score(s);
     if (v > bestScore) {
       bestScore = v;
@@ -121,6 +122,11 @@ export function SessionDetailScreen() {
                       <li key={s.id} className={`sd-set${isPr ? " pr" : i === best ? " best" : ""}`}>
                         <span className="sd-set-n">{s.setNumber}</span>
                         <span className="sd-set-v">{setValue(e, s)}</span>
+                        {s.isWarmup && (
+                          <span className="ls-warmup-tag" title="Warm-up set">
+                            W
+                          </span>
+                        )}
                         {isPr ? (
                           <span className="sd-pr-tag">🏆 PR</span>
                         ) : (

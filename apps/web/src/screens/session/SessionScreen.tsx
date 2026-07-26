@@ -29,6 +29,7 @@ export function SessionScreen() {
   const [prBanner, setPrBanner] = useState<{ prs: PrKind[]; name: string } | null>(null);
   const [prSets, setPrSets] = useState<Set<string>>(new Set());
   const [mutError, setMutError] = useState<{ message: string; retry: () => void } | null>(null);
+  const [nextIsWarmup, setNextIsWarmup] = useState(false);
   const rest = useRestTimer();
   const libraryQ = useQuery({ queryKey: ["exercises"], queryFn: () => api.get<Exercise[]>("/api/exercises") });
 
@@ -39,6 +40,7 @@ export function SessionScreen() {
     setPrBanner(null);
     setPrSets(new Set());
     setMutError(null);
+    setNextIsWarmup(false);
   }, [dayId]);
 
   useEffect(() => {
@@ -76,6 +78,7 @@ export function SessionScreen() {
     },
     onSuccess: (result, vars) => {
       setMutError(null);
+      setNextIsWarmup(false);
       invalidate();
       if (result.prs.length) {
         setPrBanner({ prs: result.prs, name: vars.name });
@@ -165,10 +168,14 @@ export function SessionScreen() {
       : (exercises.find((e) => !isDone(e))?.exerciseId ?? null);
   const active = exercises.find((e) => e.exerciseId === activeId) ?? null;
 
+  const focusExercise = (id: string) => {
+    setOverride(id);
+    setNextIsWarmup(false);
+  };
   const addExercise = (ex: Exercise) => {
     setExtras((xs) => (xs.some((x) => x.id === ex.id) ? xs : [...xs, ex]));
     setWork((wk) => (wk[ex.id] ? wk : { ...wk, [ex.id]: { weight: 45, reps: 8, durationSec: 30 } }));
-    setOverride(ex.id);
+    focusExercise(ex.id);
     setShowAdd(false);
   };
   const createAndAdd = async () => {
@@ -200,7 +207,7 @@ export function SessionScreen() {
   function completeSet() {
     if (!active) return;
     const wk = work[active.exerciseId]!;
-    const body: LogSetBody = { exerciseId: active.exerciseId, setNumber: active.loggedSets.length + 1 };
+    const body: LogSetBody = { exerciseId: active.exerciseId, setNumber: active.loggedSets.length + 1, isWarmup: nextIsWarmup };
     if (active.kind === "weighted") {
       body.weight = wk.weight;
       body.reps = wk.reps;
@@ -405,6 +412,16 @@ export function SessionScreen() {
                   />
                 ))}
               </div>
+              <div className="warmup-row">
+                <button
+                  type="button"
+                  className={`ls${nextIsWarmup ? " on" : ""}`}
+                  aria-pressed={nextIsWarmup}
+                  onClick={() => setNextIsWarmup((v) => !v)}
+                >
+                  Warm-up
+                </button>
+              </div>
               <button className="log" onClick={completeSet} disabled={logSet.isPending}>
                 {logSet.isPending ? "Logging…" : `Complete set ${active.loggedSets.length + 1}`}
               </button>
@@ -460,7 +477,20 @@ export function SessionScreen() {
                           </button>
                         </>
                       )}
+                      <button
+                        className={`ls-warmup-btn${s.isWarmup ? " on" : ""}`}
+                        aria-label={s.isWarmup ? "Mark as working set" : "Mark as warm-up"}
+                        aria-pressed={s.isWarmup}
+                        onClick={() => editSet.mutate({ setId: s.id, patch: { isWarmup: !s.isWarmup } })}
+                      >
+                        W
+                      </button>
                     </div>
+                    {s.isWarmup && (
+                      <span className="ls-warmup-tag" title="Warm-up set">
+                        W
+                      </span>
+                    )}
                     {prSets.has(s.id) && (
                       <span className="ls-pr" title="Personal record">
                         🏆
@@ -526,7 +556,7 @@ export function SessionScreen() {
                 </li>
               ) : null,
               <li key={e.exerciseId} className={inSS ? "in-ss" : undefined}>
-                <button className={`row${done ? " is-done" : ""}${e.exerciseId === activeId ? " is-active" : ""}`} onClick={() => setOverride(e.exerciseId)}>
+                <button className={`row${done ? " is-done" : ""}${e.exerciseId === activeId ? " is-active" : ""}`} onClick={() => focusExercise(e.exerciseId)}>
                   <span className="mark">{done ? "✓" : ""}</span>
                   <span className="rname">{e.name}</span>
                   <span className="rmeta">
@@ -545,7 +575,7 @@ export function SessionScreen() {
           <ul>
             {addedExercises.map((e) => (
               <li key={e.exerciseId}>
-                <button className={`row${e.exerciseId === activeId ? " is-active" : ""}`} onClick={() => setOverride(e.exerciseId)}>
+                <button className={`row${e.exerciseId === activeId ? " is-active" : ""}`} onClick={() => focusExercise(e.exerciseId)}>
                   <span className="mark" />
                   <span className="rname">{e.name}</span>
                   <span className="rmeta">

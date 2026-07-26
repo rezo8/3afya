@@ -113,6 +113,23 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   supersets (this was a real bug, fixed once already — don't reintroduce it).
   Supersets alternate via `pickNextInGroup`, cycling to the next incomplete
   group member in program order rather than falling through to list order.
+- **The warm-up toggle is per-set UI state, not derived**: `SessionScreen.tsx`
+  keeps a standalone `nextIsWarmup` boolean (not part of `Work`, which is
+  keyed per-exercise and intentionally persists) and resets it to `false` in
+  three places — `logSet`'s `onSuccess`, the `dayId`-reset effect, and
+  `focusExercise` (a thin wrapper around `setOverride` used everywhere the
+  user manually switches the active exercise: row taps, `addExercise`) — so a
+  warm-up mark never silently carries over onto a different set. Follow the
+  same `focusExercise` wrapper for any future per-set UI state that shouldn't
+  survive an exercise switch.
+- **`theme.css`'s bare `.ls`/`.ls.on`** (used by the lift-select chips in
+  `TrendsScreen`/`ProgramScreen`, and the warm-up toggle chip in
+  `SessionScreen`) is an unrelated naming coincidence next to the
+  `ls-`-prefixed classes (`ls-num`, `ls-edit`, `ls-pr`, `ls-del`,
+  `ls-warmup-btn`, `ls-warmup-tag`) scoped to the logged-set row in
+  `SessionScreen`'s "Logged sets" list — the former is a generic single-toggle
+  chip pattern, the latter is one specific component's internals. Don't
+  assume they're related when grepping for `ls`.
 
 ## Conventions worth repeating
 
