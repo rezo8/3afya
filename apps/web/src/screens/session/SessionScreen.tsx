@@ -156,6 +156,25 @@ export function SessionScreen() {
 
   const setWorkFor = (id: string, patch: Partial<Work[string]>) => setWork((wk) => ({ ...wk, [id]: { ...wk[id]!, ...patch } }));
 
+  /**
+   * Superset-aware "what's next": alternate to the next incomplete member of
+   * `justSet`'s group in program order (A1→B1→A2→B2…). `willBeDone` accounts
+   * for the set we just fired off but haven't gotten a server response for yet
+   * (so `justSet.loggedSets` is still one short). Returns null once every
+   * member of the group is done, so the caller falls back to the plain
+   * "first incomplete in program order" default.
+   */
+  function pickNextInGroup(justSet: TodayExercise, willBeDone: boolean): string | null {
+    const group = programExercises.filter((e) => e.supersetGroup === justSet.supersetGroup);
+    const idx = group.findIndex((e) => e.exerciseId === justSet.exerciseId);
+    const doneAfter = (e: TodayExercise) => (e.exerciseId === justSet.exerciseId ? willBeDone : isDone(e));
+    for (let step = 1; step <= group.length; step++) {
+      const cand = group[(idx + step) % group.length]!;
+      if (!doneAfter(cand)) return cand.exerciseId;
+    }
+    return null;
+  }
+
   function completeSet() {
     if (!active) return;
     const wk = work[active.exerciseId]!;
@@ -169,7 +188,32 @@ export function SessionScreen() {
       body.durationSec = wk.durationSec;
     }
     logSet.mutate({ body, name: active.name });
-    setOverride(active.fromProgram ? null : active.exerciseId);
+
+    if (!active.fromProgram) {
+      // Ad-hoc/"added this session" exercises are never "done" (isDone
+      // requires fromProgram), so there's nothing to auto-advance to — stay
+      // pinned here across sets, same as before.
+      setOverride(active.exerciseId);
+    } else {
+      const willBeDone = active.loggedSets.length + 1 >= active.targetSets;
+      if (active.supersetGroup) {
+        // Supersets alternate every set, whether or not `active` itself just
+        // finished — prefer the partner over "first incomplete in list order."
+        setOverride(pickNextInGroup(active, willBeDone));
+      } else if (willBeDone) {
+        // Plain linear case: only move on once this exercise's sets are all
+        // logged. `null` clears any stale override so the fallback picks the
+        // next incomplete exercise in program order.
+        setOverride(null);
+      } else {
+        // THE FIX: stay pinned on this exercise until it's actually done.
+        // Previously `override` was cleared unconditionally on every set of
+        // any program exercise, bouncing focus back to whichever exercise
+        // happened to be first-incomplete in list order.
+        setOverride(active.exerciseId);
+      }
+    }
+
     rest.start(active.restSec ?? 90);
   }
 
@@ -430,13 +474,46 @@ export function SessionScreen() {
         </div>
       )}
 
+      {(data.day.warmup || data.day.cooldown) && (
+        <div className="day-notes">
+          {data.day.warmup && (
+            <div>
+              <p className="eyebrow section-eyebrow">Warm-up</p>
+              <p className="day-note-text">{data.day.warmup}</p>
+            </div>
+          )}
+          {data.day.cooldown && (
+            <div>
+              <p className="eyebrow section-eyebrow">Cool-down</p>
+              <p className="day-note-text">{data.day.cooldown}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="lifts">
         <p className="eyebrow section-eyebrow">This day</p>
         <ul>
-          {programExercises.map((e) => {
+          {programExercises.flatMap((e, i, list) => {
+            const prev = list[i - 1];
+            const next = list[i + 1];
+            const g = e.supersetGroup;
+            const inSS = !!g && (prev?.supersetGroup === g || next?.supersetGroup === g);
+            const ssStart = inSS && prev?.supersetGroup !== g;
+            const showSection = i === 0 || prev?.section !== e.section;
             const done = isDone(e);
-            return (
-              <li key={e.exerciseId}>
+            return [
+              showSection ? (
+                <li key={`sec-${e.exerciseId}`} className="pex-section">
+                  {e.section || "Exercises"}
+                </li>
+              ) : null,
+              ssStart ? (
+                <li key={`ss-${e.exerciseId}`} className="ss-head">
+                  Superset {g}
+                </li>
+              ) : null,
+              <li key={e.exerciseId} className={inSS ? "in-ss" : undefined}>
                 <button className={`row${done ? " is-done" : ""}${e.exerciseId === activeId ? " is-active" : ""}`} onClick={() => setOverride(e.exerciseId)}>
                   <span className="mark">{done ? "✓" : ""}</span>
                   <span className="rname">{e.name}</span>
@@ -444,8 +521,8 @@ export function SessionScreen() {
                     {rowMeta(e)} · <b>{e.loggedSets.length}</b>/{e.targetSets}
                   </span>
                 </button>
-              </li>
-            );
+              </li>,
+            ];
           })}
         </ul>
       </div>

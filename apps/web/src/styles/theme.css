@@ -592,6 +592,23 @@ body {
   color: var(--cream);
   font-weight: 600;
 }
+.lifts li.in-ss {
+  border-left: 3px solid var(--marigold-dim);
+  padding-left: 4px;
+}
+
+.day-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.day-note-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cream);
+  white-space: pre-line;
+}
 
 .eating {
   background: var(--surface);
