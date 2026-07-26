@@ -1,0 +1,1 @@
+ALTER TABLE "set_log" ADD COLUMN "is_warmup" boolean DEFAULT false NOT NULL;

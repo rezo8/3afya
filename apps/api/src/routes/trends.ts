@@ -45,6 +45,7 @@ app.get("/progress", async (c) => {
       weight: setLog.weight,
       reps: setLog.reps,
       durationSec: setLog.durationSec,
+      isWarmup: setLog.isWarmup,
       performedAt: workoutSession.performedAt,
     })
     .from(setLog)
@@ -59,6 +60,7 @@ app.get("/progress", async (c) => {
 
   const bySession = new Map<string, { date: Date; best: number }>();
   for (const r of rows) {
+    if (r.isWarmup) continue;
     const s = score(r);
     const cur = bySession.get(r.sessionId);
     if (!cur) bySession.set(r.sessionId, { date: r.performedAt, best: s });

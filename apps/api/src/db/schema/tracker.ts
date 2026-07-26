@@ -129,6 +129,7 @@ export const setLog = pgTable(
     weight: real("weight").default(0).notNull(),
     reps: integer("reps").default(0).notNull(),
     durationSec: integer("duration_sec").default(0).notNull(),
+    isWarmup: boolean("is_warmup").default(false).notNull(),
     completedAt: timestamp("completed_at").defaultNow().notNull(),
   },
   (t) => [

@@ -19,6 +19,7 @@ app.get("/", async (c) => {
       weight: setLog.weight,
       reps: setLog.reps,
       durationSec: setLog.durationSec,
+      isWarmup: setLog.isWarmup,
       completedAt: setLog.completedAt,
     })
     .from(setLog)
@@ -30,7 +31,7 @@ app.get("/", async (c) => {
   for (const r of rows) {
     let g = byExercise.get(r.exerciseId);
     if (!g) byExercise.set(r.exerciseId, (g = { name: r.name, kind: r.kind, sets: [] }));
-    g.sets.push({ id: r.id, weight: r.weight, reps: r.reps, durationSec: r.durationSec, completedAt: r.completedAt });
+    g.sets.push({ id: r.id, weight: r.weight, reps: r.reps, durationSec: r.durationSec, isWarmup: r.isWarmup, completedAt: r.completedAt });
   }
 
   const out: ExerciseRecords[] = [...byExercise.entries()]
