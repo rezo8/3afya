@@ -156,14 +156,6 @@ export function SessionScreen() {
 
   const setWorkFor = (id: string, patch: Partial<Work[string]>) => setWork((wk) => ({ ...wk, [id]: { ...wk[id]!, ...patch } }));
 
-  /**
-   * Superset-aware "what's next": alternate to the next incomplete member of
-   * `justSet`'s group in program order (A1→B1→A2→B2…). `willBeDone` accounts
-   * for the set we just fired off but haven't gotten a server response for yet
-   * (so `justSet.loggedSets` is still one short). Returns null once every
-   * member of the group is done, so the caller falls back to the plain
-   * "first incomplete in program order" default.
-   */
   function pickNextInGroup(justSet: TodayExercise, willBeDone: boolean): string | null {
     const group = programExercises.filter((e) => e.supersetGroup === justSet.supersetGroup);
     const idx = group.findIndex((e) => e.exerciseId === justSet.exerciseId);
@@ -190,26 +182,14 @@ export function SessionScreen() {
     logSet.mutate({ body, name: active.name });
 
     if (!active.fromProgram) {
-      // Ad-hoc/"added this session" exercises are never "done" (isDone
-      // requires fromProgram), so there's nothing to auto-advance to — stay
-      // pinned here across sets, same as before.
       setOverride(active.exerciseId);
     } else {
       const willBeDone = active.loggedSets.length + 1 >= active.targetSets;
       if (active.supersetGroup) {
-        // Supersets alternate every set, whether or not `active` itself just
-        // finished — prefer the partner over "first incomplete in list order."
         setOverride(pickNextInGroup(active, willBeDone));
       } else if (willBeDone) {
-        // Plain linear case: only move on once this exercise's sets are all
-        // logged. `null` clears any stale override so the fallback picks the
-        // next incomplete exercise in program order.
         setOverride(null);
       } else {
-        // THE FIX: stay pinned on this exercise until it's actually done.
-        // Previously `override` was cleared unconditionally on every set of
-        // any program exercise, bouncing focus back to whichever exercise
-        // happened to be first-incomplete in list order.
         setOverride(active.exerciseId);
       }
     }
