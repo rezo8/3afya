@@ -1,0 +1,66 @@
+# CLAUDE.md — 3afya
+
+عافية (3afya, "well-being, vitality") is a personal, self-hostable workout &
+health tracker. It follows the shared blueprint in the umbrella
+**[`../CLAUDE.md`](../CLAUDE.md)** ("Node apps" throughout) — read that for
+the stack, code principles, and how-Claude-should-work rules. This file only
+records what is specific to 3afya.
+
+## App-specific
+
+- **Scope:** `@afya/*` · **package manager:** pnpm · **Node:** 22.
+- **Ports:** web **5174**, api **3001**, Postgres **5435**, Redis **6380**.
+  Local DB name/user: `afya`.
+- **Local dev:** `docker compose up -d` → `cp .env.example apps/api/.env`
+  (set a real `BETTER_AUTH_SECRET`) → `pnpm install` → `pnpm --filter
+  @afya/api db:migrate` (+ `db:seed` for a demo account) → `pnpm dev`. See the
+  README for the full quickstart + demo login.
+- **Deployed** (Cloud Run service `afya` in the `mi7rab` GCP project, on the
+  shared-infra model — domain DB `afya` on the shared `mi7rab-db` instance,
+  auth shared with mi7rab). Known prod gaps to verify before assuming
+  they're fixed: `cloudbuild.yaml`'s `BETTER_AUTH_URL`/`CORS_ORIGINS` may
+  still be placeholders rather than the real serving URL, and
+  `deploy/setup.sh` may still provision a separate DB user instead of using
+  the shared `mi7rab` role. Check current state against the umbrella
+  "Deployment" section rather than assuming either is resolved.
+
+## Domain
+
+Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
+
+- **Exercises** (`exercise`) are a shared library, reused across program
+  days. Each has a measurement **kind** that decides what a set records:
+  `weighted` (weight × reps), `reps` (count only), or `time` (duration).
+- A **program** (`program` → `programDay` → `programExercise`) is a rotation
+  of named days (not weekday-pinned) with target sets × reps/time — no
+  planned weight. "Today" is the next day after your last session.
+- A **workout session** (`workoutSession` → `setLog`) is a **snapshot of one
+  day**, not a growing edit of the program template — logging a set never
+  touches `programExercise`. An exercise belongs to a session iff it has ≥1
+  logged set; there's deliberately **no session-exercise join table**. Ad-hoc
+  exercises (not in the program day) are surfaced by `buildDayExercises`
+  (`apps/api/src/routes/sessions.ts`), which appends exercises that have
+  session sets but aren't in the program day, tagged `fromProgram: false`.
+  This is intentional — don't "fix" it by adding a join table; it keeps
+  sessions immutable records and programs reusable templates.
+- **Fuel** (`fuelEntry`, `nutritionTarget`) is logged per entry against a
+  daily protein/calorie target. **Body metrics** (`bodyMetric`, e.g. weight,
+  resting HR, sleep) trend over time. Estimated 1RM uses the Epley formula on
+  the best set per session.
+- The **contract** (`@afya/shared`) is the single source of truth for
+  request/response shapes.
+
+## Web shape
+
+- Code-based routes (`apps/web/src/router.tsx`): `/` Today · `/session/$dayId`
+  · `/program` · `/trends` · `/history` · `/history/$sessionId` · `/body`.
+  Auth pages: `/sign-in`, `/sign-up`.
+- Design direction is **"Vitality"** — a warm, dark, mobile-first world with
+  an espresso ground and a marigold accent; the working-set number is the
+  signature. Keep that restraint; don't add competing accents.
+
+## Conventions worth repeating
+
+- DB changes: edit the Drizzle schema, then `db:generate` + `db:migrate`.
+  Never hand-edit `apps/api/drizzle/`.
+- Don't format/edit generated files (see the umbrella `.prettierignore`).
