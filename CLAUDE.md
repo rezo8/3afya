@@ -37,6 +37,20 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
 - **Exercises** (`exercise`) are a shared library, reused across program
   days. Each has a measurement **kind** that decides what a set records:
   `weighted` (weight × reps), `reps` (count only), or `time` (duration).
+- **Deleting an exercise never destroys set-log history.** `setLog.exerciseId`
+  is `onDelete: "restrict"` (not `cascade`) precisely so this can't regress —
+  Postgres itself refuses the delete if any sets reference the exercise.
+  `DELETE /api/exercises/:id` (`apps/api/src/routes/exercises.ts`) checks for
+  existing set logs first: none → hard delete; any → soft-delete by setting
+  `exercise.archivedAt` instead, and returns `{ok:true}` either way. Archived
+  exercises are hidden from `GET /api/exercises` and rejected by
+  `POST /days/:dayId/exercises` (can't add one to a new program day), but the
+  row and its history stay intact. Because `(userId, name)` is a unique
+  index, `POST /api/exercises` with an archived exercise's exact name
+  **resurrects** it (clears `archivedAt`, same id) rather than erroring —
+  otherwise that name would be permanently unusable again. `programExercise`
+  keeps `onDelete: "cascade"` deliberately — losing a program-day reference on
+  delete is fine; losing historical training data is not.
 - A **program** (`program` → `programDay` → `programExercise`) is a rotation
   of named days (not weekday-pinned) with target sets × reps/time — no
   planned weight. "Today" is the next day after your last session.

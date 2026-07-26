@@ -34,6 +34,7 @@ export const exercise = pgTable(
     name: text("name").notNull(),
     kind: text("kind").$type<ExerciseKind>().default("weighted").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    archivedAt: timestamp("archived_at"),
   },
   (t) => [uniqueIndex("exercise_user_name_idx").on(t.userId, t.name)],
 );
@@ -121,7 +122,7 @@ export const setLog = pgTable(
       .references(() => workoutSession.id, { onDelete: "cascade" }),
     exerciseId: uuid("exercise_id")
       .notNull()
-      .references(() => exercise.id, { onDelete: "cascade" }),
+      .references(() => exercise.id, { onDelete: "restrict" }),
     setNumber: integer("set_number").notNull(),
     // Which fields matter depends on the exercise kind:
     //   weighted → weight + reps · reps → reps · time → durationSec

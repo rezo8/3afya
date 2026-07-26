@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import type {
   AddDayExerciseBody,
   CreateDayBody,
@@ -229,11 +229,11 @@ app.post("/days/:dayId/exercises", async (c) => {
 
   const body = await c.req.json<AddDayExerciseBody>().catch(() => null);
   if (!body?.exerciseId) return c.json({ error: "bad_request", message: "exerciseId is required." }, 400);
-  // Confirm the exercise is in the user's library.
+  // Confirm the exercise is in the user's library (and not archived).
   const [ex] = await db
     .select()
     .from(exercise)
-    .where(and(eq(exercise.id, body.exerciseId), eq(exercise.userId, userId)))
+    .where(and(eq(exercise.id, body.exerciseId), eq(exercise.userId, userId), isNull(exercise.archivedAt)))
     .limit(1);
   if (!ex) return c.json({ error: "bad_request", message: "Unknown exercise." }, 400);
 
