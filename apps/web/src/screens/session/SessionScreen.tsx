@@ -156,6 +156,17 @@ export function SessionScreen() {
 
   const setWorkFor = (id: string, patch: Partial<Work[string]>) => setWork((wk) => ({ ...wk, [id]: { ...wk[id]!, ...patch } }));
 
+  function pickNextInGroup(justSet: TodayExercise, willBeDone: boolean): string | null {
+    const group = programExercises.filter((e) => e.supersetGroup === justSet.supersetGroup);
+    const idx = group.findIndex((e) => e.exerciseId === justSet.exerciseId);
+    const doneAfter = (e: TodayExercise) => (e.exerciseId === justSet.exerciseId ? willBeDone : isDone(e));
+    for (let step = 1; step <= group.length; step++) {
+      const cand = group[(idx + step) % group.length]!;
+      if (!doneAfter(cand)) return cand.exerciseId;
+    }
+    return null;
+  }
+
   function completeSet() {
     if (!active) return;
     const wk = work[active.exerciseId]!;
@@ -169,7 +180,20 @@ export function SessionScreen() {
       body.durationSec = wk.durationSec;
     }
     logSet.mutate({ body, name: active.name });
-    setOverride(active.fromProgram ? null : active.exerciseId);
+
+    if (!active.fromProgram) {
+      setOverride(active.exerciseId);
+    } else {
+      const willBeDone = active.loggedSets.length + 1 >= active.targetSets;
+      if (active.supersetGroup) {
+        setOverride(pickNextInGroup(active, willBeDone));
+      } else if (willBeDone) {
+        setOverride(null);
+      } else {
+        setOverride(active.exerciseId);
+      }
+    }
+
     rest.start(active.restSec ?? 90);
   }
 
@@ -430,13 +454,46 @@ export function SessionScreen() {
         </div>
       )}
 
+      {(data.day.warmup || data.day.cooldown) && (
+        <div className="day-notes">
+          {data.day.warmup && (
+            <div>
+              <p className="eyebrow section-eyebrow">Warm-up</p>
+              <p className="day-note-text">{data.day.warmup}</p>
+            </div>
+          )}
+          {data.day.cooldown && (
+            <div>
+              <p className="eyebrow section-eyebrow">Cool-down</p>
+              <p className="day-note-text">{data.day.cooldown}</p>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="lifts">
         <p className="eyebrow section-eyebrow">This day</p>
         <ul>
-          {programExercises.map((e) => {
+          {programExercises.flatMap((e, i, list) => {
+            const prev = list[i - 1];
+            const next = list[i + 1];
+            const g = e.supersetGroup;
+            const inSS = !!g && (prev?.supersetGroup === g || next?.supersetGroup === g);
+            const ssStart = inSS && prev?.supersetGroup !== g;
+            const showSection = i === 0 || prev?.section !== e.section;
             const done = isDone(e);
-            return (
-              <li key={e.exerciseId}>
+            return [
+              showSection ? (
+                <li key={`sec-${e.exerciseId}`} className="pex-section">
+                  {e.section || "Exercises"}
+                </li>
+              ) : null,
+              ssStart ? (
+                <li key={`ss-${e.exerciseId}`} className="ss-head">
+                  Superset {g}
+                </li>
+              ) : null,
+              <li key={e.exerciseId} className={inSS ? "in-ss" : undefined}>
                 <button className={`row${done ? " is-done" : ""}${e.exerciseId === activeId ? " is-active" : ""}`} onClick={() => setOverride(e.exerciseId)}>
                   <span className="mark">{done ? "✓" : ""}</span>
                   <span className="rname">{e.name}</span>
@@ -444,8 +501,8 @@ export function SessionScreen() {
                     {rowMeta(e)} · <b>{e.loggedSets.length}</b>/{e.targetSets}
                   </span>
                 </button>
-              </li>
-            );
+              </li>,
+            ];
           })}
         </ul>
       </div>

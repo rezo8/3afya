@@ -221,7 +221,13 @@ app.get("/today", async (c) => {
   }
   const exercises = await buildDayExercises(userId, state.currentDay.id, state.session);
   return c.json({
-    day: { id: state.currentDay.id, name: state.currentDay.name, position: state.currentDay.position },
+    day: {
+      id: state.currentDay.id,
+      name: state.currentDay.name,
+      position: state.currentDay.position,
+      warmup: state.currentDay.warmup,
+      cooldown: state.currentDay.cooldown,
+    },
     session: state.session ? { id: state.session.id, performedAt: state.session.performedAt.toISOString() } : null,
     exercises,
   } satisfies TodayResponse);
@@ -235,7 +241,7 @@ app.get("/day/:dayId", async (c) => {
   const session = await todaySessionForDay(userId, day.id);
   const exercises = await buildDayExercises(userId, day.id, session);
   return c.json({
-    day: { id: day.id, name: day.name, position: day.position },
+    day: { id: day.id, name: day.name, position: day.position, warmup: day.warmup, cooldown: day.cooldown },
     session: session ? { id: session.id, performedAt: session.performedAt.toISOString() } : null,
     exercises,
   } satisfies TodayResponse);

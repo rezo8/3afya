@@ -78,6 +78,17 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
 - Design direction is **"Vitality"** — a warm, dark, mobile-first world with
   an espresso ground and a marigold accent; the working-set number is the
   signature. Keep that restraint; don't add competing accents.
+- **`SessionScreen.tsx`'s active-exercise focus is derived, not stored**:
+  `activeId` = the manually-tapped `override` if it's still a valid,
+  incomplete exercise, else the first incomplete exercise in program order.
+  `completeSet()` is the only thing that changes `override`, and it must stay
+  pinned on the just-logged exercise until that exercise (or, for a
+  superset — same `programExercise.supersetGroup` — *both* members of its
+  group) is actually done; clearing `override` unconditionally after every
+  set snaps focus back to list order and breaks logging out of order or
+  supersets (this was a real bug, fixed once already — don't reintroduce it).
+  Supersets alternate via `pickNextInGroup`, cycling to the next incomplete
+  group member in program order rather than falling through to list order.
 
 ## Conventions worth repeating
 

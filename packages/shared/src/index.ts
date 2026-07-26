@@ -223,7 +223,7 @@ export interface TodayExercise {
 
 /** The Today screen payload: next-up day + per-exercise history + any live session. */
 export interface TodayResponse {
-  day: { id: string; name: string; position: number } | null;
+  day: { id: string; name: string; position: number; warmup: string | null; cooldown: string | null } | null;
   session: { id: string; performedAt: string } | null;
   exercises: TodayExercise[];
 }
