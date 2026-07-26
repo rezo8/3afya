@@ -89,6 +89,19 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
 - Design direction is **"Vitality"** — a warm, dark, mobile-first world with
   an espresso ground and a marigold accent; the working-set number is the
   signature. Keep that restraint; don't add competing accents.
+- **The app's one React Context is the rest timer**
+  (`apps/web/src/screens/session/RestTimer.tsx`): `RestTimerProvider` +
+  `useRestTimer()` are colocated in the same file as the private
+  `useRestTimerState()` hook they wrap and the presentational `RestBar`. It's
+  mounted once in `apps/web/src/app/AppLayout.tsx` (the pathless layout route
+  wrapping every authenticated screen) rather than in `SessionScreen`, so the
+  countdown — and its chime/vibration completion — survives navigating to
+  another tab instead of being destroyed when `SessionScreen` unmounts.
+  `AppLayout` itself has to be split into an outer `AppLayout` (mounts
+  `RestTimerProvider`) and an inner `AppShell` (calls `useRestTimer()` and
+  renders `RestBar`), since a component can't consume a context it provides
+  in the same render pass — follow that same outer-provider/inner-consumer
+  split for any future context that needs to live at the shell level.
 - **`SessionScreen.tsx`'s active-exercise focus is derived, not stored**:
   `activeId` = the manually-tapped `override` if it's still a valid,
   incomplete exercise, else the first incomplete exercise in program order.

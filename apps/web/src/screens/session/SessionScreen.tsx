@@ -4,7 +4,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import type { CreateExerciseBody, Exercise, LoggedSetResult, LogSetBody, PrKind, TodayExercise, TodayResponse, UpdateSetBody } from "@afya/shared";
 import { api } from "@/lib/api/client";
 import { PR_LABEL } from "@/lib/pr";
-import { RestBar, useRestTimer } from "./RestTimer";
+import { useRestTimer } from "./RestTimer";
 
 type Work = Record<string, { weight: number; reps: number; durationSec: number }>;
 
@@ -570,10 +570,6 @@ export function SessionScreen() {
           </button>
         )}
       </div>
-
-      {rest.state && (
-        <RestBar total={rest.state.total} endsAt={rest.state.endsAt} onAdjust={rest.adjust} onSkip={rest.skip} onDone={rest.onDone} />
-      )}
     </>
   );
 }
