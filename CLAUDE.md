@@ -67,6 +67,17 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   daily protein/calorie target. **Body metrics** (`bodyMetric`, e.g. weight,
   resting HR, sleep) trend over time. Estimated 1RM uses the Epley formula on
   the best set per session.
+- Every logged set is **`isWarmup: boolean` (default false)** on `setLog` — a
+  simple flag, not a richer set-type enum (no dropset/failed-set concepts
+  yet). `apps/api/src/records.ts` (`computeRecords`/`detectPrs`) filters
+  warm-ups out **internally, once** — it takes the full set list and
+  discards `isWarmup` sets itself, rather than expecting every call site to
+  pre-filter. Every caller (session records, the standalone records route,
+  the trends progress route) gets correct PR/trend behavior automatically as
+  long as it includes `isWarmup` in its `RecordSet`-shaped query/object. If
+  you add a new place that reads `set_log` into a `RecordSet` or a trend
+  score, remember to select `isWarmup` — a query that omits it will silently
+  treat every set as a working set.
 - The **contract** (`@afya/shared`) is the single source of truth for
   request/response shapes.
 
@@ -95,3 +106,18 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
 - DB changes: edit the Drizzle schema, then `db:generate` + `db:migrate`.
   Never hand-edit `apps/api/drizzle/`.
 - Don't format/edit generated files (see the umbrella `.prettierignore`).
+
+## Testing
+
+- **Vitest** is the API's test framework (`apps/api/package.json`'s `test`
+  script — `vitest run`), first introduced alongside `records.ts`'s
+  warm-up/working-set tests. No vitest config file exists or is needed:
+  `records.ts` only has a type-only import from `@afya/shared`, which is
+  erased at compile time under `verbatimModuleSyntax`, so pure-logic modules
+  like it need no cross-workspace runtime resolution. If a future test needs
+  to import something with a runtime (not type-only) cross-package import,
+  that will need real workspace module resolution set up — don't assume the
+  no-config setup still works once that happens.
+- Tests live beside the code they test (`records.test.ts` next to
+  `records.ts`), matching the Go blueprint's convention even though this is
+  the Node stack.

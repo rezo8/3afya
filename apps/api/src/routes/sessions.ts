@@ -34,6 +34,7 @@ const toSet = (r: typeof setLog.$inferSelect): SetLog => ({
   weight: r.weight,
   reps: r.reps,
   durationSec: r.durationSec,
+  isWarmup: r.isWarmup,
   completedAt: r.completedAt.toISOString(),
 });
 
@@ -303,11 +304,19 @@ app.post("/:id/sets", async (c) => {
       weight: Math.max(0, body.weight ?? 0),
       reps: Math.max(0, Math.round(body.reps ?? 0)),
       durationSec: Math.max(0, Math.round(body.durationSec ?? 0)),
+      isWarmup: body.isWarmup ?? false,
     })
     .returning();
 
   const priorSets = await db
-    .select({ id: setLog.id, weight: setLog.weight, reps: setLog.reps, durationSec: setLog.durationSec, completedAt: setLog.completedAt })
+    .select({
+      id: setLog.id,
+      weight: setLog.weight,
+      reps: setLog.reps,
+      durationSec: setLog.durationSec,
+      isWarmup: setLog.isWarmup,
+      completedAt: setLog.completedAt,
+    })
     .from(setLog)
     .innerJoin(workoutSession, eq(setLog.sessionId, workoutSession.id))
     .where(and(eq(workoutSession.userId, userId), eq(setLog.exerciseId, ex.id), ne(setLog.id, row!.id)));
@@ -316,6 +325,7 @@ app.post("/:id/sets", async (c) => {
     weight: row!.weight,
     reps: row!.reps,
     durationSec: row!.durationSec,
+    isWarmup: row!.isWarmup,
     completedAt: row!.completedAt,
   });
   return c.json({ set: toSet(row!), prs } satisfies LoggedSetResult, 201);
@@ -337,6 +347,7 @@ app.patch("/:id/sets/:setId", async (c) => {
   if (typeof body.weight === "number") patch.weight = Math.max(0, body.weight);
   if (typeof body.reps === "number") patch.reps = Math.max(0, Math.round(body.reps));
   if (typeof body.durationSec === "number") patch.durationSec = Math.max(0, Math.round(body.durationSec));
+  if (typeof body.isWarmup === "boolean") patch.isWarmup = body.isWarmup;
   if (!Object.keys(patch).length) return c.json({ error: "bad_request" }, 400);
 
   const [row] = await db
@@ -443,7 +454,15 @@ app.get("/:id", async (c) => {
   const exIds = [...new Set(sets.map((r) => r.exerciseId))];
   const allTimeSets = exIds.length
     ? await db
-        .select({ exerciseId: setLog.exerciseId, id: setLog.id, weight: setLog.weight, reps: setLog.reps, durationSec: setLog.durationSec, completedAt: setLog.completedAt })
+        .select({
+          exerciseId: setLog.exerciseId,
+          id: setLog.id,
+          weight: setLog.weight,
+          reps: setLog.reps,
+          durationSec: setLog.durationSec,
+          isWarmup: setLog.isWarmup,
+          completedAt: setLog.completedAt,
+        })
         .from(setLog)
         .innerJoin(workoutSession, eq(setLog.sessionId, workoutSession.id))
         .where(and(eq(workoutSession.userId, userId), inArray(setLog.exerciseId, exIds)))

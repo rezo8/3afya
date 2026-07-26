@@ -136,6 +136,7 @@ export interface SetLog {
   reps: number;
   /** Seconds — used by the time kind (0 for others). */
   durationSec: number;
+  isWarmup: boolean;
   completedAt: string;
 }
 
@@ -192,11 +193,13 @@ export interface LogSetBody {
   weight?: number;
   reps?: number;
   durationSec?: number;
+  isWarmup?: boolean;
 }
 export interface UpdateSetBody {
   weight?: number;
   reps?: number;
   durationSec?: number;
+  isWarmup?: boolean;
 }
 
 /** One exercise on today's session, with last-session numbers pre-filled. */

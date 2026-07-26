@@ -5,6 +5,7 @@ export type RecordSet = {
   weight: number;
   reps: number;
   durationSec: number;
+  isWarmup: boolean;
   completedAt: Date;
 };
 
@@ -27,11 +28,12 @@ export function prKindsFor(kind: ExerciseKind): PrKind[] {
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export function computeRecords(kind: ExerciseKind, sets: RecordSet[]): PrEntry[] {
+  const working = sets.filter((s) => !s.isWarmup);
   const out: PrEntry[] = [];
   for (const k of prKindsFor(kind)) {
     let best: RecordSet | null = null;
     let bestScore = 0;
-    for (const s of sets) {
+    for (const s of working) {
       const v = SCORE[k](s);
       if (v > 0 && v > bestScore) {
         bestScore = v;
@@ -54,13 +56,15 @@ export function computeRecords(kind: ExerciseKind, sets: RecordSet[]): PrEntry[]
 }
 
 export function detectPrs(kind: ExerciseKind, priorSets: RecordSet[], newSet: RecordSet): PrKind[] {
+  if (newSet.isWarmup) return [];
+  const priorWorking = priorSets.filter((s) => !s.isWarmup);
   const broken: PrKind[] = [];
   for (const k of prKindsFor(kind)) {
     const nv = SCORE[k](newSet);
     if (nv <= 0) continue;
     let priorBest = 0;
     let hasPrior = false;
-    for (const s of priorSets) {
+    for (const s of priorWorking) {
       const v = SCORE[k](s);
       if (v > 0) {
         hasPrior = true;
