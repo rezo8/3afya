@@ -2019,6 +2019,39 @@ svg.chart {
   color: var(--marigold);
   font-weight: 800;
 }
+
+/* ---- ERROR STATES ---- */
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: linear-gradient(90deg, rgba(224, 83, 47, 0.18), rgba(224, 83, 47, 0.06));
+  border: 1px solid var(--pomegranate);
+}
+.eb-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--cream);
+}
+.eb-retry {
+  appearance: none;
+  border: 1px solid var(--pomegranate);
+  background: none;
+  color: var(--cream);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: var(--r-sm);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.eb-retry:hover {
+  background: var(--pomegranate);
+  color: var(--espresso);
+}
 .ls-pr {
   font-size: 14px;
   line-height: 1;
