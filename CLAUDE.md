@@ -17,12 +17,18 @@ records what is specific to 3afya.
   README for the full quickstart + demo login.
 - **Deployed** (Cloud Run service `afya` in the `mi7rab` GCP project, on the
   shared-infra model — domain DB `afya` on the shared `mi7rab-db` instance,
-  auth shared with mi7rab). Known prod gaps to verify before assuming
-  they're fixed: `cloudbuild.yaml`'s `BETTER_AUTH_URL`/`CORS_ORIGINS` may
-  still be placeholders rather than the real serving URL, and
-  `deploy/setup.sh` may still provision a separate DB user instead of using
-  the shared `mi7rab` role. Check current state against the umbrella
-  "Deployment" section rather than assuming either is resolved.
+  auth shared with mi7rab). Real serving URL is
+  `https://afya-qjyft4sfwa-uc.a.run.app` (no custom domain mapped, despite an
+  old placeholder `afya.ribhielzaru.com` — don't reintroduce that as
+  `BETTER_AUTH_URL`/an exact `CORS_ORIGINS` value, it isn't real and will
+  break login with Better Auth's "Invalid origin" error for anyone hitting
+  the actual URL). Origin policy is intentionally wide open:
+  `CORS_ORIGINS=*` in `cloudbuild.yaml` trusts any origin (CORS reflects the
+  request's Origin in `index.ts`; Better Auth's own wildcard matching handles
+  `trustedOrigins` natively). Known remaining prod gap: `deploy/setup.sh` may
+  still provision a separate DB user instead of using the shared `mi7rab`
+  role — check current state against the umbrella "Deployment" section
+  rather than assuming it's resolved.
 
 ## Domain
 

@@ -30,7 +30,7 @@ steps:
       - --max-instances=3
       - --add-cloudsql-instances=mi7rab:us-central1:mi7rab-db
       - --service-account=mi7rab-run@mi7rab.iam.gserviceaccount.com
-      - --set-env-vars=NODE_ENV=production,BETTER_AUTH_URL=https://afya.ribhielzaru.com,CORS_ORIGINS=https://afya.ribhielzaru.com
+      - --set-env-vars=NODE_ENV=production,BETTER_AUTH_URL=https://afya-qjyft4sfwa-uc.a.run.app,CORS_ORIGINS=*
       - >-
         --set-secrets=DATABASE_URL=afya-database-url:latest,AUTH_DATABASE_URL=database-url:latest,REDIS_URL=redis-url:latest,BETTER_AUTH_SECRET=better-auth-secret:latest
 

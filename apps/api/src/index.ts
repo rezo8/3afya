@@ -19,10 +19,11 @@ export const app = new Hono();
 app.use("*", secureHeaders());
 
 // CORS restricted to the configured browser origins; credentials for cookies.
+const isPublicOrigin = env.CORS_ORIGINS.length === 1 && env.CORS_ORIGINS[0] === "*";
 app.use(
   "/api/*",
   cors({
-    origin: env.CORS_ORIGINS,
+    origin: isPublicOrigin ? (origin) => origin : env.CORS_ORIGINS,
     credentials: true,
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
