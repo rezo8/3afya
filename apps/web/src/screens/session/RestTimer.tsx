@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 type RestState = { total: number; endsAt: number } | null;
 
@@ -20,7 +20,7 @@ function chime(ac: AudioContext | null) {
   });
 }
 
-export function useRestTimer() {
+function useRestTimerState() {
   const [state, setState] = useState<RestState>(null);
   const acRef = useRef<AudioContext | null>(null);
 
@@ -45,6 +45,20 @@ export function useRestTimer() {
   }, []);
 
   return { state, start, adjust, skip, onDone };
+}
+
+type RestTimerApi = ReturnType<typeof useRestTimerState>;
+const RestTimerContext = createContext<RestTimerApi | null>(null);
+
+export function RestTimerProvider({ children }: { children: ReactNode }) {
+  const value = useRestTimerState();
+  return <RestTimerContext.Provider value={value}>{children}</RestTimerContext.Provider>;
+}
+
+export function useRestTimer(): RestTimerApi {
+  const ctx = useContext(RestTimerContext);
+  if (!ctx) throw new Error("useRestTimer must be used within a RestTimerProvider");
+  return ctx;
 }
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;

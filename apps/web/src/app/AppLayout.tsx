@@ -2,6 +2,7 @@ import { Outlet } from "@tanstack/react-router";
 import { signOut, useSession } from "@/lib/auth/auth-client";
 import { queryClient } from "@/lib/query/query-client";
 import { router } from "@/router";
+import { RestBar, RestTimerProvider, useRestTimer } from "@/screens/session/RestTimer";
 import { TabBar } from "./TabBar";
 
 const today = new Date().toLocaleDateString("en-US", {
@@ -11,7 +12,16 @@ const today = new Date().toLocaleDateString("en-US", {
 });
 
 export function AppLayout() {
+  return (
+    <RestTimerProvider>
+      <AppShell />
+    </RestTimerProvider>
+  );
+}
+
+function AppShell() {
   const { data } = useSession();
+  const rest = useRestTimer();
 
   async function handleSignOut() {
     await signOut();
@@ -39,6 +49,9 @@ export function AppLayout() {
         <Outlet />
       </div>
       <TabBar />
+      {rest.state && (
+        <RestBar total={rest.state.total} endsAt={rest.state.endsAt} onAdjust={rest.adjust} onSkip={rest.skip} onDone={rest.onDone} />
+      )}
     </>
   );
 }
