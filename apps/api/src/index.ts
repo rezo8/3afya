@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import { HTTPException } from "hono/http-exception";
 import { serveStatic } from "@hono/node-server/serve-static";
+import type { ApiErrorBody } from "@afya/shared";
 import { env } from "./env";
 import { auth } from "./auth";
 import { rateLimit } from "./middleware/rate-limit";
@@ -14,6 +16,29 @@ import trends from "./routes/trends";
 import records from "./routes/records";
 
 export const app = new Hono();
+
+// Global safety net: any thrown exception anywhere in the app lands here.
+// Registered on `app` itself — because every route, including nested
+// sub-routers and the /api/auth/* passthrough, shares this instance's
+// router/errorHandler, this alone covers the whole app. It does NOT run
+// for handler-returned Responses (e.g. `c.json({error:...}, 400)`) — only
+// for thrown Errors, so existing intentional error responses are untouched.
+app.onError((err, c) => {
+  if (err instanceof HTTPException) return err.getResponse();
+
+  // requireAuth only runs inside the /api sub-router, so userId may be unset
+  // (e.g. a crash in /api/auth/* or in secureHeaders/cors before any route runs).
+  const userId = (c.var as { userId?: string }).userId;
+  console.error(
+    `[api] unhandled error: ${c.req.method} ${c.req.path}${userId ? ` (user ${userId})` : ""}:`,
+    err,
+  );
+
+  return c.json(
+    { error: "internal_error", message: "Something went wrong. Please try again." } satisfies ApiErrorBody,
+    500,
+  );
+});
 
 // Sensible security headers on every response.
 app.use("*", secureHeaders());
