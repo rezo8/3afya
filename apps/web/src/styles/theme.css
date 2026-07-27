@@ -758,6 +758,219 @@ body {
 .chip:active {
   transform: scale(0.94);
 }
+.mnote {
+  margin: 6px 0 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--taupe);
+}
+.fuel-target-open {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.fuel-target-open:hover {
+  color: var(--marigold);
+}
+.eating .error-banner {
+  margin-bottom: 16px;
+}
+.fuel-edit,
+.fuel-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--espresso);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--r-md);
+  padding: 14px;
+}
+.fuel-edit {
+  margin-bottom: 16px;
+}
+.fuel-custom {
+  margin-top: 10px;
+}
+.fuel-custom-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.fuel-name {
+  background: var(--surface);
+  border: 1px solid var(--line-hi);
+  color: var(--cream);
+  border-radius: var(--r-md);
+  padding: 11px 13px;
+  font-family: var(--sans);
+  font-size: 15px;
+  width: 100%;
+}
+.fuel-name:focus {
+  outline: none;
+  border-color: var(--marigold);
+}
+.fuel-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.fuel-field-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.fuel-field-ctl {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.fuel-field-num {
+  background: none;
+  border: none;
+  color: var(--cream);
+  font-family: var(--mono);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  width: 62px;
+  padding: 2px 0;
+}
+.fuel-field-num:focus {
+  outline: none;
+  color: var(--marigold);
+}
+.fuel-field-unit {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--taupe);
+  min-width: 26px;
+}
+.fuel-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.fuel-cancel {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--taupe);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.fuel-cancel:hover {
+  color: var(--marigold);
+}
+.fuel-save {
+  appearance: none;
+  border: none;
+  background: var(--marigold);
+  color: var(--espresso);
+  font-weight: 800;
+  border-radius: var(--r-md);
+  padding: 0 18px;
+  height: 40px;
+  cursor: pointer;
+  font-size: 15px;
+}
+.fuel-save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.fuel-custom-open {
+  appearance: none;
+  width: 100%;
+  margin-top: 10px;
+  background: none;
+  border: 1px dashed var(--line-hi);
+  color: var(--taupe);
+  border-radius: var(--r-md);
+  padding: 11px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.fuel-custom-open:hover {
+  border-color: var(--marigold);
+  color: var(--cream);
+}
+.fuel-log {
+  margin-top: 16px;
+}
+.fuel-log ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fuel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--espresso);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 7px 8px 7px 12px;
+}
+.fr-label {
+  flex: 1;
+  font-size: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fr-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--taupe);
+}
+.fr-del {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--taupe-dim);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 4px;
+}
+.fr-del:hover {
+  color: var(--pomegranate);
+}
+.fr-del:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.fuel-more {
+  appearance: none;
+  border: none;
+  background: none;
+  margin-top: 8px;
+  padding: 4px 0;
+  color: var(--taupe);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.fuel-more:hover {
+  color: var(--marigold);
+}
 
 /* ---- PROGRAM BUILDER ---- */
 .prog-name input {

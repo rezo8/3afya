@@ -148,6 +148,15 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   badges that day `DONE ✓` and moves `NEXT UP` to the following day in
   `program.days` itself (see the comment there). If rotation ever advances
   server-side, delete the client rule rather than letting both advance.
+- **`FuelPanel`'s quick-add chips are the user's own `frequent` labels.** The
+  four hardcoded `COLD_START_CHIPS` in `apps/web/src/screens/start/FuelPanel.tsx`
+  are a cold-start fallback for when `FuelDay.frequent` is empty, not a default
+  menu — anything else is logged through the panel's collapsed free-text form
+  (name + protein/calorie steppers), which reuses the same `POST /api/fuel`
+  mutation. Target editing hangs off the `targets · today` caption and **must
+  invalidate both `["fuel","today"]` and `["fuel","history"]`**: `TrendsScreen`'s
+  adherence chart grades its 7 days against `FuelHistory.target`, so invalidating
+  only `today` leaves that chart scoring against the target you just replaced.
 - **The recap is the session's ending, and it never locks.**
   `/history/$sessionId` (`SessionDetailScreen`) is the post-workout recap;
   `SessionScreen` links to it with `Review session ›` — a quiet
