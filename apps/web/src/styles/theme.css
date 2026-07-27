@@ -1961,6 +1961,10 @@ svg.chart {
   color: var(--taupe);
   font-variant-numeric: tabular-nums;
 }
+.sess .ssum.untrained {
+  color: var(--taupe-dim);
+  font-style: italic;
+}
 .sess .schev {
   color: var(--taupe-dim);
   font-size: 20px;
@@ -2183,6 +2187,38 @@ svg.chart {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--marigold);
+}
+/* Recap of a session that was started and never logged into. The History row stays
+   visible on purpose, so the way out of the dead end lives here. */
+.sd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.sd-empty .center-note {
+  padding-bottom: 0;
+}
+.sd-remove {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--taupe);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.sd-remove:hover {
+  color: var(--pomegranate);
+}
+.sd-remove.armed {
+  color: var(--pomegranate);
+  font-weight: 600;
+}
+.sd-remove:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ---- ADD EXERCISE TO SESSION ---- */

@@ -9,10 +9,11 @@ const localDate = (d: Date) =>
 const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 const allSets = (s: SessionDetail) => s.exercises.flatMap((e) => e.sets);
 const volume = (s: SessionDetail) => allSets(s).reduce((sum, x) => sum + x.weight * x.reps, 0);
+/** A session started but never logged into: it stays visible, but it isn't training. */
+const wasTrained = (s: SessionDetail) => allSets(s).length > 0;
 
 function summarize(s: SessionDetail): string {
   const sets = allSets(s);
-  if (!sets.length) return "No sets";
   const exCount = s.exercises.length;
   const lead = `${exCount} ${exCount === 1 ? "exercise" : "exercises"} · ${sets.length} ${sets.length === 1 ? "set" : "sets"}`;
   const vol = volume(s);
@@ -32,6 +33,7 @@ export function HistoryScreen() {
 
   if (isLoading) return <p className="center-note">Loading history…</p>;
   const sessions = data ?? [];
+  const trained = sessions.filter(wasTrained);
 
   const now = new Date();
   const year = now.getFullYear();
@@ -39,7 +41,7 @@ export function HistoryScreen() {
   const monthLabel = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   // streak: consecutive days with a session, ending today or yesterday
-  const dateSet = new Set(sessions.map((s) => localDate(new Date(s.performedAt))));
+  const dateSet = new Set(trained.map((s) => localDate(new Date(s.performedAt))));
   let streak = 0;
   const cursor = new Date();
   if (!dateSet.has(localDate(cursor))) cursor.setDate(cursor.getDate() - 1);
@@ -48,7 +50,7 @@ export function HistoryScreen() {
     cursor.setDate(cursor.getDate() - 1);
   }
 
-  const monthSessions = sessions.filter((s) => {
+  const monthSessions = trained.filter((s) => {
     const d = new Date(s.performedAt);
     return d.getFullYear() === year && d.getMonth() === month;
   });
@@ -126,7 +128,11 @@ export function HistoryScreen() {
                   </span>
                   <span className="sbody">
                     <span className="sname">{s.dayName ?? "Freeform"}</span>
-                    <span className="ssum">{summarize(s)}</span>
+                    {wasTrained(s) ? (
+                      <span className="ssum">{summarize(s)}</span>
+                    ) : (
+                      <span className="ssum untrained">started · nothing logged</span>
+                    )}
                   </span>
                   <span className="schev" aria-hidden="true">
                     ›

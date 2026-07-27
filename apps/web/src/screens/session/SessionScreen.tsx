@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import type { CreateExerciseBody, Exercise, LoggedSetResult, LogSetBody, PrKind, TodayExercise, TodayResponse, UpdateSetBody } from "@afya/shared";
@@ -31,6 +31,13 @@ export function SessionScreen() {
   const [prSets, setPrSets] = useState<Set<string>>(new Set());
   const [mutError, setMutError] = useState<{ message: string; retry: () => void } | null>(null);
   const [nextIsWarmup, setNextIsWarmup] = useState(false);
+  /**
+   * The session `logSet` lazily created, held until an invalidated query reports it.
+   * A failed set-POST doesn't invalidate, so without this a retry re-reads the same
+   * still-empty `data.session` and issues another create call — which only avoids a
+   * duplicate row because `POST /api/sessions` happens to be find-or-create.
+   */
+  const createdSessionId = useRef<string | null>(null);
   const rest = useRestTimer();
   const libraryQ = useQuery({ queryKey: ["exercises"], queryFn: () => api.get<Exercise[]>("/api/exercises") });
 
@@ -42,6 +49,7 @@ export function SessionScreen() {
     setPrSets(new Set());
     setMutError(null);
     setNextIsWarmup(false);
+    createdSessionId.current = null;
   }, [dayId]);
 
   useEffect(() => {
@@ -73,13 +81,17 @@ export function SessionScreen() {
   };
   const logSet = useMutation({
     mutationFn: async ({ body }: { body: LogSetBody; name: string }) => {
-      let sid = data?.session?.id;
-      if (!sid) sid = (await api.post<{ id: string }>("/api/sessions", { dayId })).id;
+      let sid = data?.session?.id ?? createdSessionId.current;
+      if (!sid) {
+        sid = (await api.post<{ id: string }>("/api/sessions", { dayId })).id;
+        createdSessionId.current = sid;
+      }
       return api.post<LoggedSetResult>(`/api/sessions/${sid}/sets`, body);
     },
     onSuccess: (result, vars) => {
       setMutError(null);
       setNextIsWarmup(false);
+      createdSessionId.current = null;
       invalidate();
       if (result.prs.length) {
         setPrBanner({ prs: result.prs, name: vars.name });
