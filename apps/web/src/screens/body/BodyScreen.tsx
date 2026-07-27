@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AddBodyMetricBody, BodyMetric, BodyMetricKind } from "@afya/shared";
 import { api } from "@/lib/api/client";
+import { daysAgo } from "@/lib/dates";
 import { LineChart } from "@/components/charts/LineChart";
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -47,6 +48,11 @@ function MetricCard({ cfg }: { cfg: MetricCfg }) {
   const labels = rows.map((r) => shortDate(r.measuredAt));
   const delta = vals.length > 1 ? +(vals.at(-1)! - vals[0]!).toFixed(cfg.precision) : 0;
 
+  // The big number is whatever was measured last, however long ago that was, and
+  // one Log tap re-stamps it as today. Say the age instead of guarding the tap —
+  // re-logging the same value is legitimate and has to stay one tap.
+  const staleDays = latest ? daysAgo(new Date(latest.measuredAt)) : 0;
+
   return (
     <div className="card">
       <div className="card-head">
@@ -60,6 +66,7 @@ function MetricCard({ cfg }: { cfg: MetricCfg }) {
           {vals.length > 1 ? `${delta > 0 ? "↑ +" : "↓ "}${delta} ${cfg.unit} overall` : "log to start the trend"}
         </span>
       </div>
+      {staleDays > 0 && <p className="metric-stale">last logged {staleDays}d ago</p>}
 
       <div className="bm-log">
         <button className="step" aria-label={`Decrease ${cfg.label}`} onClick={() => bump(-cfg.step)}>
