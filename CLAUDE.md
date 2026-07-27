@@ -317,6 +317,35 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   warm-up mark never silently carries over onto a different set. Follow the
   same `focusExercise` wrapper for any future per-set UI state that shouldn't
   survive an exercise switch.
+- **Swapping an exercise is performed-side only.** The `Swap ⇄` chip on
+  `SessionScreen`'s active card opens an inline panel of `GET
+  /api/exercises/:id/alternatives`; choosing one puts the substitute in the
+  *session* through the same `addExercise` path an ad-hoc exercise takes (so
+  focus pins on it exactly like adding does) and **never touches
+  `programExercise`**. The plan keeps the exercise it planned; the session
+  records what was actually performed. Don't "improve" this into editing the
+  program day.
+  - The chip renders only when the active exercise is **tagged**, and that tag
+    is read out of `libraryQ.data` by `exerciseId` — `TodayExercise` carries no
+    `primaryMuscleGroup`/`equipment`, only the library `Exercise` does. Ad-hoc
+    extras get the chip on the same rule; an untagged exercise gets none (the
+    endpoint would answer `[]` anyway).
+  - A catalog-only alternative (`inLibrary: false`, `id: null`) is created with
+    `createEx.mutateAsync({ name })` and **deliberately no `kind`**, so the
+    server resolves kind *and* the muscle tags from the catalog entry for that
+    exact name. Sending the add-panel's `newKind` default instead would make
+    e.g. "Side Plank" `weighted` rather than `time` (verified against the API).
+  - The open panel is held as `swapFor` — the exercise id whose alternatives are
+    shown, not a boolean — which is also the query key (`["alternatives",
+    swapFor]`). It's cleared in `focusExercise` and in the `dayId`-reset effect,
+    and the panel renders only while `swapFor === active.exerciseId`: focus also
+    moves via `completeSet`'s bare `setOverride` calls, so that render guard is
+    what stops a swap panel from outliving the exercise it belongs to. Opening
+    the add panel or the swap panel closes the other.
+  - Muscle/equipment tags render through one `TaxonomyTags` component and the
+    single `.ex-tag` class, used by both the swap panel and the "Add to this
+    session" library list — keep them one visual system rather than styling
+    taxonomy per panel.
 - **`TrendsScreen` leads with the answer, not the trophy case.** Card order is
   Progress (per-exercise chart + lift picker) → Fuel adherence → Records, and
   Records is collapsed to the 3 newest `PrEntry`s across all exercises (ranked

@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import type { CreateExerciseBody, Exercise, LoggedSetResult, LogSetBody, PrKind, TodayExercise, TodayResponse, UpdateSetBody } from "@afya/shared";
+import type {
+  CreateExerciseBody,
+  Equipment,
+  Exercise,
+  ExerciseAlternative,
+  LoggedSetResult,
+  LogSetBody,
+  MuscleGroup,
+  PrKind,
+  TodayExercise,
+  TodayResponse,
+  UpdateSetBody,
+} from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
@@ -12,6 +24,17 @@ import { useRestTimer } from "./RestTimer";
 type Work = Record<string, { weight: number; reps: number; durationSec: number }>;
 
 const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
+
+const muscleLabel = (group: MuscleGroup) => group.replace("_", " ");
+
+function TaxonomyTags({ muscleGroup, equipment }: { muscleGroup: MuscleGroup | null; equipment: Equipment | null }) {
+  return (
+    <>
+      {muscleGroup && <span className="ex-tag">{muscleLabel(muscleGroup)}</span>}
+      {equipment && <span className="ex-tag">{equipment}</span>}
+    </>
+  );
+}
 
 export function SessionScreen() {
   const qc = useQueryClient();
@@ -25,6 +48,7 @@ export function SessionScreen() {
   const [override, setOverride] = useState<string | null>(null);
   const [extras, setExtras] = useState<Exercise[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [swapFor, setSwapFor] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newKind, setNewKind] = useState<Exercise["kind"]>("weighted");
   const [prBanner, setPrBanner] = useState<{ prs: PrKind[]; name: string } | null>(null);
@@ -40,10 +64,16 @@ export function SessionScreen() {
   const createdSessionId = useRef<string | null>(null);
   const rest = useRestTimer();
   const libraryQ = useQuery({ queryKey: ["exercises"], queryFn: () => api.get<Exercise[]>("/api/exercises") });
+  const alternativesQ = useQuery({
+    queryKey: ["alternatives", swapFor],
+    queryFn: () => api.get<ExerciseAlternative[]>(`/api/exercises/${swapFor}/alternatives`),
+    enabled: swapFor !== null,
+  });
 
   useEffect(() => {
     setExtras([]);
     setShowAdd(false);
+    setSwapFor(null);
     setOverride(null);
     setPrBanner(null);
     setPrSets(new Set());
@@ -183,6 +213,7 @@ export function SessionScreen() {
   const focusExercise = (id: string) => {
     setOverride(id);
     setNextIsWarmup(false);
+    setSwapFor(null);
   };
   const addExercise = (ex: Exercise) => {
     setExtras((xs) => (xs.some((x) => x.id === ex.id) ? xs : [...xs, ex]));
@@ -202,6 +233,41 @@ export function SessionScreen() {
   };
   const inSession = new Set(exercises.map((e) => e.exerciseId));
   const library = (libraryQ.data ?? []).filter((ex) => !inSession.has(ex.id));
+  const libraryById = new Map<string, Exercise>((libraryQ.data ?? []).map((ex) => [ex.id, ex]));
+
+  const openAdd = () => {
+    setShowAdd(true);
+    setSwapFor(null);
+  };
+  /** The muscle group lives on the library `Exercise`, never on the session's `TodayExercise`. */
+  const canSwap = active !== null && libraryById.get(active.exerciseId)?.primaryMuscleGroup != null;
+  const swapOpen = active !== null && swapFor === active.exerciseId;
+  const alternatives = alternativesQ.data ?? [];
+  const toggleSwap = (exerciseId: string) => {
+    setSwapFor(swapOpen ? null : exerciseId);
+    setShowAdd(false);
+  };
+  /**
+   * A substitute is performed-side only: it joins this session as an ad-hoc exercise and
+   * the program day keeps the exercise it planned.
+   */
+  const swapTo = async (alt: ExerciseAlternative) => {
+    if (alt.id === null) {
+      try {
+        // No `kind` on purpose — the server takes it (and the muscle tags) from the catalog.
+        addExercise(await createEx.mutateAsync({ name: alt.name }));
+      } catch {
+        // onError above already surfaced the banner; nothing else to do here.
+      }
+      return;
+    }
+    if (inSession.has(alt.id)) {
+      focusExercise(alt.id);
+      return;
+    }
+    const fromLibrary = libraryById.get(alt.id);
+    if (fromLibrary) addExercise(fromLibrary);
+  };
 
   const setWorkFor = (id: string, patch: Partial<Work[string]>) => setWork((wk) => ({ ...wk, [id]: { ...wk[id]!, ...patch } }));
 
@@ -345,6 +411,50 @@ export function SessionScreen() {
             <p className="set-target">Added to this session</p>
           )}
           {active.note && <p className="set-note">{active.note}</p>}
+
+          {canSwap && (
+            <div className="swap-row">
+              <button
+                type="button"
+                className={`ls${swapOpen ? " on" : ""}`}
+                aria-expanded={swapOpen}
+                onClick={() => toggleSwap(active.exerciseId)}
+              >
+                Swap ⇄
+              </button>
+            </div>
+          )}
+          {swapOpen && (
+            <div className="swap-panel">
+              <div className="add-ex-head">
+                <p className="eyebrow">Swap for</p>
+                <button className="add-ex-close" onClick={() => setSwapFor(null)}>
+                  Close
+                </button>
+              </div>
+              {alternativesQ.isLoading ? (
+                <p className="swap-note">Finding alternatives…</p>
+              ) : alternativesQ.isError ? (
+                <ErrorBanner message={errorMessage(alternativesQ.error)} onRetry={() => alternativesQ.refetch()} />
+              ) : alternatives.length === 0 ? (
+                <p className="swap-note">No alternatives for this one</p>
+              ) : (
+                <ul className="swap-list">
+                  {alternatives.map((alt) => (
+                    <li key={alt.id ?? alt.name}>
+                      <button onClick={() => swapTo(alt)} disabled={createEx.isPending}>
+                        <span className="swap-name">{alt.name}</span>
+                        <span className="swap-tags">
+                          <TaxonomyTags muscleGroup={alt.primaryMuscleGroup} equipment={alt.equipment} />
+                          {!alt.inLibrary && <span className="swap-new">new</span>}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {w && (
             <>
@@ -629,6 +739,7 @@ export function SessionScreen() {
                   <button key={ex.id} onClick={() => addExercise(ex)}>
                     {ex.name}
                     <span className="kind-tag">{ex.kind}</span>
+                    <TaxonomyTags muscleGroup={ex.primaryMuscleGroup} equipment={ex.equipment} />
                   </button>
                 ))}
               </div>
@@ -653,7 +764,7 @@ export function SessionScreen() {
             </div>
           </div>
         ) : (
-          <button className="add-ex-open" onClick={() => setShowAdd(true)}>
+          <button className="add-ex-open" onClick={openAdd}>
             ＋ Add an exercise
           </button>
         )}
