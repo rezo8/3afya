@@ -10,6 +10,9 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { m
 const weekday = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "short" });
 const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 
+const RECENT_RECORDS = 3;
+const VISIBLE_LIFT_CHIPS = 8;
+
 const METRIC_LABEL: Record<ProgressTrend["metric"], string> = {
   est1rm: "Estimated 1RM",
   reps: "Best set",
@@ -22,6 +25,25 @@ const fmtRecord = (r: PrEntry) => {
   if (r.kind === "weight") return `${r.value} lb`;
   return `${Math.round(r.value).toLocaleString()} lb`;
 };
+
+const describeAdherence = (onTarget: number, logged: number) =>
+  logged === 0 ? "no days logged" : `${onTarget} of ${logged} logged day${logged === 1 ? "" : "s"} on target`;
+
+/** The newest PRs across every exercise, regrouped by exercise so one list shape renders both states. */
+function newestRecords(all: ExerciseRecords[]): ExerciseRecords[] {
+  const newest = all
+    .flatMap((ex) => ex.records.map((record) => ({ ex, record })))
+    .sort((a, b) => Date.parse(b.record.achievedAt) - Date.parse(a.record.achievedAt))
+    .slice(0, RECENT_RECORDS);
+
+  const byExercise = new Map<string, ExerciseRecords>();
+  for (const { ex, record } of newest) {
+    const group = byExercise.get(ex.exerciseId);
+    if (group) group.records.push(record);
+    else byExercise.set(ex.exerciseId, { ...ex, records: [record] });
+  }
+  return [...byExercise.values()];
+}
 
 export function TrendsScreen() {
   const exQ = useQuery({
@@ -50,6 +72,8 @@ export function TrendsScreen() {
   const [progReadout, setProgReadout] = useState<string | null>(null);
   const [fuelReadout, setFuelReadout] = useState<string | null>(null);
   const [fuelKind, setFuelKind] = useState<"protein" | "cal">("protein");
+  const [allLiftsShown, setAllLiftsShown] = useState(false);
+  const [allRecordsShown, setAllRecordsShown] = useState(false);
 
   const prog = progQ.data;
   const isTime = prog?.metric === "time";
@@ -60,12 +84,27 @@ export function TrendsScreen() {
   const progNow = progVals.at(-1);
   const progDelta = progVals.length > 1 ? progNow! - progVals[0]! : 0;
 
+  const lifts = exQ.data ?? [];
+  const selectedLift = lifts.find((e) => e.id === liftId);
+  const orderedLifts = selectedLift ? [selectedLift, ...lifts.filter((e) => e.id !== selectedLift.id)] : lifts;
+  const visibleLifts = allLiftsShown ? orderedLifts : orderedLifts.slice(0, VISIBLE_LIFT_CHIPS);
+
   const fuel = fuelQ.data;
-  const fuelVals = fuel ? fuel.days.map((d) => (fuelKind === "protein" ? Math.round(d.proteinG) : Math.round(d.calories))) : [];
-  const fuelLabels = fuel ? fuel.days.map((d) => weekday(d.date)) : [];
+  const fuelDays = fuel?.days ?? [];
+  const fuelVals = fuelDays.map((d) => {
+    if (d.entryCount === 0) return null;
+    return fuelKind === "protein" ? Math.round(d.proteinG) : Math.round(d.calories);
+  });
+  const fuelLabels = fuelDays.map((d) => weekday(d.date));
   const fuelGoal = fuel ? (fuelKind === "protein" ? fuel.target.proteinG : fuel.target.calories) : 0;
   const fuelUnit = fuelKind === "protein" ? "g" : "kcal";
-  const fuelHits = fuelVals.filter((v) => v >= fuelGoal).length;
+  const loggedDays = fuelVals.filter((v) => v !== null).length;
+  const onTargetDays = fuelVals.filter((v) => v !== null && v >= fuelGoal).length;
+  const adherence = fuel ? describeAdherence(onTargetDays, loggedDays) : "—";
+
+  const records = recordsQ.data ?? [];
+  const recordCount = records.reduce((n, ex) => n + ex.records.length, 0);
+  const shownRecords = allRecordsShown ? records : newestRecords(records);
 
   if (exQ.isLoading) return <p className="center-note">Loading trends…</p>;
 
@@ -83,30 +122,6 @@ export function TrendsScreen() {
         </section>
       ) : (
         <>
-          {recordsQ.data && recordsQ.data.length > 0 && (
-            <div className="card">
-              <div className="card-head">
-                <p className="eyebrow">Records</p>
-                <span className="readout">🏆 all-time bests</span>
-              </div>
-              <ul className="rec-list">
-                {recordsQ.data.map((ex) => (
-                  <li key={ex.exerciseId} className="rec-ex">
-                    <span className="rec-name">{ex.name}</span>
-                    <div className="rec-prs">
-                      {ex.records.map((r) => (
-                        <span key={r.kind} className="rec-pr">
-                          <span className="rec-pr-k">{PR_LABEL[r.kind]}</span>
-                          <span className="rec-pr-v">{fmtRecord(r)}</span>
-                        </span>
-                      ))}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           <div className="card">
             <div className="card-head">
               <p className="eyebrow">{prog ? METRIC_LABEL[prog.metric] : "Progress"}</p>
@@ -122,11 +137,16 @@ export function TrendsScreen() {
               </span>
             </div>
             <div className="lift-select">
-              {exQ.data?.map((e) => (
+              {visibleLifts.map((e) => (
                 <button key={e.id} className={`ls${e.id === liftId ? " on" : ""}`} onClick={() => setLiftId(e.id)}>
                   {e.name}
                 </button>
               ))}
+              {orderedLifts.length > VISIBLE_LIFT_CHIPS && (
+                <button className="ls" onClick={() => setAllLiftsShown(!allLiftsShown)}>
+                  {allLiftsShown ? "Fewer" : `+${orderedLifts.length - VISIBLE_LIFT_CHIPS} more`}
+                </button>
+              )}
             </div>
             <LineChart
               data={progVals}
@@ -150,16 +170,49 @@ export function TrendsScreen() {
               </div>
             </div>
             <div className="card-head" style={{ marginTop: 8 }}>
-              <span className="readout">{fuelReadout ?? `${fuelHits} / ${fuelVals.length} days on target`}</span>
+              <span className="readout">{fuelReadout ?? adherence}</span>
             </div>
             <BarChart
               data={fuelVals}
               goal={fuelGoal}
               labels={fuelLabels}
-              onHover={(i, v) => setFuelReadout(`${fuelLabels[i]} · ${v} ${fuelUnit}`)}
+              onHover={(i, v) =>
+                setFuelReadout(`${fuelLabels[i]} · ${v === null ? "not logged" : `${v} ${fuelUnit}`}`)
+              }
               onLeave={() => setFuelReadout(null)}
             />
           </div>
+
+          {records.length > 0 && (
+            <div className="card">
+              <div className="card-head">
+                <p className="eyebrow">Records</p>
+                <span className="readout">🏆 {allRecordsShown ? "all-time bests" : "latest PRs"}</span>
+              </div>
+              <ul className="rec-list">
+                {shownRecords.map((ex) => (
+                  <li key={ex.exerciseId} className="rec-ex">
+                    <span className="rec-name">{ex.name}</span>
+                    <div className="rec-prs">
+                      {ex.records.map((r) => (
+                        <span key={r.kind} className="rec-pr">
+                          <span className="rec-pr-k">{PR_LABEL[r.kind]}</span>
+                          <span className="rec-pr-v">{fmtRecord(r)}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {recordCount > RECENT_RECORDS && (
+                <div className="expand-row">
+                  <button className="ls" onClick={() => setAllRecordsShown(!allRecordsShown)}>
+                    {allRecordsShown ? "Show fewer" : "See all records"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </>
