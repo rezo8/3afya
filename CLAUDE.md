@@ -113,6 +113,33 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   supersets (this was a real bug, fixed once already — don't reintroduce it).
   Supersets alternate via `pickNextInGroup`, cycling to the next incomplete
   group member in program order rather than falling through to list order.
+- **Sets past the plan are loggable, and they pin focus.** A program exercise
+  at/beyond `targetSets` keeps its numbers block, pips and Complete-set button
+  live (eyebrow reads `Extra · set N`; the beyond-plan pips carry
+  `.pip.extra`). `completeSet()` tests `loggedSets.length >= targetSets`
+  **before** the `willBeDone`/superset branches and re-pins `override` on the
+  same exercise, so an extra set never advances focus — not even for a
+  superset member, since `pickNextInGroup`'s alternation is for plan sets and
+  an extra set is a deliberate choice to stay put. `isExerciseDone`,
+  `doneCount` and the progress track keep meaning "hit the plan", so a row
+  legitimately reads 5/4.
+- **`isExerciseDone` (`apps/web/src/lib/session.ts`) is the one done
+  predicate**, shared by `SessionScreen` (focus, counts, row ticks) and
+  `StartScreen` (the day cards' Resume/Done states). Ad-hoc exercises are
+  never done (`fromProgram &&`). Don't re-inline it in a screen — the point of
+  the extraction is that the two screens can't disagree about where a day
+  stands.
+- **`StartScreen` owns advancing "next up" past a finished day.** The API's
+  `rotationState` keeps returning *today's* day until tomorrow, so the client
+  badges that day `DONE ✓` and moves `NEXT UP` to the following day in
+  `program.days` itself (see the comment there). If rotation ever advances
+  server-side, delete the client rule rather than letting both advance.
+- **The recap is the session's ending, and it never locks.**
+  `/history/$sessionId` (`SessionDetailScreen`) is the post-workout recap;
+  `SessionScreen` links to it with `Review session ›` — a quiet
+  `.review-session` link at the bottom while logging, and the primary action
+  in the all-done card. Keep that wording: "Finish"/"Close" would lie, since
+  sets can still be logged (and edited) after.
 - **The warm-up toggle is per-set UI state, not derived**: `SessionScreen.tsx`
   keeps a standalone `nextIsWarmup` boolean (not part of `Work`, which is
   keyed per-exercise and intentionally persists) and resets it to `false` in

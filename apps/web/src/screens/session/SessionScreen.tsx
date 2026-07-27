@@ -6,6 +6,7 @@ import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
 import { PR_LABEL } from "@/lib/pr";
+import { isExerciseDone } from "@/lib/session";
 import { useRestTimer } from "./RestTimer";
 
 type Work = Record<string, { weight: number; reps: number; durationSec: number }>;
@@ -160,12 +161,11 @@ export function SessionScreen() {
   const programExercises = exercises.filter((e) => e.fromProgram);
   const addedExercises = exercises.filter((e) => !e.fromProgram);
 
-  const isDone = (e: TodayExercise) => e.fromProgram && e.loggedSets.length >= e.targetSets;
-  const doneCount = programExercises.filter(isDone).length;
+  const doneCount = programExercises.filter(isExerciseDone).length;
   const activeId =
     override && exercises.some((e) => e.exerciseId === override)
       ? override
-      : (exercises.find((e) => !isDone(e))?.exerciseId ?? null);
+      : (exercises.find((e) => !isExerciseDone(e))?.exerciseId ?? null);
   const active = exercises.find((e) => e.exerciseId === activeId) ?? null;
 
   const focusExercise = (id: string) => {
@@ -196,7 +196,7 @@ export function SessionScreen() {
   function pickNextInGroup(justSet: TodayExercise, willBeDone: boolean): string | null {
     const group = programExercises.filter((e) => e.supersetGroup === justSet.supersetGroup);
     const idx = group.findIndex((e) => e.exerciseId === justSet.exerciseId);
-    const doneAfter = (e: TodayExercise) => (e.exerciseId === justSet.exerciseId ? willBeDone : isDone(e));
+    const doneAfter = (e: TodayExercise) => (e.exerciseId === justSet.exerciseId ? willBeDone : isExerciseDone(e));
     for (let step = 1; step <= group.length; step++) {
       const cand = group[(idx + step) % group.length]!;
       if (!doneAfter(cand)) return cand.exerciseId;
@@ -218,7 +218,8 @@ export function SessionScreen() {
     }
     logSet.mutate({ body, name: active.name });
 
-    if (!active.fromProgram) {
+    const beyondTarget = active.loggedSets.length >= active.targetSets;
+    if (!active.fromProgram || beyondTarget) {
       setOverride(active.exerciseId);
     } else {
       const willBeDone = active.loggedSets.length + 1 >= active.targetSets;
@@ -235,7 +236,8 @@ export function SessionScreen() {
   }
 
   const w = active ? work[active.exerciseId] : undefined;
-  const activeDone = active ? isDone(active) : false;
+  const activeDone = active ? isExerciseDone(active) : false;
+  const pipCount = active ? Math.max(active.targetSets, active.loggedSets.length + 1) : 0;
 
   let delta: number | null = null;
   let deltaUnit = "";
@@ -315,7 +317,7 @@ export function SessionScreen() {
           <p className="eyebrow">
             {active.fromProgram
               ? activeDone
-                ? "Done · edit below"
+                ? `Extra · set ${active.loggedSets.length + 1}`
                 : `Now · set ${active.loggedSets.length + 1} of ${active.targetSets}`
               : `Added · set ${active.loggedSets.length + 1}`}
           </p>
@@ -335,7 +337,7 @@ export function SessionScreen() {
           )}
           {active.note && <p className="set-note">{active.note}</p>}
 
-          {!activeDone && w && (
+          {w && (
             <>
               <div className="numbers">
                 {active.kind === "weighted" ? (
@@ -404,13 +406,13 @@ export function SessionScreen() {
               </div>
 
               <div className="pips">
-                {Array.from({ length: active.fromProgram ? active.targetSets : active.loggedSets.length + 1 }).map((_, i) => (
-                  <span
-                    key={i}
-                    className={`pip${i < active.loggedSets.length ? " done" : i === active.loggedSets.length ? " active" : ""}`}
-                    onClick={() => i === active.loggedSets.length && completeSet()}
-                  />
-                ))}
+                {Array.from({ length: pipCount }).map((_, i) => {
+                  const cls = ["pip"];
+                  if (active.fromProgram && i >= active.targetSets) cls.push("extra");
+                  if (i < active.loggedSets.length) cls.push("done");
+                  else if (i === active.loggedSets.length) cls.push("active");
+                  return <span key={i} className={cls.join(" ")} onClick={() => i === active.loggedSets.length && completeSet()} />;
+                })}
               </div>
               <div className="warmup-row">
                 <button
@@ -505,14 +507,29 @@ export function SessionScreen() {
             </div>
           )}
         </div>
+      ) : exercises.length === 0 ? (
+        <section className="empty-state">
+          <h2>This day has no exercises yet</h2>
+          <p>Add lifts to this day in your program, then come back here to log them.</p>
+          <Link className="btn" to="/program">
+            Edit program
+          </Link>
+        </section>
       ) : (
         <div className="setcard">
           <p className="eyebrow">Session</p>
           <h2 className="lift">All sets logged — nice work. 💪</h2>
           <div className="delta">Great session. Pick your next day whenever you’re ready.</div>
-          <Link className="log" to="/" style={{ textAlign: "center", textDecoration: "none" }}>
-            Back to days
-          </Link>
+          <div className="done-actions">
+            {data.session && (
+              <Link className="log" to="/history/$sessionId" params={{ sessionId: data.session.id }}>
+                Review session ›
+              </Link>
+            )}
+            <Link to="/" className="back-link">
+              ‹ All days
+            </Link>
+          </div>
         </div>
       )}
 
@@ -543,7 +560,7 @@ export function SessionScreen() {
             const inSS = !!g && (prev?.supersetGroup === g || next?.supersetGroup === g);
             const ssStart = inSS && prev?.supersetGroup !== g;
             const showSection = i === 0 || prev?.section !== e.section;
-            const done = isDone(e);
+            const done = isExerciseDone(e);
             return [
               showSection ? (
                 <li key={`sec-${e.exerciseId}`} className="pex-section">
@@ -632,6 +649,12 @@ export function SessionScreen() {
           </button>
         )}
       </div>
+
+      {active && data.session && (
+        <Link className="review-session" to="/history/$sessionId" params={{ sessionId: data.session.id }}>
+          Review session <span aria-hidden="true">›</span>
+        </Link>
+      )}
     </>
   );
 }

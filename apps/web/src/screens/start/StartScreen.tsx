@@ -1,15 +1,52 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import type { Program, TodayResponse } from "@afya/shared";
+import type { Program, SessionDetail, TodayResponse } from "@afya/shared";
 import { api } from "@/lib/api/client";
+import { isExerciseDone } from "@/lib/session";
 import { FuelPanel } from "@/screens/start/FuelPanel";
+
+type DayMark = { kind: "resume"; done: number; total: number } | { kind: "done" } | { kind: "next" } | { kind: "none" };
+
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+function daysAgoLabel(iso: string): string {
+  const days = Math.round((startOfDay(new Date()).getTime() - startOfDay(new Date(iso)).getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  return `${days} days ago`;
+}
 
 export function StartScreen() {
   const programsQ = useQuery({ queryKey: ["programs"], queryFn: () => api.get<Program[]>("/api/programs") });
   const todayQ = useQuery({ queryKey: ["today"], queryFn: () => api.get<TodayResponse>("/api/sessions/today") });
+  const lastQ = useQuery({ queryKey: ["last-session"], queryFn: () => api.get<SessionDetail[]>("/api/sessions?limit=1") });
 
   const program = programsQ.data?.[0] ?? null;
-  const nextDayId = todayQ.data?.day?.id ?? null;
+  const currentDayId = todayQ.data?.day?.id ?? null;
+  const sessionToday = todayQ.data?.session ?? null;
+  const plannedToday = (todayQ.data?.exercises ?? []).filter((e) => e.fromProgram);
+  const doneToday = plannedToday.filter(isExerciseDone).length;
+
+  const currentMark: DayMark = !sessionToday
+    ? { kind: "next" }
+    : doneToday < plannedToday.length
+      ? { kind: "resume", done: doneToday, total: plannedToday.length }
+      : { kind: "done" };
+
+  // The client owns advancing "next up" past a finished day: the server's
+  // rotation keeps returning today's day until tomorrow. If rotation ever moves
+  // server-side, drop this rather than letting both advance.
+  const days = program?.days ?? [];
+  const currentIndex = days.findIndex((d) => d.id === currentDayId);
+  const followingDayId = currentIndex === -1 ? null : (days[(currentIndex + 1) % days.length]?.id ?? null);
+
+  const markFor = (dayId: string): DayMark => {
+    if (dayId === currentDayId) return currentMark;
+    if (currentMark.kind === "done" && dayId === followingDayId) return { kind: "next" };
+    return { kind: "none" };
+  };
+
+  const lastSession = lastQ.data?.[0] ?? null;
 
   if (programsQ.isLoading) return <p className="center-note">Loading…</p>;
 
@@ -36,23 +73,42 @@ export function StartScreen() {
       <div className="view-head">
         <p className="eyebrow">Start</p>
         <h1>{program.name}</h1>
+        {!sessionToday && lastSession && (
+          <p className="last-trained">
+            Last trained · {lastSession.dayName ?? "Freeform"} · {daysAgoLabel(lastSession.performedAt)}
+          </p>
+        )}
       </div>
 
       <div>
         <p className="eyebrow section-eyebrow">Pick a day</p>
         <div className="start-days">
-          {program.days.map((d, i) => (
-            <Link key={d.id} to="/session/$dayId" params={{ dayId: d.id }} className={`start-day${d.id === nextDayId ? " is-next" : ""}`}>
-              <div className="sd-top">
-                <span className="sd-badge">{String.fromCharCode(65 + i)}</span>
-                {d.id === nextDayId && <span className="sd-next">next up</span>}
-              </div>
-              <span className="sd-name">{d.name}</span>
-              <span className="sd-meta">
-                {d.exercises.length} {d.exercises.length === 1 ? "exercise" : "exercises"}
-              </span>
-            </Link>
-          ))}
+          {program.days.map((d, i) => {
+            const mark = markFor(d.id);
+            return (
+              <Link
+                key={d.id}
+                to="/session/$dayId"
+                params={{ dayId: d.id }}
+                className={`start-day${mark.kind === "resume" ? " is-resume" : mark.kind === "next" ? " is-next" : mark.kind === "done" ? " is-done" : ""}`}
+              >
+                <div className="sd-top">
+                  <span className="sd-badge">{String.fromCharCode(65 + i)}</span>
+                  {mark.kind === "resume" && (
+                    <span className="sd-resume">
+                      resume · {mark.done}/{mark.total} lifts
+                    </span>
+                  )}
+                  {mark.kind === "done" && <span className="sd-done">done ✓</span>}
+                  {mark.kind === "next" && <span className="sd-next">next up</span>}
+                </div>
+                <span className="sd-name">{d.name}</span>
+                <span className="sd-meta">
+                  {d.exercises.length} {d.exercises.length === 1 ? "exercise" : "exercises"}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </div>
 

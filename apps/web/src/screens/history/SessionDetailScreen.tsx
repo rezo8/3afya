@@ -68,6 +68,8 @@ export function SessionDetailScreen() {
   const totalSets = data.exercises.reduce((n, e) => n + e.sets.length, 0);
   const volume = Math.round(data.exercises.reduce((n, e) => n + e.sets.reduce((v, s) => v + s.weight * s.reps, 0), 0));
   const recordSetIds = new Set((data.records ?? []).flatMap((r) => r.records.map((x) => x.setId)));
+  const prSetCount = data.exercises.reduce((n, e) => n + e.sets.filter((s) => recordSetIds.has(s.id)).length, 0);
+  const prExerciseNames = data.exercises.filter((e) => e.sets.some((s) => recordSetIds.has(s.id))).map((e) => e.name);
 
   return (
     <>
@@ -79,6 +81,17 @@ export function SessionDetailScreen() {
         <h1>{data.dayName ?? "Freeform"}</h1>
       </div>
       <p className="sd-sub">{when.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
+      {prSetCount > 0 && (
+        <div className="pr-banner">
+          <span className="pr-trophy">🏆</span>
+          <span className="pr-text">
+            <b>
+              {prSetCount} {prSetCount === 1 ? "PR" : "PRs"}
+            </b>{" "}
+            · {prExerciseNames.join(" · ")}
+          </span>
+        </div>
+      )}
       {data.note && <p className="sd-note">{data.note}</p>}
 
       <div className="stat-row">

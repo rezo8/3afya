@@ -5,12 +5,6 @@ import { router } from "@/router";
 import { RestBar, RestTimerProvider, useRestTimer } from "@/screens/session/RestTimer";
 import { TabBar } from "./TabBar";
 
-const today = new Date().toLocaleDateString("en-US", {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-});
-
 export function AppLayout() {
   return (
     <RestTimerProvider>
@@ -22,6 +16,7 @@ export function AppLayout() {
 function AppShell() {
   const { data } = useSession();
   const rest = useRestTimer();
+  const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
   async function handleSignOut() {
     await signOut();

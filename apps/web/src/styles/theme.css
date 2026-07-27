@@ -497,6 +497,19 @@ body {
   border-color: var(--marigold);
   box-shadow: 0 0 0 3px rgba(242, 164, 60, 0.12);
 }
+.pip.extra {
+  background: none;
+  border-style: dashed;
+  border-color: var(--marigold-dim);
+}
+.pip.extra.done {
+  background: var(--marigold-dim);
+  border-style: solid;
+  border-color: transparent;
+}
+.pip.extra.active {
+  border-color: var(--marigold);
+}
 .warmup-row {
   display: flex;
   justify-content: flex-end;
@@ -527,6 +540,18 @@ body {
 .log:disabled {
   opacity: 0.5;
   cursor: default;
+}
+.done-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.done-actions .log {
+  display: block;
+  text-align: center;
+  text-decoration: none;
 }
 
 .section-eyebrow {
@@ -1396,6 +1421,12 @@ body {
   font-size: 13px;
   cursor: pointer;
 }
+.last-trained {
+  margin: 8px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--taupe);
+}
 .start-days {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -1424,6 +1455,16 @@ body {
 .start-day.is-next {
   border-color: var(--marigold-dim);
 }
+.start-day.is-resume {
+  border-color: var(--marigold);
+  background: linear-gradient(180deg, var(--surface-hi), var(--surface));
+}
+.start-day.is-done {
+  border-style: dashed;
+}
+.start-day.is-done .sd-name {
+  color: var(--taupe);
+}
 .sd-top {
   display: flex;
   align-items: center;
@@ -1441,7 +1482,8 @@ body {
   font-size: 12px;
   font-weight: 700;
 }
-.sd-next {
+.sd-next,
+.sd-resume {
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.08em;
@@ -1450,6 +1492,19 @@ body {
   background: var(--marigold);
   border-radius: 5px;
   padding: 2px 7px;
+  white-space: nowrap;
+}
+.sd-done {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--taupe);
+  background: var(--surface-hi);
+  border: 1px solid var(--line-hi);
+  border-radius: 5px;
+  padding: 1px 6px;
+  white-space: nowrap;
 }
 .sd-name {
   font-size: 17px;
@@ -1935,6 +1990,30 @@ svg.chart {
 }
 .add-ex-open:hover {
   border-color: var(--marigold);
+  color: var(--cream);
+}
+.review-session {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--r-md);
+  padding: 13px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--taupe);
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.review-session:hover {
+  border-color: var(--marigold-dim);
   color: var(--cream);
 }
 .add-ex-panel {
