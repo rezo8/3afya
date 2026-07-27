@@ -315,20 +315,6 @@ body {
   letter-spacing: 0.01em;
   line-height: 0.95;
 }
-.split-tag {
-  display: inline-block;
-  margin-left: 8px;
-  transform: translateY(-6px);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--espresso);
-  background: var(--marigold);
-  padding: 4px 9px;
-  border-radius: 999px;
-  vertical-align: middle;
-}
 .session-progress {
   text-align: right;
   line-height: 1;
@@ -1090,6 +1076,7 @@ body {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 .de-head input {
   flex: 1;
@@ -1110,13 +1097,22 @@ body {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe-dim);
+  color: var(--taupe);
   font-family: var(--mono);
   font-size: 12px;
   cursor: pointer;
+  padding: 0;
+  text-align: left;
 }
 .de-del:hover {
   color: var(--pomegranate);
+}
+/* Armed by a first tap: takes its own line, since the stakes it spells out are
+   far longer than "Delete day" and would otherwise squash the name input. */
+.de-del.armed {
+  flex-basis: 100%;
+  color: var(--pomegranate);
+  font-weight: 600;
 }
 .rot-move {
   display: flex;

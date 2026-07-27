@@ -260,7 +260,7 @@ app.post("/", async (c) => {
     if (existing) {
       return c.json({ id: existing.id, dayId: existing.dayId, performedAt: existing.performedAt.toISOString() });
     }
-    const [row] = await db.insert(workoutSession).values({ userId, dayId: day.id }).returning();
+    const [row] = await db.insert(workoutSession).values({ userId, dayId: day.id, dayName: day.name }).returning();
     return c.json({ id: row!.id, dayId: row!.dayId, performedAt: row!.performedAt.toISOString() }, 201);
   }
 
@@ -268,8 +268,11 @@ app.post("/", async (c) => {
   if (state.session) {
     return c.json({ id: state.session.id, dayId: state.session.dayId, performedAt: state.session.performedAt.toISOString() });
   }
-  const dayId = state.currentDay?.id ?? null;
-  const [row] = await db.insert(workoutSession).values({ userId, dayId }).returning();
+  const day = state.currentDay;
+  const [row] = await db
+    .insert(workoutSession)
+    .values({ userId, dayId: day?.id ?? null, dayName: day?.name ?? null })
+    .returning();
   return c.json({ id: row!.id, dayId: row!.dayId, performedAt: row!.performedAt.toISOString() }, 201);
 });
 
@@ -423,7 +426,8 @@ app.get("/", async (c) => {
   const out: SessionDetail[] = sessions.map((s) => ({
     id: s.id,
     dayId: s.dayId,
-    dayName: s.day?.name ?? null,
+    // Snapshot first: a renamed or deleted program day must not rewrite history.
+    dayName: s.dayName ?? s.day?.name ?? null,
     performedAt: s.performedAt.toISOString(),
     note: s.note,
     exercises: groupSets(s.sets, meta, (s.dayId && programByDay.get(s.dayId)) || new Set()),
@@ -445,8 +449,10 @@ app.get("/:id", async (c) => {
   const programByDay = session.dayId ? await programIdsForDays([session.dayId]) : new Map();
   const programIds: Set<string> = (session.dayId && programByDay.get(session.dayId)) || new Set();
 
-  let dayName: string | null = null;
-  if (session.dayId) {
+  // Snapshot first: a renamed or deleted program day must not rewrite history.
+  // The live join is only a fallback for sessions written before the snapshot existed.
+  let dayName: string | null = session.dayName;
+  if (!dayName && session.dayId) {
     const [day] = await db.select({ name: programDay.name }).from(programDay).where(eq(programDay.id, session.dayId)).limit(1);
     dayName = day?.name ?? null;
   }

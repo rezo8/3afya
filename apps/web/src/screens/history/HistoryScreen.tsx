@@ -115,7 +115,7 @@ export function HistoryScreen() {
       <div>
         <p className="eyebrow section-eyebrow">Recent sessions</p>
         {sessions.length === 0 ? (
-          <p className="center-note">No sessions logged yet — head to Today and start your first.</p>
+          <p className="center-note">No sessions logged yet — head to Start and log your first.</p>
         ) : (
           <ul className="sess-list">
             {sessions.map((s) => (

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import type {
   AddDayExerciseBody,
   CreateDayBody,
@@ -13,7 +13,7 @@ import type {
   UpdateProgramBody,
 } from "@afya/shared";
 import { db } from "../db";
-import { exercise, program, programDay, programExercise } from "../db/schema/tracker";
+import { exercise, program, programDay, programExercise, workoutSession } from "../db/schema/tracker";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
 
 const app = new Hono<AuthedEnv>();
@@ -66,12 +66,28 @@ type FullDay = {
   }[];
 };
 
-const toDay = (d: FullDay): ProgramDay => ({
+/**
+ * Past sessions per program day, for every day the user owns — one grouped query,
+ * not one per day. Days with no sessions are simply absent from the map.
+ */
+async function sessionCountsByDay(userId: string): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ dayId: workoutSession.dayId, sessions: count() })
+    .from(workoutSession)
+    .where(and(eq(workoutSession.userId, userId), isNotNull(workoutSession.dayId)))
+    .groupBy(workoutSession.dayId);
+  const byDay = new Map<string, number>();
+  for (const r of rows) if (r.dayId) byDay.set(r.dayId, r.sessions);
+  return byDay;
+}
+
+const toDay = (d: FullDay, sessionCount: number): ProgramDay => ({
   id: d.id,
   name: d.name,
   position: d.position,
   warmup: d.warmup,
   cooldown: d.cooldown,
+  sessionCount,
   exercises: d.exercises.map((e) => ({
     id: e.id,
     exerciseId: e.exerciseId,
@@ -93,8 +109,9 @@ const toDay = (d: FullDay): ProgramDay => ({
 
 /** All programs, active first, with days → exercises fully nested. */
 app.get("/", async (c) => {
+  const userId = c.get("userId");
   const rows = await db.query.program.findMany({
-    where: eq(program.userId, c.get("userId")),
+    where: eq(program.userId, userId),
     orderBy: [desc(program.isActive), asc(program.createdAt)],
     with: {
       days: {
@@ -108,11 +125,12 @@ app.get("/", async (c) => {
       },
     },
   });
+  const sessionCounts = await sessionCountsByDay(userId);
   const programs: Program[] = rows.map((p) => ({
     id: p.id,
     name: p.name,
     isActive: p.isActive,
-    days: (p.days as FullDay[]).map(toDay),
+    days: (p.days as FullDay[]).map((d) => toDay(d, sessionCounts.get(d.id) ?? 0)),
   }));
   return c.json(programs);
 });
@@ -169,7 +187,15 @@ app.post("/:id/days", async (c) => {
     .values({ programId, name, position: existing.length })
     .returning();
   return c.json(
-    { id: row!.id, name: row!.name, position: row!.position, warmup: row!.warmup, cooldown: row!.cooldown, exercises: [] } satisfies ProgramDay,
+    {
+      id: row!.id,
+      name: row!.name,
+      position: row!.position,
+      warmup: row!.warmup,
+      cooldown: row!.cooldown,
+      exercises: [],
+      sessionCount: 0,
+    } satisfies ProgramDay,
     201,
   );
 });

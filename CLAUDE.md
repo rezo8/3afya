@@ -63,6 +63,19 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   session sets but aren't in the program day, tagged `fromProgram: false`.
   This is intentional — don't "fix" it by adding a join table; it keeps
   sessions immutable records and programs reusable templates.
+- **A session snapshots its day's name in `workoutSession.dayName`.** `dayId`
+  is `onDelete: "set null"`, so before this column existed, deleting a program
+  day permanently degraded every past session that referenced it to "Freeform"
+  in History — the template's mutability rewrote the record. `POST
+  /api/sessions` sets `dayName` at **both** creation sites (the explicit-`dayId`
+  branch and the rotation branch), and both read paths (`GET /` and `GET /:id`)
+  resolve the name as **stored snapshot → live `programDay` join → null**. The
+  live join is only a fallback for rows written before the snapshot existed
+  (`0008_backfill_session_day_names.sql` backfilled the ones still pointing at a
+  live day; ones already orphaned stay null — their names are unrecoverable).
+  Keep that precedence order: reading the join first would re-break history on
+  a rename. If you add another session-creation path, snapshot the name there
+  too.
 - **Fuel** (`fuelEntry`, `nutritionTarget`) is logged per entry against a
   daily protein/calorie target. **Body metrics** (`bodyMetric`, e.g. weight,
   resting HR, sleep) trend over time. Estimated 1RM uses the Epley formula on
@@ -157,6 +170,22 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   invalidate both `["fuel","today"]` and `["fuel","history"]`**: `TrendsScreen`'s
   adherence chart grades its 7 days against `FuelHistory.target`, so invalidating
   only `today` leaves that chart scoring against the target you just replaced.
+- **A day letter is its index in `program.days`, never `programDay.position`.**
+  `position` is rotation order and is *not* re-packed when a day is deleted, so
+  it outruns the array and disagrees with the letters on Start/Program (both
+  `String.fromCharCode(65 + i)` over the rendered array). `SessionScreen`'s
+  header deliberately shows **no** letter at all — the day's name is already
+  its H1 — rather than deriving one from `position`. Don't reintroduce a
+  position-derived letter anywhere.
+- **"Delete day" is a two-step armed confirm that states the stakes.**
+  `ProgramScreen` holds `armedDeleteDayId`; the first tap arms it for
+  `DELETE_ARM_MS` (4s) and swaps the label for `Tap again to delete "<day>" · N
+  sessions keep their name`, the second tap within the window deletes.
+  Switching day chips disarms it. The count comes from `ProgramDay.sessionCount`
+  (added to the payload `ProgramScreen` already fetches via one grouped
+  `sessionCountsByDay` query in `apps/api/src/routes/programs.ts` — not a query
+  per day). The copy can promise the name survives only because of the
+  `dayName` snapshot above; if that ever regresses, this copy becomes a lie.
 - **The recap is the session's ending, and it never locks.**
   `/history/$sessionId` (`SessionDetailScreen`) is the post-workout recap;
   `SessionScreen` links to it with `Review session ›` — a quiet

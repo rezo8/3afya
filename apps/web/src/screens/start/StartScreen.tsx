@@ -50,7 +50,7 @@ export function StartScreen() {
 
   if (programsQ.isLoading) return <p className="center-note">Loading…</p>;
 
-  if (!program || program.days.length === 0) {
+  if (!program) {
     return (
       <>
         <div className="view-head">
@@ -62,6 +62,25 @@ export function StartScreen() {
           <p>Build your days in the Program tab, then pick one here to start a session.</p>
           <Link className="btn" to="/program">
             Build a program
+          </Link>
+        </section>
+      </>
+    );
+  }
+
+  // Having a program but no days is a different gap from having no program at all.
+  if (program.days.length === 0) {
+    return (
+      <>
+        <div className="view-head">
+          <p className="eyebrow">Start</p>
+          <h1>{program.name}</h1>
+        </div>
+        <section className="empty-state">
+          <h2>Add days to your program</h2>
+          <p>This program has no days yet — a day is what you pick here to start a session.</p>
+          <Link className="btn" to="/program">
+            Add days
           </Link>
         </section>
       </>

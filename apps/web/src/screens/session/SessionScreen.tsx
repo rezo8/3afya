@@ -285,10 +285,7 @@ export function SessionScreen() {
       <div className="today-head">
         <div>
           <p className="eyebrow">Session</p>
-          <h1 className="day">
-            {data.day.name}
-            <span className="split-tag">DAY {String.fromCharCode(65 + data.day.position)}</span>
-          </h1>
+          <h1 className="day">{data.day.name}</h1>
         </div>
         <div className="session-progress">
           <span className="frac num">
