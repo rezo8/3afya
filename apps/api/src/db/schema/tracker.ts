@@ -107,6 +107,11 @@ export const workoutSession = pgTable(
     // Nullable: a freeform session isn't tied to a program day, and we keep the
     // session if the day is later deleted.
     dayId: uuid("day_id").references(() => programDay.id, { onDelete: "set null" }),
+    // Snapshot of the day's name at the time the session was created. A session is
+    // a historical record: deleting or renaming the program day must not rewrite
+    // what this workout was called. Null only for genuinely freeform sessions (and
+    // for sessions orphaned before this column existed).
+    dayName: text("day_name"),
     performedAt: timestamp("performed_at").defaultNow().notNull(),
     note: text("note"),
   },

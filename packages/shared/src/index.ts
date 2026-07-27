@@ -72,6 +72,8 @@ export interface ProgramDay {
   warmup: string | null;
   cooldown: string | null;
   exercises: ProgramExercise[];
+  /** Past sessions logged against this day — the stakes shown before deleting it. */
+  sessionCount: number;
 }
 
 export interface Program {

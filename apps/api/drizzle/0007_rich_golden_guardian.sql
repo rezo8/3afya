@@ -1,0 +1,1 @@
+ALTER TABLE "workout_session" ADD COLUMN "day_name" text;

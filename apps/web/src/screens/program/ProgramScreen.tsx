@@ -5,6 +5,20 @@ import { api } from "@/lib/api/client";
 
 const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 
+/**
+ * How long "Delete day" stays armed after the first tap. Long enough to read the
+ * stakes it reveals and tap again — a shorter window expires mid-sentence and
+ * reads as a broken control rather than a guard.
+ */
+const DELETE_ARM_MS = 4000;
+
+const deleteDayStakes = (sessionCount: number) =>
+  sessionCount === 0
+    ? "no sessions logged"
+    : sessionCount === 1
+      ? "1 session keeps its name"
+      : `${sessionCount} sessions keep their name`;
+
 const KIND_OPTIONS: { value: ExerciseKind; label: string }[] = [
   { value: "weighted", label: "Weight × reps" },
   { value: "reps", label: "Reps" },
@@ -23,6 +37,7 @@ export function ProgramScreen() {
   const [progName, setProgName] = useState("");
   const [addEx, setAddEx] = useState("");
   const [newExKind, setNewExKind] = useState<ExerciseKind>("weighted");
+  const [armedDeleteDayId, setArmedDeleteDayId] = useState<string | null>(null);
 
   useEffect(() => {
     if (program && (!selDayId || !program.days.some((d) => d.id === selDayId))) {
@@ -33,6 +48,12 @@ export function ProgramScreen() {
   useEffect(() => {
     if (program) setProgName(program.name);
   }, [program?.id, program?.name]);
+
+  useEffect(() => {
+    if (!armedDeleteDayId) return;
+    const t = setTimeout(() => setArmedDeleteDayId(null), DELETE_ARM_MS);
+    return () => clearTimeout(t);
+  }, [armedDeleteDayId]);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["programs"] });
@@ -61,7 +82,10 @@ export function ProgramScreen() {
   });
   const deleteDay = useMutation({
     mutationFn: (dayId: string) => api.delete(`/api/programs/days/${dayId}`),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      setArmedDeleteDayId(null);
+      invalidate();
+    },
   });
   const reorderDays = useMutation({
     mutationFn: (order: string[]) => api.post(`/api/programs/${program!.id}/days/reorder`, { order }),
@@ -188,7 +212,14 @@ export function ProgramScreen() {
 
       <div className="day-chips">
         {days.map((d, i) => (
-          <button key={d.id} className={`day-chip${d.id === selDay?.id ? " sel" : ""}`} onClick={() => setSelDayId(d.id)}>
+          <button
+            key={d.id}
+            className={`day-chip${d.id === selDay?.id ? " sel" : ""}`}
+            onClick={() => {
+              setSelDayId(d.id);
+              setArmedDeleteDayId(null);
+            }}
+          >
             <span className="badge">{String.fromCharCode(65 + i)}</span>
             {d.name}
           </button>
@@ -210,9 +241,15 @@ export function ProgramScreen() {
                 if (v && v !== selDay.name) renameDay.mutate({ dayId: selDay.id, name: v });
               }}
             />
-            <button className="de-del" onClick={() => deleteDay.mutate(selDay.id)}>
-              Delete day
-            </button>
+            {armedDeleteDayId === selDay.id ? (
+              <button className="de-del armed" onClick={() => deleteDay.mutate(selDay.id)}>
+                Tap again to delete “{selDay.name}” · {deleteDayStakes(selDay.sessionCount)}
+              </button>
+            ) : (
+              <button className="de-del" onClick={() => setArmedDeleteDayId(selDay.id)}>
+                Delete day
+              </button>
+            )}
           </div>
 
           <div className="de-rot">
