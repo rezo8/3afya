@@ -1797,6 +1797,11 @@ body {
   color: var(--marigold);
   background: var(--surface-hi);
 }
+.expand-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
 .seg {
   display: inline-flex;
   background: var(--espresso);

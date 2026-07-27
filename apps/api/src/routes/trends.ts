@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, max } from "drizzle-orm";
 import type { ProgressMetric, ProgressTrend, TrendExercise, TrendPoint } from "@afya/shared";
 import { db } from "../db";
 import { exercise, setLog, workoutSession } from "../db/schema/tracker";
@@ -9,7 +9,7 @@ import { epley } from "../records";
 const app = new Hono<AuthedEnv>();
 app.use("*", requireAuth);
 
-/** Exercises that have at least one logged set — the picker list for trends. */
+/** Exercises that have at least one logged set, most recently trained first. */
 app.get("/exercises", async (c) => {
   const rows = await db
     .select({ id: exercise.id, name: exercise.name, kind: exercise.kind })
@@ -18,7 +18,7 @@ app.get("/exercises", async (c) => {
     .innerJoin(exercise, eq(setLog.exerciseId, exercise.id))
     .where(eq(workoutSession.userId, c.get("userId")))
     .groupBy(exercise.id, exercise.name, exercise.kind)
-    .orderBy(asc(exercise.name));
+    .orderBy(desc(max(setLog.completedAt)), asc(exercise.name));
   return c.json(rows satisfies TrendExercise[]);
 });
 

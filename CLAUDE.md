@@ -172,6 +172,35 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   warm-up mark never silently carries over onto a different set. Follow the
   same `focusExercise` wrapper for any future per-set UI state that shouldn't
   survive an exercise switch.
+- **`TrendsScreen` leads with the answer, not the trophy case.** Card order is
+  Progress (per-exercise chart + lift picker) → Fuel adherence → Records, and
+  Records is collapsed to the 3 newest `PrEntry`s across all exercises (ranked
+  by `achievedAt`) behind a `See all records` toggle. The wall of 24+
+  alphabetical exercises used to occupy ~70% of a ~4000px page and bury the
+  chart 3.6 screens down; don't restore Records to the top or un-collapse it.
+- **`GET /api/trends/exercises` is ordered by recency, and the picker depends
+  on that order.** The SQL is `order by max(set_log.completed_at) desc,
+  exercise.name asc`, and `TrendsScreen` takes `data[0]` as the default
+  selected lift and renders the chips in array order (capped at 8 behind a
+  `+N more` chip, with the selected chip pinned first). `TrendExercise` carries
+  no timestamp — recency lives *only* in the array order, so reverting the
+  route to `asc(exercise.name)` would silently make the chart default to
+  whatever is alphabetically first again.
+- **Un-logged fuel days are `null`, not `0`.** `FuelHistoryDay.entryCount === 0`
+  is the only way to tell "didn't log" from "ate 0 g", and it must stay that
+  way. `BarChart` accepts `(number | null)[]` where `null` draws a dashed
+  hollow placeholder at the baseline (a real `0` is a solid 2px sliver), and the
+  adherence readout counts logged days only — `"4 of 6 logged days on target"`,
+  or `"no days logged"` when the window is empty. Scoring un-logged days as
+  misses is what made the card read `0/7 days on target` against real data.
+- **Both charts scrub by pointer position, not per-mark hover.** `LineChart` and
+  `BarChart` each derive the hovered index from `clientX` in a shared
+  `move(clientX)` and wire `onMouseMove`/`onMouseLeave` +
+  `onTouchStart`/`onTouchMove`/`onTouchEnd` on the `<svg>` itself. `BarChart`'s
+  old per-`<rect>` `onMouseEnter` had no touch path at all, so its readout never
+  worked on the phone viewport this app targets — don't reintroduce per-mark
+  mouse handlers. The readout clears on touch end (press-and-hold to read), and
+  `svg.chart`'s `touch-action: pan-y` keeps vertical page scroll alive.
 - **`theme.css`'s bare `.ls`/`.ls.on`** (used by the lift-select chips in
   `TrendsScreen`/`ProgramScreen`, and the warm-up toggle chip in
   `SessionScreen`) is an unrelated naming coincidence next to the
