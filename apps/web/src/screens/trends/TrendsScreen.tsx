@@ -1,15 +1,10 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ExerciseRecords, PrEntry, ProgressTrend, TrendExercise } from "@afya/shared";
+import type { ExerciseRecords, FuelHistory, PrEntry, ProgressTrend, TrendExercise } from "@afya/shared";
 import { api } from "@/lib/api/client";
 import { PR_LABEL } from "@/lib/pr";
 import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
-
-type FuelHistory = {
-  target: { proteinG: number; calories: number };
-  days: { date: string; proteinG: number; calories: number }[];
-};
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 const weekday = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "short" });

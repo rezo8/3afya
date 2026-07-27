@@ -248,12 +248,40 @@ export interface NutritionTarget {
   calories: number;
 }
 
+/**
+ * A label the user logs often, with the portion from their most recent entry for
+ * it. Derived from their own entries only — this is not a food catalog.
+ */
+export interface FrequentFuel {
+  label: string;
+  proteinG: number;
+  calories: number;
+}
+
 export interface FuelDay {
   /** Local calendar date, YYYY-MM-DD. */
   date: string;
   target: NutritionTarget;
   entries: FuelEntry[];
   totals: { proteinG: number; calories: number };
+  /** Most-logged labels first, for one-tap re-adding. */
+  frequent: FrequentFuel[];
+}
+
+/** One day of the adherence window. Zero-filled for days with nothing logged. */
+export interface FuelHistoryDay {
+  /** Local calendar date, YYYY-MM-DD. */
+  date: string;
+  proteinG: number;
+  calories: number;
+  /** Entries logged that day — 0 means nothing was logged, not "logged 0 g". */
+  entryCount: number;
+}
+
+/** Daily totals over the last N days — powers the adherence chart. */
+export interface FuelHistory {
+  target: NutritionTarget;
+  days: FuelHistoryDay[];
 }
 
 export interface AddFuelEntryBody {

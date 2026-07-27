@@ -154,16 +154,23 @@ export const fuelEntry = pgTable(
   (t) => [index("fuel_entry_user_logged_idx").on(t.userId, t.loggedAt)],
 );
 
-export const nutritionTarget = pgTable("nutrition_target", {
-  // One row per user.
-  userId: text("user_id").primaryKey(),
-  proteinG: integer("protein_g").default(180).notNull(),
-  calories: integer("calories").default(2600).notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-});
+/**
+ * Append-only log of nutrition targets: one row per edit, never updated in place.
+ * The user's current target is the newest row. Keeping every past target is what
+ * lets historical adherence stay scored against the target that was actually in
+ * force on that day.
+ */
+export const nutritionTarget = pgTable(
+  "nutrition_target",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull(),
+    proteinG: integer("protein_g").default(180).notNull(),
+    calories: integer("calories").default(2600).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("nutrition_target_user_created_idx").on(t.userId, t.createdAt)],
+);
 
 // --- Body metrics ----------------------------------------------------------
 
