@@ -10,7 +10,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import type { BodyMetricKind, ExerciseKind } from "@afya/shared";
+import type { BodyMetricKind, Equipment, ExerciseKind, MuscleGroup } from "@afya/shared";
 
 /**
  * Tracker schema. Everything is user-scoped via a `user_id` FK to Better Auth's
@@ -33,6 +33,12 @@ export const exercise = pgTable(
     userId: text("user_id").notNull(),
     name: text("name").notNull(),
     kind: text("kind").$type<ExerciseKind>().default("weighted").notNull(),
+    // Taxonomy stamped from the curated catalog (../exercise-catalog.ts) when the name
+    // matches one of its entries, and null otherwise — a name we don't recognize stays
+    // untagged rather than guessed at. Drives substitution suggestions and (eventually)
+    // per-muscle volume.
+    primaryMuscleGroup: text("primary_muscle_group").$type<MuscleGroup>(),
+    equipment: text("equipment").$type<Equipment>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     archivedAt: timestamp("archived_at"),
   },

@@ -24,6 +24,24 @@ export interface ApiErrorBody {
 /** How an exercise is measured — decides which fields a set records. */
 export type ExerciseKind = "weighted" | "reps" | "time";
 
+/** The muscle group an exercise mainly trains — the axis substitutions pivot on. */
+export type MuscleGroup =
+  | "chest"
+  | "back"
+  | "shoulders"
+  | "biceps"
+  | "triceps"
+  | "forearms"
+  | "quads"
+  | "hamstrings"
+  | "glutes"
+  | "calves"
+  | "core"
+  | "full_body";
+
+/** What an exercise is performed with — the axis a swap usually trades away. */
+export type Equipment = "barbell" | "dumbbell" | "machine" | "cable" | "bodyweight" | "kettlebell" | "band" | "other";
+
 // ---------------------------------------------------------------------------
 // Exercise library
 // ---------------------------------------------------------------------------
@@ -32,6 +50,9 @@ export interface Exercise {
   id: string;
   name: string;
   kind: ExerciseKind;
+  /** Null when the name never matched the curated catalog — an untagged exercise gets no suggestions. */
+  primaryMuscleGroup: MuscleGroup | null;
+  equipment: Equipment | null;
   createdAt: string;
   archivedAt: string | null;
 }
@@ -39,6 +60,20 @@ export interface Exercise {
 export interface CreateExerciseBody {
   name: string;
   kind?: ExerciseKind;
+}
+
+/**
+ * A stand-in for an exercise, sharing its primary muscle group. Either one of the
+ * user's own library exercises (`inLibrary: true`, with an `id`) or a curated catalog
+ * entry they don't have yet (`inLibrary: false`, `id: null` — adding it is the next step).
+ */
+export interface ExerciseAlternative {
+  id: string | null;
+  name: string;
+  kind: ExerciseKind;
+  primaryMuscleGroup: MuscleGroup;
+  equipment: Equipment | null;
+  inLibrary: boolean;
 }
 
 // ---------------------------------------------------------------------------

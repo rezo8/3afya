@@ -64,6 +64,20 @@
       "when": 1785123398842,
       "tag": "0008_backfill_session_day_names",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785125853478,
+      "tag": "0009_gifted_famine",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785125873153,
+      "tag": "0010_backfill_exercise_tags",
+      "breakpoints": true
     }
   ]
 }
