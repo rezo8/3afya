@@ -37,6 +37,41 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
 - **Exercises** (`exercise`) are a shared library, reused across program
   days. Each has a measurement **kind** that decides what a set records:
   `weighted` (weight × reps), `reps` (count only), or `time` (duration).
+- **An exercise's `primaryMuscleGroup` / `equipment` come from the curated catalog
+  in `apps/api/src/db/exercise-catalog.ts`, or they stay null.** Both columns are
+  nullable and there is deliberately no UI or API to set them by hand.
+  `POST /api/exercises` calls `findCatalogExercise(name)` — an **exact,
+  case-insensitive** lookup on the trimmed name, **never fuzzy, not now and not
+  later** — and stamps the match's tags onto the new row. A name the catalog
+  doesn't list verbatim ("Incline DB Press", "Sandbag Zercher Carry") is left
+  untagged, because a wrong tag would silently misattribute muscle volume and
+  suggest nonsense swaps with nothing in the UI to expose the error, whereas a
+  null degrades honestly (`/alternatives` returns `[]`). The catalog also supplies
+  `kind` — but only as a fallback: `parseKind(body.kind) ?? catalogEntry.kind ??
+  "weighted"`, so an explicit caller kind always wins.
+  - The tags are stamped **on create only**. The resurrect and existing-row
+    branches don't re-tag, and rows that predate the columns were tagged once by
+    `drizzle/0010_backfill_exercise_tags.sql` — a materialized `UPDATE ... FROM
+    (VALUES ...)` snapshot of the catalog's (lower name → group, equipment) pairs,
+    guarded by `primary_muscle_group IS NULL` so it only fills gaps. **The
+    migration and the constant must never disagree about what a name means**; the
+    VALUES list was printed from the constant, not typed. Adding a catalog entry
+    later tags exercises created from then on but does *not* retroactively tag one
+    a user already has under that name — that needs its own new backfill
+    migration.
+- **`GET /api/exercises/:id/alternatives` ranks different equipment first.**
+  Substitutes are the user's own non-archived same-muscle exercises (`inLibrary:
+  true`) followed by catalog entries of that group whose names the library doesn't
+  already hold, case-insensitively (`inLibrary: false, id: null` — adding it is
+  the client's next step). Ordering lives in the pure `rankAlternatives`
+  (`apps/api/src/exercise-alternatives.ts`, unit-tested): library half before
+  catalog half, and within each half **different-`equipment` before
+  same-`equipment`**, alphabetical on ties, capped at `ALTERNATIVES_LIMIT` (12).
+  That equipment rule is the whole point — you look for a substitute because the
+  machine is taken, so another exercise on that same machine is no help. An
+  untagged source exercise returns `[]` rather than a guess. The handler fetches
+  the user's whole active library in one query (tens of rows) and filters in JS,
+  since it needs both the same-muscle candidates and the full name set.
 - **Deleting an exercise never destroys set-log history.** `setLog.exerciseId`
   is `onDelete: "restrict"` (not `cascade`) precisely so this can't regress —
   Postgres itself refuses the delete if any sets reference the exercise.
@@ -294,6 +329,12 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   forward, so the pending diff survives for the next `db:generate`. See
   `apps/api/drizzle/0005_drop_nutrition_target_legacy_pk.sql` +
   `0006_neat_albert_cleary.sql`. Prefer this over editing generated SQL.
+- **`--custom` is also how data backfills ship**, not just DDL drizzle-kit can't
+  emit — see `0008_backfill_session_day_names.sql` and
+  `0010_backfill_exercise_tags.sql`. A backfill whose values come from a TypeScript
+  constant should be *printed* from that constant into the SQL (throwaway script),
+  never retyped, and should be guarded so re-running it can't overwrite live data
+  (`WHERE <col> IS NULL`).
 - **A schema change that is breaking for `main` must not be migrated against
   the shared dev `afya` database.** Create a throwaway DB
   (`CREATE DATABASE afya_prN OWNER afya`), point `DATABASE_URL` at it, and run
@@ -311,10 +352,11 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
 
 - **Vitest** is the API's test framework (`apps/api/package.json`'s `test`
   script — `vitest run`), first introduced alongside `records.ts`'s
-  warm-up/working-set tests. No vitest config file exists or is needed:
-  `records.ts` only has a type-only import from `@afya/shared`, which is
+  warm-up/working-set tests. No vitest config file exists or is needed: every
+  tested module (`records.ts`, `exercise-alternatives.ts`,
+  `db/exercise-catalog.ts`) imports from `@afya/shared` **type-only**, which is
   erased at compile time under `verbatimModuleSyntax`, so pure-logic modules
-  like it need no cross-workspace runtime resolution. If a future test needs
+  like these need no cross-workspace runtime resolution. If a future test needs
   to import something with a runtime (not type-only) cross-package import,
   that will need real workspace module resolution set up — don't assume the
   no-config setup still works once that happens.
