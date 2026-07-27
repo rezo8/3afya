@@ -76,6 +76,27 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   Keep that precedence order: reading the join first would re-break history on
   a rename. If you add another session-creation path, snapshot the name there
   too.
+- **A session with zero sets is a real state, and it must never advance the
+  rotation.** The row is created lazily on the first "Complete set" tap, so a
+  failed set-POST leaves an empty session behind. `rotationState`
+  (`apps/api/src/routes/sessions.ts`) therefore runs **two** latest-session
+  queries, and the distinction is load-bearing: the *today* check
+  (`latestSession`) takes the newest session of any kind, because a
+  legitimately just-started session has zero sets for the moment between
+  creation and its first set landing and filtering it would break resume;
+  the *next-up* pick (`latestSessionWithSets`, "the day after the last
+  session") inner-joins `set_log`, so an empty session can't silently advance
+  the rotation past a day that was never trained. Don't collapse the two.
+- **`DELETE /api/sessions/:id` exists only for those empty sessions** — it
+  refuses with 400 (`Sessions with logged sets can't be deleted.`) as soon as
+  the session has any `set_log` row. That is not a hole in "sessions are
+  immutable records": an empty session has no performed content to protect.
+- **`POST /api/sessions` is find-or-create per (day, calendar day)** via
+  `todaySessionForDay` — a second POST with the same `dayId` returns the
+  existing row with 200 rather than inserting (verified: 201 then 200, one
+  row). So a retried create can't multiply empty sessions server-side. It is
+  still a read-then-insert with no unique index, so it's not a concurrency
+  guarantee — clients shouldn't lean on it as one.
 - **Fuel** (`fuelEntry`, `nutritionTarget`) is logged per entry against a
   daily protein/calorie target. **Body metrics** (`bodyMetric`, e.g. weight,
   resting HR, sleep) trend over time. Estimated 1RM uses the Epley formula on
@@ -150,6 +171,13 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   an extra set is a deliberate choice to stay put. `isExerciseDone`,
   `doneCount` and the progress track keep meaning "hit the plan", so a row
   legitimately reads 5/4.
+- **`SessionScreen` remembers the session it lazily created.** `logSet`'s
+  `mutationFn` resolves the session as `data?.session?.id ??
+  createdSessionId.current`, and stores the id of any session it creates in
+  that ref, because a failed set-POST doesn't invalidate — without the ref a
+  retry re-reads the same still-empty `data.session` and issues another create
+  round-trip. The ref is cleared in `logSet`'s `onSuccess` (invalidation
+  repopulates `data.session`) and in the `dayId`-reset effect.
 - **`isExerciseDone` (`apps/web/src/lib/session.ts`) is the one done
   predicate**, shared by `SessionScreen` (focus, counts, row ticks) and
   `StartScreen` (the day cards' Resume/Done states). Ad-hoc exercises are
@@ -192,6 +220,19 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   `.review-session` link at the bottom while logging, and the primary action
   in the all-done card. Keep that wording: "Finish"/"Close" would lie, since
   sets can still be logged (and edited) after.
+- **Zero-set sessions stay visible in History; only the stats exclude them.**
+  `HistoryScreen` renders such a row with a muted `started · nothing logged`
+  (`.ssum.untrained`) in place of the summary rather than filtering it out —
+  explicit visibility beats silently hiding a row the user created — while the
+  streak, the sessions-this-month count, the month volume and the calendar dots
+  all derive from `sessions.filter(wasTrained)`. The way out of the dead end
+  lives on `SessionDetailScreen`: its empty state carries a `Remove this
+  session` armed confirm (the same `DELETE_ARM_MS` two-tap shape as
+  `ProgramScreen`'s delete-day) wired to `DELETE /api/sessions/:id`, which
+  navigates back to `/history` and invalidates `["sessions"]`, `["session"]`
+  **and** `["today"]` — the last two matter because removing a session changes
+  next-up and would otherwise leave a cached `SessionScreen` posting sets into
+  a row that no longer exists.
 - **The warm-up toggle is per-set UI state, not derived**: `SessionScreen.tsx`
   keeps a standalone `nextIsWarmup` boolean (not part of `Work`, which is
   keyed per-exercise and intentionally persists) and resets it to `false` in

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import type {
+  ApiErrorBody,
   ExerciseKind,
   ExerciseRecords,
   LoggedSetResult,
@@ -76,7 +77,7 @@ function groupSets(
  * Work out where the user is in their rotation:
  *  - the active program and its days (rotation order),
  *  - today's in-progress session if one was already started today,
- *  - otherwise the next-up day = the one after the last session's day.
+ *  - otherwise the next-up day = the one after the last day they actually logged sets on.
  */
 async function rotationState(userId: string) {
   const [active] = await db
@@ -94,19 +95,27 @@ async function rotationState(userId: string) {
     .orderBy(asc(programDay.position));
   if (!days.length) return { program: active, days, currentDay: null, session: null } as const;
 
-  const [latest] = await db
+  const [latestSession] = await db
     .select()
     .from(workoutSession)
     .where(eq(workoutSession.userId, userId))
     .orderBy(desc(workoutSession.performedAt))
     .limit(1);
 
-  if (latest && isToday(latest.performedAt)) {
-    const currentDay = days.find((d) => d.id === latest.dayId) ?? days[0]!;
-    return { program: active, days, currentDay, session: latest } as const;
+  if (latestSession && isToday(latestSession.performedAt)) {
+    const currentDay = days.find((d) => d.id === latestSession.dayId) ?? days[0]!;
+    return { program: active, days, currentDay, session: latestSession } as const;
   }
 
-  const lastIdx = latest?.dayId ? days.findIndex((d) => d.id === latest.dayId) : -1;
+  const [latestSessionWithSets] = await db
+    .select({ dayId: workoutSession.dayId })
+    .from(workoutSession)
+    .innerJoin(setLog, eq(setLog.sessionId, workoutSession.id))
+    .where(eq(workoutSession.userId, userId))
+    .orderBy(desc(workoutSession.performedAt))
+    .limit(1);
+
+  const lastIdx = latestSessionWithSets?.dayId ? days.findIndex((d) => d.id === latestSessionWithSets.dayId) : -1;
   const nextIdx = lastIdx === -1 ? 0 : (lastIdx + 1) % days.length;
   return { program: active, days, currentDay: days[nextIdx]!, session: null } as const;
 }
@@ -493,6 +502,31 @@ app.get("/:id", async (c) => {
     exercises: groupSets(sets, meta, programIds),
     records,
   } satisfies SessionDetail);
+});
+
+/**
+ * Discard a session that was started but never logged into. A session holding sets
+ * is a performed record and stays; an empty one has no performed content to protect.
+ */
+app.delete("/:id", async (c) => {
+  const userId = c.get("userId");
+  const [session] = await db
+    .select()
+    .from(workoutSession)
+    .where(and(eq(workoutSession.id, c.req.param("id")), eq(workoutSession.userId, userId)))
+    .limit(1);
+  if (!session) return c.json({ error: "not_found" }, 404);
+
+  const [loggedSet] = await db.select({ id: setLog.id }).from(setLog).where(eq(setLog.sessionId, session.id)).limit(1);
+  if (loggedSet) {
+    return c.json(
+      { error: "bad_request", message: "Sessions with logged sets can't be deleted." } satisfies ApiErrorBody,
+      400,
+    );
+  }
+
+  await db.delete(workoutSession).where(eq(workoutSession.id, session.id));
+  return c.json({ ok: true });
 });
 
 export default app;

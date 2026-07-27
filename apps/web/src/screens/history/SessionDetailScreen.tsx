@@ -1,7 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import type { SessionDetail, SessionExercise, SetLog } from "@afya/shared";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/errors";
+
+/** Matches ProgramScreen's "Delete day" arming window — same guard, same feel. */
+const DELETE_ARM_MS = 4000;
 
 const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 const est1rm = (s: SetLog) => s.weight * (1 + s.reps / 30);
@@ -44,11 +50,31 @@ function setValue(e: SessionExercise, s: SetLog) {
 }
 
 export function SessionDetailScreen() {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
   const { sessionId } = useParams({ strict: false }) as { sessionId?: string };
   const { data, isLoading } = useQuery({
     queryKey: ["session-detail", sessionId],
     queryFn: () => api.get<SessionDetail>(`/api/sessions/${sessionId}`),
     enabled: !!sessionId,
+  });
+  const [armedRemove, setArmedRemove] = useState(false);
+
+  useEffect(() => {
+    if (!armedRemove) return;
+    const t = setTimeout(() => setArmedRemove(false), DELETE_ARM_MS);
+    return () => clearTimeout(t);
+  }, [armedRemove]);
+
+  const removeSession = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/sessions/${id}`),
+    onSuccess: () => {
+      setArmedRemove(false);
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+      qc.invalidateQueries({ queryKey: ["session"] });
+      qc.invalidateQueries({ queryKey: ["today"] });
+      navigate({ to: "/history" });
+    },
   });
 
   if (isLoading) return <p className="center-note">Loading session…</p>;
@@ -113,7 +139,21 @@ export function SessionDetailScreen() {
       </div>
 
       {data.exercises.length === 0 ? (
-        <p className="center-note">No sets were logged in this session.</p>
+        <section className="sd-empty">
+          <p className="center-note">No sets were logged in this session.</p>
+          {removeSession.isError && (
+            <ErrorBanner message={errorMessage(removeSession.error)} onRetry={() => removeSession.mutate(data.id)} />
+          )}
+          {armedRemove ? (
+            <button className="sd-remove armed" disabled={removeSession.isPending} onClick={() => removeSession.mutate(data.id)}>
+              Tap again to remove this empty session · this can’t be undone
+            </button>
+          ) : (
+            <button className="sd-remove" onClick={() => setArmedRemove(true)}>
+              Remove this session
+            </button>
+          )}
+        </section>
       ) : (
         <ul className="sd-ex-list">
           {data.exercises.map((e) => {
