@@ -117,14 +117,17 @@ body {
   font-size: 12px;
   color: var(--taupe);
 }
+/* --taupe, not --taupe-dim: this sits on every screen and --taupe-dim on
+   --espresso lands under WCAG AA. The padding is hit area, not spacing. */
 .signout {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe-dim);
+  color: var(--taupe);
   font-family: var(--mono);
   font-size: 11px;
   cursor: pointer;
+  padding: 8px 4px;
 }
 .signout:hover {
   color: var(--pomegranate);
@@ -407,7 +410,7 @@ body {
 }
 .rlabel {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--taupe);
@@ -667,35 +670,6 @@ body {
 }
 .mval .goal {
   color: var(--taupe);
-}
-.mctl {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.mstep {
-  appearance: none;
-  border: 1px solid var(--line-hi);
-  background: var(--espresso);
-  color: var(--cream);
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  font-size: 17px;
-  line-height: 1;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition:
-    border-color 0.15s ease,
-    transform 0.08s ease;
-  flex: none;
-}
-.mstep:hover {
-  border-color: var(--marigold);
-}
-.mstep:active {
-  transform: scale(0.9);
 }
 .bar {
   height: 9px;
@@ -1153,7 +1127,7 @@ body {
 .pex {
   display: flex;
   gap: 10px;
-  padding: 12px;
+  padding: 16px;
   background: var(--espresso);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
@@ -1161,7 +1135,7 @@ body {
 .pex-ord {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
   justify-content: center;
 }
 .ord {
@@ -1169,14 +1143,15 @@ body {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--taupe);
-  width: 24px;
-  height: 20px;
-  border-radius: 6px;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 11px;
   line-height: 1;
   display: grid;
   place-items: center;
+  flex: none;
 }
 .ord:hover:not(:disabled) {
   color: var(--marigold);
@@ -1221,9 +1196,24 @@ body {
   font-size: 20px;
   cursor: pointer;
   line-height: 1;
-  padding: 0 2px;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex: none;
 }
 .pex-del:hover {
+  color: var(--pomegranate);
+}
+/* Armed by a first tap — the hint replaces the glyph, so the box has to grow
+   with the copy instead of staying a 32px square. */
+.pex-del.armed {
+  width: auto;
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
   color: var(--pomegranate);
 }
 .pex-ctl {
@@ -1234,15 +1224,32 @@ body {
 .ctl {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 4px 6px;
 }
+/* A rep range packs 8 controls into one pill — ~320px of content against the
+   ~232px of card body a 390px viewport leaves. It takes its own row and wraps
+   onto two lines rather than letting flexbox squash the steppers back under the
+   touch minimum, so the radius softens to a block. `.ctl-grp` keeps the max
+   side (– − value + ✕) together, so the break falls between min and max rather
+   than orphaning a stepper from the number it changes. */
+.ctl.ctl-range {
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  border-radius: var(--r-md);
+}
+.ctl-grp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .ctl-lbl {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--taupe);
@@ -1259,14 +1266,15 @@ body {
   border: none;
   background: var(--surface-hi);
   color: var(--cream);
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   cursor: pointer;
   font-size: 15px;
   line-height: 1;
   display: grid;
   place-items: center;
+  flex: none;
 }
 .ctl button:hover {
   background: var(--marigold);
@@ -1390,16 +1398,24 @@ body {
   gap: 8px;
   margin-top: 6px;
 }
+/* Dashed while empty, solid once filled: these are free-text inputs, and a solid
+   chip border made them read as inert tags with nothing inviting a tap. Dashed
+   is the same "add something here" language as the `+ range` / `+ rest` buttons
+   on the same card. */
 .pex-tag-in {
   flex: 1;
   min-width: 0;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px dashed var(--line-hi);
   color: var(--taupe);
   border-radius: var(--r-sm);
   padding: 5px 8px;
   font-family: var(--mono);
   font-size: 11px;
+}
+.pex-tag-in:not(:placeholder-shown) {
+  border-style: solid;
+  color: var(--cream);
 }
 .pex-tag-in:focus {
   outline: none;
@@ -2479,6 +2495,12 @@ svg.chart {
 }
 
 /* ---- BODY ---- */
+.metric-stale {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--taupe);
+}
 .bm-log {
   display: flex;
   align-items: center;

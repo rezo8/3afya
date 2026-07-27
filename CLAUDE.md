@@ -249,6 +249,46 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   `sessionCountsByDay` query in `apps/api/src/routes/programs.ts` — not a query
   per day). The copy can promise the name survives only because of the
   `dayName` snapshot above; if that ever regresses, this copy becomes a lie.
+- **Removing a program exercise is armed too, but deliberately terse.**
+  `ProgramScreen` holds a second armed id — `armedRemoveExId`, same
+  `DELETE_ARM_MS` window, also disarmed by a day-chip switch — for `.pex-del`;
+  the armed state swaps the `×` glyph for `Remove?` and adds nothing else. It
+  states no stakes on purpose: unlike delete-day it destroys no history, only a
+  plan row (`programExercise` is `onDelete: cascade`, set logs are untouched),
+  so a count or a "can't be undone" would overstate it. That makes three armed
+  confirms sharing the shape (delete day, remove empty session, remove
+  exercise) — reuse it rather than reaching for a modal.
+- **The program builder's controls are sized against a 390px budget.** At the
+  narrowest target viewport `.pex-body` gets ~232px (390 − 2×18 `.app` − 2×18+2
+  `.day-editor` − 2×16+2 `.pex` − 40 `.ord` − 10 gap), while an active rep range
+  wants ~320px for its eight controls. So `.ord` (40px), `.ctl button` (32px)
+  and `.pex-del` (32px) all carry **`flex: none`** — without it flexbox silently
+  shrank them back under the touch minimum, which is exactly what that row did
+  before — and the range pill alone gets `.ctl-range` (its own row,
+  `flex-wrap`, block radius instead of the stadium) with the max side boxed in
+  `.ctl-grp`, so the wrap falls between min and max rather than orphaning a
+  stepper from the number it changes. Re-do that arithmetic before adding a
+  control to any `.ctl` pill: the non-range Reps pill already sits at ~228 of
+  232.
+- **`.pex-tag-in`'s empty state is `:placeholder-shown`, so the `placeholder`
+  attribute is load-bearing.** The Section/Superset free-text inputs are dashed
+  while empty and solid once filled (they were indistinguishable from inert
+  chips); removing either `placeholder` leaves that input permanently dashed.
+- **History's lead stat is a presentation swap, not a streak fix.** When the
+  computed streak is 0 but something was trained, the stat renders `Nd ago /
+  Last trained` off the newest `wasTrained` session instead of `0d / Current
+  streak` — "0d" directly above a calendar full of dots reads as "never
+  trained". The streak loop itself is untouched; redefining it (rest days,
+  per-week goals) is a separate decision. `daysAgo`
+  (`apps/web/src/lib/dates.ts`) does the calendar-day math here and for
+  `BodyScreen`'s `last logged Nd ago` staleness line, and it **rounds** because
+  a DST boundary makes a day 23 or 25 hours long and truncation would report
+  yesterday as today.
+- **`BodyScreen` names the staleness instead of guarding the tap.** The big
+  metric is whatever was measured last, however old, and one `Log` tap
+  re-stamps that value as today; the card says `last logged Nd ago` when the
+  latest entry isn't from today and nothing when it is. Re-logging an unchanged
+  weight is legitimate, so it must stay one tap — don't add a confirm there.
 - **The recap is the session's ending, and it never locks.**
   `/history/$sessionId` (`SessionDetailScreen`) is the post-workout recap;
   `SessionScreen` links to it with `Review session ›` — a quiet

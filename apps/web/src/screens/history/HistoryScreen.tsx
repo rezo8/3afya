@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { SessionDetail } from "@afya/shared";
 import { api } from "@/lib/api/client";
+import { daysAgo } from "@/lib/dates";
 
 const WD = ["M", "T", "W", "T", "F", "S", "S"];
 const localDate = (d: Date) =>
@@ -50,6 +51,19 @@ export function HistoryScreen() {
     cursor.setDate(cursor.getDate() - 1);
   }
 
+  const lastTrainedAt = trained.reduce<Date | null>((newest, s) => {
+    const at = new Date(s.performedAt);
+    return newest === null || at > newest ? at : newest;
+  }, null);
+
+  // A broken streak reads as "0d — never trained" directly above a calendar full
+  // of dots, so the lead stat answers what the streak no longer can. Presentation
+  // only: `streak` above is untouched.
+  const leadStat =
+    streak === 0 && lastTrainedAt
+      ? { value: daysAgo(lastTrainedAt), unit: "d ago", label: "Last trained" }
+      : { value: streak, unit: "d", label: "Current streak" };
+
   const monthSessions = trained.filter((s) => {
     const d = new Date(s.performedAt);
     return d.getFullYear() === year && d.getMonth() === month;
@@ -71,10 +85,10 @@ export function HistoryScreen() {
       <div className="stat-row">
         <div className="stat">
           <div className="v">
-            {streak}
-            <span className="u">d</span>
+            {leadStat.value}
+            <span className="u">{leadStat.unit}</span>
           </div>
-          <span className="k">Current streak</span>
+          <span className="k">{leadStat.label}</span>
         </div>
         <div className="stat">
           <div className="v">{monthSessions.length}</div>

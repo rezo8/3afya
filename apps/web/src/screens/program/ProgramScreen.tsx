@@ -6,9 +6,10 @@ import { api } from "@/lib/api/client";
 const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 
 /**
- * How long "Delete day" stays armed after the first tap. Long enough to read the
- * stakes it reveals and tap again — a shorter window expires mid-sentence and
- * reads as a broken control rather than a guard.
+ * How long an armed confirm — "Delete day", "remove exercise" — stays armed after
+ * the first tap. Long enough to read the stakes it reveals and tap again; a
+ * shorter window expires mid-sentence and reads as a broken control rather than
+ * a guard.
  */
 const DELETE_ARM_MS = 4000;
 
@@ -38,6 +39,7 @@ export function ProgramScreen() {
   const [addEx, setAddEx] = useState("");
   const [newExKind, setNewExKind] = useState<ExerciseKind>("weighted");
   const [armedDeleteDayId, setArmedDeleteDayId] = useState<string | null>(null);
+  const [armedRemoveExId, setArmedRemoveExId] = useState<string | null>(null);
 
   useEffect(() => {
     if (program && (!selDayId || !program.days.some((d) => d.id === selDayId))) {
@@ -54,6 +56,12 @@ export function ProgramScreen() {
     const t = setTimeout(() => setArmedDeleteDayId(null), DELETE_ARM_MS);
     return () => clearTimeout(t);
   }, [armedDeleteDayId]);
+
+  useEffect(() => {
+    if (!armedRemoveExId) return;
+    const t = setTimeout(() => setArmedRemoveExId(null), DELETE_ARM_MS);
+    return () => clearTimeout(t);
+  }, [armedRemoveExId]);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["programs"] });
@@ -115,7 +123,10 @@ export function ProgramScreen() {
   });
   const deleteEx = useMutation({
     mutationFn: (id: string) => api.delete(`/api/programs/day-exercises/${id}`),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      setArmedRemoveExId(null);
+      invalidate();
+    },
   });
   const reorderEx = useMutation({
     mutationFn: ({ dayId, order }: { dayId: string; order: string[] }) =>
@@ -218,6 +229,7 @@ export function ProgramScreen() {
             onClick={() => {
               setSelDayId(d.id);
               setArmedDeleteDayId(null);
+              setArmedRemoveExId(null);
             }}
           >
             <span className="badge">{String.fromCharCode(65 + i)}</span>
@@ -321,9 +333,15 @@ export function ProgramScreen() {
                           {ex.name}
                           {ex.kind !== "weighted" && <span className="kind-tag">{ex.kind === "time" ? "time" : "reps"}</span>}
                         </span>
-                        <button className="pex-del" aria-label="Remove" onClick={() => deleteEx.mutate(ex.id)}>
-                          ×
-                        </button>
+                        {armedRemoveExId === ex.id ? (
+                          <button className="pex-del armed" onClick={() => deleteEx.mutate(ex.id)}>
+                            Remove?
+                          </button>
+                        ) : (
+                          <button className="pex-del" aria-label={`Remove ${ex.name}`} onClick={() => setArmedRemoveExId(ex.id)}>
+                            ×
+                          </button>
+                        )}
                       </div>
                       <div className="pex-ctl">
                         <div className="ctl">
@@ -340,7 +358,7 @@ export function ProgramScreen() {
                             <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetDurationSec: (ex.targetDurationSec ?? 30) + 5 } })}>+</button>
                           </div>
                         ) : (
-                          <div className="ctl">
+                          <div className={`ctl${ex.targetRepsMax == null ? "" : " ctl-range"}`}>
                             <span className="ctl-lbl">Reps</span>
                             <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetReps: Math.max(1, ex.targetReps - 1) } })}>−</button>
                             <b>{ex.targetReps}</b>
@@ -350,7 +368,7 @@ export function ProgramScreen() {
                                 + range
                               </button>
                             ) : (
-                              <>
+                              <span className="ctl-grp">
                                 <span className="ctl-to">–</span>
                                 <button onClick={() => updateEx.mutate({ id: ex.id, patch: { targetRepsMax: Math.max(ex.targetReps, ex.targetRepsMax! - 1) } })}>−</button>
                                 <b>{ex.targetRepsMax}</b>
@@ -358,7 +376,7 @@ export function ProgramScreen() {
                                 <button className="ctl-clear" aria-label="Clear range" onClick={() => updateEx.mutate({ id: ex.id, patch: { targetRepsMax: null } })}>
                                   ✕
                                 </button>
-                              </>
+                              </span>
                             )}
                           </div>
                         )}
