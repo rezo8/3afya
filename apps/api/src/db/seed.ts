@@ -84,7 +84,7 @@ async function main() {
   }
 
   // 2) nutrition target
-  await db.insert(nutritionTarget).values({ userId, proteinG: 180, calories: 2600 }).onConflictDoNothing();
+  await db.insert(nutritionTarget).values({ userId, proteinG: 180, calories: 2600 });
 
   // 3) exercise library
   const exIds = new Map<string, string>();

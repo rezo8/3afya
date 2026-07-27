@@ -1,6 +1,14 @@
 import { Hono } from "hono";
-import { and, asc, eq, gte } from "drizzle-orm";
-import type { AddFuelEntryBody, FuelDay, FuelEntry, NutritionTarget } from "@afya/shared";
+import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
+import type {
+  AddFuelEntryBody,
+  FrequentFuel,
+  FuelDay,
+  FuelEntry,
+  FuelHistory,
+  NutritionTarget,
+} from "@afya/shared";
 import { db } from "../db";
 import { fuelEntry, nutritionTarget } from "../db/schema/tracker";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
@@ -9,6 +17,7 @@ const app = new Hono<AuthedEnv>();
 app.use("*", requireAuth);
 
 const DEFAULT_TARGET: NutritionTarget = { proteinG: 180, calories: 2600 };
+const FREQUENT_LIMIT = 8;
 
 const startOfDay = (d: Date) => {
   const x = new Date(d);
@@ -26,12 +35,41 @@ const toEntry = (r: typeof fuelEntry.$inferSelect): FuelEntry => ({
   loggedAt: r.loggedAt.toISOString(),
 });
 
+/** The current target is the newest row of the append-only log. */
 async function targetFor(userId: string): Promise<NutritionTarget> {
-  const [t] = await db.select().from(nutritionTarget).where(eq(nutritionTarget.userId, userId)).limit(1);
-  return t ? { proteinG: t.proteinG, calories: t.calories } : DEFAULT_TARGET;
+  const [current] = await db
+    .select({ proteinG: nutritionTarget.proteinG, calories: nutritionTarget.calories })
+    .from(nutritionTarget)
+    .where(eq(nutritionTarget.userId, userId))
+    .orderBy(desc(nutritionTarget.createdAt))
+    .limit(1);
+  return current ?? DEFAULT_TARGET;
 }
 
-/** Today's fuel: target, entries, and running totals. */
+/** The column's value from the group's newest entry — a fresh portion beats an average of stale ones. */
+const newestInGroup = <T>(column: PgColumn) =>
+  sql<T>`(array_agg(${column} order by ${fuelEntry.loggedAt} desc))[1]`;
+
+/**
+ * The labels this user logs most often, for one-tap re-adding. Derived strictly
+ * from their own entries — no food catalog and no fuzzy matching, just an
+ * exact match on the trimmed, lowercased label.
+ */
+async function frequentFor(userId: string): Promise<FrequentFuel[]> {
+  return db
+    .select({
+      label: newestInGroup<string>(fuelEntry.label),
+      proteinG: newestInGroup<number>(fuelEntry.proteinG),
+      calories: newestInGroup<number>(fuelEntry.calories),
+    })
+    .from(fuelEntry)
+    .where(eq(fuelEntry.userId, userId))
+    .groupBy(sql`lower(trim(${fuelEntry.label}))`)
+    .orderBy(desc(sql`count(*)`), desc(sql`max(${fuelEntry.loggedAt})`))
+    .limit(FREQUENT_LIMIT);
+}
+
+/** Today's fuel: target, entries, running totals, and the user's frequent labels. */
 app.get("/today", async (c) => {
   const userId = c.get("userId");
   const target = await targetFor(userId);
@@ -49,6 +87,7 @@ app.get("/today", async (c) => {
     target,
     entries: entries.map(toEntry),
     totals,
+    frequent: await frequentFor(userId),
   } satisfies FuelDay);
 });
 
@@ -82,20 +121,14 @@ app.put("/target", async (c) => {
   if (!body || typeof body.proteinG !== "number" || typeof body.calories !== "number") {
     return c.json({ error: "bad_request" }, 400);
   }
-  const userId = c.get("userId");
-  const values = {
-    userId,
+  const target: NutritionTarget = {
     proteinG: Math.max(0, Math.round(body.proteinG)),
     calories: Math.max(0, Math.round(body.calories)),
   };
-  await db
-    .insert(nutritionTarget)
-    .values(values)
-    .onConflictDoUpdate({
-      target: nutritionTarget.userId,
-      set: { proteinG: values.proteinG, calories: values.calories },
-    });
-  return c.json({ proteinG: values.proteinG, calories: values.calories } satisfies NutritionTarget);
+  // Append-only: an edit adds a row rather than overwriting one, so the target
+  // each past day was actually judged against stays on record.
+  await db.insert(nutritionTarget).values({ userId: c.get("userId"), ...target });
+  return c.json(target);
 });
 
 /** Daily protein/calorie totals over the last N days — powers the adherence chart. */
@@ -111,11 +144,11 @@ app.get("/history", async (c) => {
     .where(and(eq(fuelEntry.userId, userId), gte(fuelEntry.loggedAt, start)))
     .orderBy(asc(fuelEntry.loggedAt));
 
-  const byDate = new Map<string, { proteinG: number; calories: number }>();
+  const byDate = new Map<string, { proteinG: number; calories: number; entryCount: number }>();
   for (let i = 0; i < days; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
-    byDate.set(localDate(d), { proteinG: 0, calories: 0 });
+    byDate.set(localDate(d), { proteinG: 0, calories: 0, entryCount: 0 });
   }
   for (const e of entries) {
     const key = localDate(e.loggedAt);
@@ -123,12 +156,13 @@ app.get("/history", async (c) => {
     if (bucket) {
       bucket.proteinG += e.proteinG;
       bucket.calories += e.calories;
+      bucket.entryCount += 1;
     }
   }
   return c.json({
     target: await targetFor(userId),
-    days: [...byDate.entries()].map(([date, totals]) => ({ date, ...totals })),
-  });
+    days: [...byDate.entries()].map(([date, day]) => ({ date, ...day })),
+  } satisfies FuelHistory);
 });
 
 export default app;

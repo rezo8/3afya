@@ -78,6 +78,20 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
   you add a new place that reads `set_log` into a `RecordSet` or a trend
   score, remember to select `isWarmup` — a query that omits it will silently
   treat every set as a working set.
+- **`nutritionTarget` is an append-only log, not a mutable row.** `PUT
+  /api/fuel/target` INSERTs; nothing ever updates or upserts it. `targetFor()`
+  (`apps/api/src/routes/fuel.ts`) reads the current target as the newest row by
+  `createdAt`, falling back to `DEFAULT_TARGET` when a user has none. The point
+  is that editing a target must not rewrite the past: `GET /history` still
+  applies today's target to every day in the window, and fixing that to score
+  each day against the target in force *then* is only possible because the old
+  rows survive. Don't reintroduce an upsert or a per-user unique constraint.
+- **Frequent fuel labels are derived from the user's own entries, full stop.**
+  `frequentFor()` groups `fuel_entry` on `lower(trim(label))` — exact match
+  only, no food catalog and no fuzzy matching — and returns each group's
+  newest label casing plus its newest portion (a re-weighed portion should win
+  over an average of stale ones). It rides along on `GET /today` rather than a
+  separate endpoint because the Fuel panel already fetches that query.
 - The **contract** (`@afya/shared`) is the single source of truth for
   request/response shapes.
 
@@ -162,7 +176,28 @@ Schema in `apps/api/src/db/schema/tracker.ts`. All rows are user-scoped.
 
 - DB changes: edit the Drizzle schema, then `db:generate` + `db:migrate`.
   Never hand-edit `apps/api/drizzle/`.
+- **drizzle-kit cannot drop a Postgres primary key.** For an implicit
+  column-level PK it emits a commented `DROP CONSTRAINT "<constraint_name>"`
+  placeholder instead of SQL (`PgAlterTableAlterColumnDropPrimaryKeyConvertor`
+  — it doesn't know the constraint's name), so the generated migration will not
+  run as-is and no reshaping of the schema definition avoids it. The fix is a
+  companion `drizzle-kit generate --custom` migration holding just the drop,
+  ordered before the generated one — `--custom` copies the previous snapshot
+  forward, so the pending diff survives for the next `db:generate`. See
+  `apps/api/drizzle/0005_drop_nutrition_target_legacy_pk.sql` +
+  `0006_neat_albert_cleary.sql`. Prefer this over editing generated SQL.
+- **A schema change that is breaking for `main` must not be migrated against
+  the shared dev `afya` database.** Create a throwaway DB
+  (`CREATE DATABASE afya_prN OWNER afya`), point `DATABASE_URL` at it, and run
+  the API on a spare port; `AUTH_DATABASE_URL` can stay as-is since auth lives
+  in mi7rab's DB. To rehearse the production upgrade, apply the *old*
+  migrations first, insert rows that mirror prod, then apply the new ones and
+  confirm the rows survived.
 - Don't format/edit generated files (see the umbrella `.prettierignore`).
+- The umbrella `.prettierrc` sets no `printWidth`, so `prettier --check` is red
+  across the whole repo (the code is written at ~110 columns). Match the
+  surrounding style; don't run `pnpm format` to "fix" it — that reformats
+  everything.
 
 ## Testing
 

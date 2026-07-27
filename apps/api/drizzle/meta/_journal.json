@@ -36,6 +36,20 @@
       "when": 1785083309605,
       "tag": "0004_useful_night_nurse",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785122793859,
+      "tag": "0005_drop_nutrition_target_legacy_pk",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785123016458,
+      "tag": "0006_neat_albert_cleary",
+      "breakpoints": true
     }
   ]
 }
