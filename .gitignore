@@ -30,3 +30,6 @@ coverage/
 
 # GCP service account key (stored in Secret Manager, never committed)
 apps/api/gcp-key.json
+
+# Devin local config (rules/skills/hooks) — not checked in
+.devin/
