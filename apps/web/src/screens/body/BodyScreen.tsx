@@ -18,9 +18,9 @@ type MetricCfg = {
 };
 
 const METRICS: MetricCfg[] = [
-  { kind: "weight", label: "Weight", unit: "lb", step: 1, precision: 1, fallback: 165, color: "#f2a43c" },
-  { kind: "resting_hr", label: "Resting HR", unit: "bpm", step: 1, precision: 0, fallback: 60, color: "#e0532f" },
-  { kind: "sleep_hours", label: "Sleep", unit: "h", step: 0.5, precision: 1, fallback: 8, color: "#a6bd6a" },
+  { kind: "weight", label: "Weight", unit: "lb", step: 1, precision: 1, fallback: 165, color: "var(--accent)" },
+  { kind: "resting_hr", label: "Resting HR", unit: "bpm", step: 1, precision: 0, fallback: 60, color: "var(--alert)" },
+  { kind: "sleep_hours", label: "Sleep", unit: "h", step: 0.5, precision: 1, fallback: 8, color: "var(--good)" },
 ];
 
 function MetricCard({ cfg }: { cfg: MetricCfg }) {

@@ -10,6 +10,7 @@ import { TrendsScreen } from "@/screens/trends/TrendsScreen";
 import { HistoryScreen } from "@/screens/history/HistoryScreen";
 import { SessionDetailScreen } from "@/screens/history/SessionDetailScreen";
 import { BodyScreen } from "@/screens/body/BodyScreen";
+import { SettingsScreen } from "@/screens/settings/SettingsScreen";
 
 const rootRoute = createRootRoute({ component: RootComponent });
 
@@ -63,11 +64,12 @@ const trendsRoute = createRoute({ getParentRoute: () => appRoute, path: "/trends
 const historyRoute = createRoute({ getParentRoute: () => appRoute, path: "/history", component: HistoryScreen });
 const sessionDetailRoute = createRoute({ getParentRoute: () => appRoute, path: "/history/$sessionId", component: SessionDetailScreen });
 const bodyRoute = createRoute({ getParentRoute: () => appRoute, path: "/body", component: BodyScreen });
+const settingsRoute = createRoute({ getParentRoute: () => appRoute, path: "/settings", component: SettingsScreen });
 
 const routeTree = rootRoute.addChildren([
   signInRoute,
   signUpRoute,
-  appRoute.addChildren([startRoute, sessionRoute, programRoute, trendsRoute, historyRoute, sessionDetailRoute, bodyRoute]),
+  appRoute.addChildren([startRoute, sessionRoute, programRoute, trendsRoute, historyRoute, sessionDetailRoute, bodyRoute, settingsRoute]),
 ]);
 
 export const router = createRouter({ routeTree, defaultPreload: "intent", scrollRestoration: true });

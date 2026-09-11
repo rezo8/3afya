@@ -1,27 +1,149 @@
-@import "tailwindcss";
-
 /*
- * 3afya — "Vitality" design system.
- * Warm neutrals biased toward the marigold accent; boldness spent in one place
- * (the working-set number). Commits to a dark, warm world on purpose.
+ * 3afya design system.
+ *
+ * Colour is addressed by role (--bg, --accent, --text-soft), never by hue, so a
+ * palette can be swapped wholesale. Every palette below redefines the same
+ * eleven role tokens and nothing else; the rest of this file — 2600 lines of
+ * it — never names a colour. Shades and tints are derived with color-mix from
+ * those tokens for the same reason.
+ *
+ * A palette applies wherever [data-theme] sits, not just on :root. The Settings
+ * picker leans on that: each swatch is a plain element carrying data-theme, so
+ * the preview is the real palette rather than a copy of it that can drift.
  */
-:root {
-  --espresso: #17110d;
+:root,
+[data-theme="graphite"] {
+  /* Graphite — cool near-black under an electric blue. */
+  --bg: #0e1013;
+  --surface: #171a1f;
+  --surface-hi: #212630;
+  --accent: #5aa2ff;
+  --accent-deep: #3b7fd4;
+  --accent-mute: #24374f;
+  --alert: #ff6b5a;
+  --good: #6ed39b;
+  --text: #e9edf2;
+  --text-soft: #98a3b2;
+  --text-faint: #656e7b;
+}
+
+[data-theme="midnight"] {
+  /* Midnight — navy black, indigo, a teal that only shows up on good news. */
+  --bg: #0a0e17;
+  --surface: #131a29;
+  --surface-hi: #1c2438;
+  --accent: #8590ff;
+  --accent-deep: #5f6bdb;
+  --accent-mute: #2e3358;
+  --alert: #ff7a90;
+  --good: #63d6c0;
+  --text: #e6eaf7;
+  --text-soft: #949ebb;
+  --text-faint: #616a85;
+}
+
+[data-theme="forest"] {
+  /* Forest — green-black ground, mint accent, amber-lime for the wins. */
+  --bg: #0a110d;
+  --surface: #131c17;
+  --surface-hi: #1c2820;
+  --accent: #57d98c;
+  --accent-deep: #35b36b;
+  --accent-mute: #1f4630;
+  --alert: #ff8558;
+  --good: #b9d96a;
+  --text: #e5efe7;
+  --text-soft: #90a897;
+  --text-faint: #5f7568;
+}
+
+[data-theme="plum"] {
+  /* Plum — aubergine dark, magenta accent, cyan on the other side of it. */
+  --bg: #120a17;
+  --surface: #1d1225;
+  --surface-hi: #281a34;
+  --accent: #e35bd4;
+  --accent-deep: #bd39b0;
+  --accent-mute: #4d2147;
+  --alert: #ff6a8a;
+  --good: #4fd6d6;
+  --text: #f0e6f5;
+  --text-soft: #ab94b5;
+  --text-faint: #74607e;
+}
+
+[data-theme="oxblood"] {
+  /* Oxblood — wine dark, dusty rose, old gold. */
+  --bg: #140a0d;
+  --surface: #201216;
+  --surface-hi: #2c1a1f;
+  --accent: #e8607a;
+  --accent-deep: #c43e59;
+  --accent-mute: #52232f;
+  --alert: #ff9147;
+  --good: #d3b25e;
+  --text: #f4e7ea;
+  --text-soft: #b1919a;
+  --text-faint: #7a6167;
+}
+
+[data-theme="slate"] {
+  /* Slate — blue-grey concrete with an acid lime cutting through it. */
+  --bg: #0f1315;
+  --surface: #1a2024;
+  --surface-hi: #242c31;
+  --accent: #c3f04a;
+  --accent-deep: #9cc42e;
+  --accent-mute: #3b4a22;
+  --alert: #ff7b5c;
+  --good: #4fd1a0;
+  --text: #e8eef0;
+  --text-soft: #97a5ad;
+  --text-faint: #667279;
+}
+
+[data-theme="silver"] {
+  /* Silver — graphite ground under brushed platinum; the accent is achromatic,
+     so colour only appears when something is wrong or something went well. */
+  --bg: #0f1112;
+  --surface: #191c1e;
+  --surface-hi: #242829;
+  --accent: #ced7dc;
+  --accent-deep: #9daab1;
+  --accent-mute: #3a4145;
+  --alert: #ff6b5a;
+  --good: #7fd3a8;
+  --text: #eef2f4;
+  --text-soft: #9aa4a9;
+  --text-faint: #676f73;
+}
+
+[data-theme="vitality"] {
+  /* Vitality — the original warm marigold-on-espresso world. */
+  --bg: #17110d;
   --surface: #211a12;
   --surface-hi: #2c2118;
-  --line: rgba(243, 233, 218, 0.08);
-  --line-hi: rgba(243, 233, 218, 0.16);
+  --accent: #f2a43c;
+  --accent-deep: #d98a26;
+  --accent-mute: #6d5327;
+  --alert: #e0532f;
+  --good: #a6bd6a;
+  --text: #f4ead9;
+  --text-soft: #a58e74;
+  --text-faint: #6f5e4c;
+}
 
-  --marigold: #f2a43c;
-  --marigold-d: #d98a26;
-  --marigold-dim: #6d5327;
-  --pomegranate: #e0532f;
-  --sage: #a6bd6a;
+/* Hairlines are the text colour thinned out, so they follow the palette. They
+   are redeclared wherever a palette lands because a custom property resolves
+   its var()s on the element that declares it — declaring these only on :root
+   would freeze them at the root palette and leave the swatches wrong. */
+:root,
+[data-theme] {
+  --line: color-mix(in srgb, var(--text) 8%, transparent);
+  --line-hi: color-mix(in srgb, var(--text) 16%, transparent);
+}
 
-  --cream: #f4ead9;
-  --taupe: #a58e74;
-  --taupe-dim: #6f5e4c;
-
+:root {
   --r-lg: 22px;
   --r-md: 16px;
   --r-sm: 11px;
@@ -42,18 +164,18 @@ body {
 }
 
 body {
-  background: var(--espresso);
+  background: var(--bg);
   background-image:
-    radial-gradient(120% 60% at 50% -10%, rgba(242, 164, 60, 0.1), transparent 60%),
-    radial-gradient(90% 50% at 50% 110%, rgba(224, 83, 47, 0.07), transparent 55%);
+    radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
+    radial-gradient(90% 50% at 50% 110%, color-mix(in srgb, var(--alert) 7%, transparent), transparent 55%);
   background-attachment: fixed;
-  color: var(--cream);
+  color: var(--text);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
 }
 
 :focus-visible {
-  outline: 2px solid var(--marigold);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -63,8 +185,8 @@ body {
   left: -999px;
   top: 8px;
   z-index: 50;
-  background: var(--marigold);
-  color: var(--espresso);
+  background: var(--accent);
+  color: var(--bg);
   padding: 8px 14px;
   border-radius: 8px;
   font-weight: 700;
@@ -94,6 +216,8 @@ body {
   display: flex;
   align-items: baseline;
   gap: 9px;
+  color: inherit;
+  text-decoration: none;
 }
 .brand .ar {
   font-size: 26px;
@@ -105,7 +229,7 @@ body {
   font-size: 11px;
   letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: var(--marigold);
+  color: var(--accent);
 }
 .topbar-right {
   display: flex;
@@ -115,22 +239,29 @@ body {
 .date {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
-/* --taupe, not --taupe-dim: this sits on every screen and --taupe-dim on
-   --espresso lands under WCAG AA. The padding is hit area, not spacing. */
-.signout {
+/* --text-soft, not --text-faint: this sits on every screen and --text-faint on
+   --bg lands under WCAG AA. The padding is hit area, not spacing. */
+.topbar-link {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-family: var(--mono);
   font-size: 11px;
   cursor: pointer;
   padding: 8px 4px;
 }
-.signout:hover {
-  color: var(--pomegranate);
+.topbar-link {
+  text-decoration: none;
+}
+.topbar-link:hover {
+  color: var(--accent);
+}
+/* Signing out is the one thing up here you cannot undo with another tap. */
+.topbar-link.leave:hover {
+  color: var(--alert);
 }
 
 .eyebrow {
@@ -139,7 +270,7 @@ body {
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .num {
   font-variant-numeric: tabular-nums;
@@ -162,8 +293,8 @@ body {
   font-family: var(--sans);
   font-size: 16px;
   font-weight: 800;
-  color: var(--espresso);
-  background: var(--marigold);
+  color: var(--bg);
+  background: var(--accent);
   cursor: pointer;
   transition:
     transform 0.08s ease,
@@ -181,7 +312,7 @@ body {
 }
 .btn-ghost {
   background: var(--surface);
-  color: var(--cream);
+  color: var(--text);
   border: 1px solid var(--line-hi);
   font-weight: 600;
 }
@@ -196,12 +327,12 @@ body {
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .field input {
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line-hi);
-  color: var(--cream);
+  color: var(--text);
   border-radius: var(--r-md);
   padding: 13px 14px;
   font-family: var(--sans);
@@ -209,10 +340,10 @@ body {
 }
 .field input:focus {
   outline: none;
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .form-error {
-  color: var(--pomegranate);
+  color: var(--alert);
   font-size: 13px;
   margin: 0;
 }
@@ -239,7 +370,7 @@ body {
   font-size: 12px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
   margin-top: 4px;
 }
 .auth-card {
@@ -263,10 +394,10 @@ body {
 .auth-alt {
   text-align: center;
   font-size: 14px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .auth-alt a {
-  color: var(--marigold);
+  color: var(--accent);
   text-decoration: none;
   font-weight: 600;
 }
@@ -274,7 +405,7 @@ body {
 /* ---- generic states ---- */
 .center-note {
   text-align: center;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-family: var(--mono);
   font-size: 13px;
   padding: 40px 12px;
@@ -298,7 +429,7 @@ body {
 }
 .empty-state p {
   margin: 0;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-size: 14px;
   max-width: 34ch;
 }
@@ -327,7 +458,7 @@ body {
   font-size: 26px;
 }
 .session-progress .frac b {
-  color: var(--marigold);
+  color: var(--accent);
   font-weight: 400;
 }
 .session-progress .lbl {
@@ -337,7 +468,7 @@ body {
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .track {
   height: 5px;
@@ -349,7 +480,7 @@ body {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--marigold-d), var(--marigold));
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
   transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -391,13 +522,13 @@ body {
   font-size: clamp(58px, 20vw, 82px);
   font-weight: 400;
   letter-spacing: 0.01em;
-  color: var(--marigold);
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 .bignum .unit {
   font-size: 18px;
   font-weight: 700;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .reps {
   text-align: center;
@@ -413,13 +544,13 @@ body {
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .step {
   appearance: none;
   border: 1px solid var(--line-hi);
-  background: var(--espresso);
-  color: var(--cream);
+  background: var(--bg);
+  color: var(--text);
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -440,7 +571,7 @@ body {
   font-size: 19px;
 }
 .step:hover {
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .step:active {
   transform: scale(0.9);
@@ -454,13 +585,13 @@ body {
   font-family: var(--mono);
   font-size: 13px;
   font-weight: 600;
-  color: var(--sage);
+  color: var(--good);
 }
 .delta.flat {
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .delta.down {
-  color: var(--pomegranate);
+  color: var(--alert);
 }
 .pips {
   display: flex;
@@ -479,25 +610,25 @@ body {
     border-color 0.2s ease;
 }
 .pip.done {
-  background: linear-gradient(90deg, var(--marigold-d), var(--marigold));
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
   border-color: transparent;
 }
 .pip.active {
-  border-color: var(--marigold);
-  box-shadow: 0 0 0 3px rgba(242, 164, 60, 0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .pip.extra {
   background: none;
   border-style: dashed;
-  border-color: var(--marigold-dim);
+  border-color: var(--accent-mute);
 }
 .pip.extra.done {
-  background: var(--marigold-dim);
+  background: var(--accent-mute);
   border-style: solid;
   border-color: transparent;
 }
 .pip.extra.active {
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .warmup-row {
   display: flex;
@@ -513,8 +644,8 @@ body {
   font-family: var(--sans);
   font-size: 16px;
   font-weight: 800;
-  color: var(--espresso);
-  background: var(--marigold);
+  color: var(--bg);
+  background: var(--accent);
   cursor: pointer;
   transition:
     transform 0.08s ease,
@@ -570,26 +701,26 @@ body {
   transition: border-color 0.15s ease;
 }
 .row.is-active {
-  border-color: var(--marigold);
+  border-color: var(--accent);
   background: var(--surface-hi);
 }
 .row .mark {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 2px solid var(--taupe-dim);
+  border: 2px solid var(--text-faint);
   display: grid;
   place-items: center;
   font-size: 13px;
-  color: var(--espresso);
+  color: var(--bg);
   flex: none;
 }
 .row.is-done .mark {
-  background: var(--marigold);
-  border-color: var(--marigold);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .row.is-active .mark {
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .row .rname {
   flex: 1;
@@ -597,22 +728,22 @@ body {
   font-weight: 600;
 }
 .row.is-done .rname {
-  color: var(--taupe);
+  color: var(--text-soft);
   text-decoration: line-through;
-  text-decoration-color: var(--taupe-dim);
+  text-decoration-color: var(--text-faint);
 }
 .row .rmeta {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-variant-numeric: tabular-nums;
 }
 .row .rmeta b {
-  color: var(--cream);
+  color: var(--text);
   font-weight: 600;
 }
 .lifts li.in-ss {
-  border-left: 3px solid var(--marigold-dim);
+  border-left: 3px solid var(--accent-mute);
   padding-left: 4px;
 }
 
@@ -625,7 +756,7 @@ body {
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--cream);
+  color: var(--text);
   white-space: pre-line;
 }
 
@@ -644,7 +775,7 @@ body {
 .eating-head .kcap {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .meters {
   display: flex;
@@ -669,7 +800,7 @@ body {
   text-align: right;
 }
 .mval .goal {
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .bar {
   height: 9px;
@@ -684,13 +815,13 @@ body {
   transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .bar.protein > i {
-  background: linear-gradient(90deg, var(--sage), #c3d986);
+  background: linear-gradient(90deg, var(--good), color-mix(in srgb, var(--good) 62%, var(--text)));
 }
 .bar.cal > i {
-  background: linear-gradient(90deg, var(--marigold-d), var(--marigold));
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
 }
 .bar.cal.over > i {
-  background: linear-gradient(90deg, var(--pomegranate), #f2734e);
+  background: linear-gradient(90deg, var(--alert), color-mix(in srgb, var(--alert) 62%, var(--text)));
 }
 .quickadd {
   display: flex;
@@ -701,8 +832,8 @@ body {
 .chip {
   appearance: none;
   border: 1px solid var(--line-hi);
-  background: var(--espresso);
-  color: var(--cream);
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--mono);
   font-size: 12px;
   padding: 8px 12px;
@@ -713,7 +844,7 @@ body {
     transform 0.08s ease;
 }
 .chip:hover {
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .chip:active {
   transform: scale(0.94);
@@ -722,7 +853,7 @@ body {
   margin: 6px 0 0;
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .fuel-target-open {
   appearance: none;
@@ -734,7 +865,7 @@ body {
   text-underline-offset: 3px;
 }
 .fuel-target-open:hover {
-  color: var(--marigold);
+  color: var(--accent);
 }
 .eating .error-banner {
   margin-bottom: 16px;
@@ -744,7 +875,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line-hi);
   border-radius: var(--r-md);
   padding: 14px;
@@ -763,7 +894,7 @@ body {
 .fuel-name {
   background: var(--surface);
   border: 1px solid var(--line-hi);
-  color: var(--cream);
+  color: var(--text);
   border-radius: var(--r-md);
   padding: 11px 13px;
   font-family: var(--sans);
@@ -772,7 +903,7 @@ body {
 }
 .fuel-name:focus {
   outline: none;
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .fuel-field {
   display: flex;
@@ -792,7 +923,7 @@ body {
 .fuel-field-num {
   background: none;
   border: none;
-  color: var(--cream);
+  color: var(--text);
   font-family: var(--mono);
   font-size: 17px;
   font-variant-numeric: tabular-nums;
@@ -802,12 +933,12 @@ body {
 }
 .fuel-field-num:focus {
   outline: none;
-  color: var(--marigold);
+  color: var(--accent);
 }
 .fuel-field-unit {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--taupe);
+  color: var(--text-soft);
   min-width: 26px;
 }
 .fuel-edit-actions {
@@ -820,19 +951,19 @@ body {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-family: var(--mono);
   font-size: 12px;
   cursor: pointer;
 }
 .fuel-cancel:hover {
-  color: var(--marigold);
+  color: var(--accent);
 }
 .fuel-save {
   appearance: none;
   border: none;
-  background: var(--marigold);
-  color: var(--espresso);
+  background: var(--accent);
+  color: var(--bg);
   font-weight: 800;
   border-radius: var(--r-md);
   padding: 0 18px;
@@ -850,7 +981,7 @@ body {
   margin-top: 10px;
   background: none;
   border: 1px dashed var(--line-hi);
-  color: var(--taupe);
+  color: var(--text-soft);
   border-radius: var(--r-md);
   padding: 11px;
   font-family: var(--sans);
@@ -862,8 +993,8 @@ body {
     color 0.15s ease;
 }
 .fuel-custom-open:hover {
-  border-color: var(--marigold);
-  color: var(--cream);
+  border-color: var(--accent);
+  color: var(--text);
 }
 .fuel-log {
   margin-top: 16px;
@@ -880,7 +1011,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   padding: 7px 8px 7px 12px;
@@ -897,20 +1028,20 @@ body {
   font-family: var(--mono);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .fr-del {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe-dim);
+  color: var(--text-faint);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
   padding: 4px 4px;
 }
 .fr-del:hover {
-  color: var(--pomegranate);
+  color: var(--alert);
 }
 .fr-del:disabled {
   opacity: 0.5;
@@ -922,21 +1053,21 @@ body {
   background: none;
   margin-top: 8px;
   padding: 4px 0;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.06em;
   cursor: pointer;
 }
 .fuel-more:hover {
-  color: var(--marigold);
+  color: var(--accent);
 }
 
 /* ---- PROGRAM BUILDER ---- */
 .prog-name input {
   background: none;
   border: none;
-  color: var(--cream);
+  color: var(--text);
   font-family: var(--display);
   font-size: 34px;
   font-weight: 400;
@@ -967,31 +1098,31 @@ body {
 .rot-seg .rn {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .rot-seg .rnm {
   font-size: 13px;
   font-weight: 700;
 }
 .rot-seg.next {
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .rot-seg.next .rnm {
-  color: var(--marigold);
+  color: var(--accent);
 }
 .rot-tag {
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--espresso);
-  background: var(--marigold);
+  color: var(--bg);
+  background: var(--accent);
   border-radius: 5px;
   padding: 1px 5px;
   font-weight: 700;
 }
 .rot-arrow {
-  color: var(--taupe-dim);
+  color: var(--text-faint);
   font-size: 13px;
 }
 .day-chips {
@@ -1003,7 +1134,7 @@ body {
   appearance: none;
   border: 1px solid var(--line-hi);
   background: var(--surface);
-  color: var(--cream);
+  color: var(--text);
   border-radius: 999px;
   padding: 9px 15px;
   font-size: 14px;
@@ -1019,21 +1150,21 @@ body {
 .day-chip .badge {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--espresso);
-  background: var(--taupe);
+  color: var(--bg);
+  background: var(--text-soft);
   border-radius: 5px;
   padding: 1px 5px;
   font-weight: 700;
 }
 .day-chip.sel {
-  border-color: var(--marigold);
+  border-color: var(--accent);
   background: var(--surface-hi);
 }
 .day-chip.sel .badge {
-  background: var(--marigold);
+  background: var(--accent);
 }
 .day-chip.add {
-  color: var(--taupe);
+  color: var(--text-soft);
   font-weight: 600;
   border-style: dashed;
 }
@@ -1057,7 +1188,7 @@ body {
   background: none;
   border: none;
   border-bottom: 1px solid var(--line-hi);
-  color: var(--cream);
+  color: var(--text);
   font-family: var(--sans);
   font-size: 22px;
   font-weight: 800;
@@ -1065,13 +1196,13 @@ body {
 }
 .de-head input:focus {
   outline: none;
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .de-del {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-family: var(--mono);
   font-size: 12px;
   cursor: pointer;
@@ -1079,13 +1210,13 @@ body {
   text-align: left;
 }
 .de-del:hover {
-  color: var(--pomegranate);
+  color: var(--alert);
 }
 /* Armed by a first tap: takes its own line, since the stakes it spells out are
    far longer than "Delete day" and would otherwise squash the name input. */
 .de-del.armed {
   flex-basis: 100%;
-  color: var(--pomegranate);
+  color: var(--alert);
   font-weight: 600;
 }
 .rot-move {
@@ -1096,8 +1227,8 @@ body {
 .rot-move button {
   appearance: none;
   border: 1px solid var(--line-hi);
-  background: var(--espresso);
-  color: var(--cream);
+  background: var(--bg);
+  color: var(--text);
   border-radius: 999px;
   padding: 7px 13px;
   font-size: 12px;
@@ -1109,12 +1240,12 @@ body {
   cursor: default;
 }
 .rot-move button:not(:disabled):hover {
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .rot-pos {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .pex-list {
   list-style: none;
@@ -1128,7 +1259,7 @@ body {
   display: flex;
   gap: 10px;
   padding: 16px;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
 }
@@ -1142,7 +1273,7 @@ body {
   appearance: none;
   border: 1px solid var(--line);
   background: var(--surface);
-  color: var(--taupe);
+  color: var(--text-soft);
   width: 40px;
   height: 40px;
   border-radius: 8px;
@@ -1154,8 +1285,8 @@ body {
   flex: none;
 }
 .ord:hover:not(:disabled) {
-  color: var(--marigold);
-  border-color: var(--marigold);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 .ord:disabled {
   opacity: 0.3;
@@ -1182,7 +1313,7 @@ body {
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
   border: 1px solid var(--line-hi);
   border-radius: 5px;
   padding: 1px 5px;
@@ -1192,7 +1323,7 @@ body {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe-dim);
+  color: var(--text-faint);
   font-size: 20px;
   cursor: pointer;
   line-height: 1;
@@ -1204,7 +1335,7 @@ body {
   flex: none;
 }
 .pex-del:hover {
-  color: var(--pomegranate);
+  color: var(--alert);
 }
 /* Armed by a first tap — the hint replaces the glyph, so the box has to grow
    with the copy instead of staying a 32px square. */
@@ -1214,7 +1345,7 @@ body {
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 600;
-  color: var(--pomegranate);
+  color: var(--alert);
 }
 .pex-ctl {
   display: flex;
@@ -1252,7 +1383,7 @@ body {
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
   padding-left: 4px;
 }
 .ctl b {
@@ -1265,7 +1396,7 @@ body {
   appearance: none;
   border: none;
   background: var(--surface-hi);
-  color: var(--cream);
+  color: var(--text);
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1277,8 +1408,8 @@ body {
   flex: none;
 }
 .ctl button:hover {
-  background: var(--marigold);
-  color: var(--espresso);
+  background: var(--accent);
+  color: var(--bg);
 }
 .addex {
   display: flex;
@@ -1286,9 +1417,9 @@ body {
 }
 .addex input {
   flex: 1;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line-hi);
-  color: var(--cream);
+  color: var(--text);
   border-radius: var(--r-md);
   padding: 12px 14px;
   font-family: var(--sans);
@@ -1296,13 +1427,13 @@ body {
 }
 .addex input:focus {
   outline: none;
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .addex button {
   appearance: none;
   border: none;
-  background: var(--marigold);
-  color: var(--espresso);
+  background: var(--accent);
+  color: var(--bg);
   font-weight: 800;
   border-radius: var(--r-md);
   padding: 0 18px;
@@ -1317,16 +1448,16 @@ body {
 .ex-suggest button {
   appearance: none;
   border: 1px solid var(--line);
-  background: var(--espresso);
-  color: var(--taupe);
+  background: var(--bg);
+  color: var(--text-soft);
   border-radius: 999px;
   padding: 5px 10px;
   font-size: 12px;
   cursor: pointer;
 }
 .ex-suggest button:hover {
-  border-color: var(--marigold);
-  color: var(--cream);
+  border-color: var(--accent);
+  color: var(--text);
 }
 .pex-section {
   list-style: none;
@@ -1334,7 +1465,7 @@ body {
   font-size: 10px;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: var(--marigold);
+  color: var(--accent);
   margin: 12px 0 2px;
   padding-left: 2px;
 }
@@ -1347,18 +1478,18 @@ body {
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
   padding-left: 8px;
 }
 .pex.in-ss {
-  border-left: 3px solid var(--marigold-dim);
+  border-left: 3px solid var(--accent-mute);
 }
 .ctl .ctl-add,
 .ctl .ctl-clear {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-family: var(--mono);
   font-size: 11px;
   cursor: pointer;
@@ -1371,10 +1502,10 @@ body {
 .ctl .ctl-add:hover,
 .ctl .ctl-clear:hover {
   background: none;
-  color: var(--marigold);
+  color: var(--accent);
 }
 .ctl-to {
-  color: var(--taupe);
+  color: var(--text-soft);
   font-size: 13px;
   padding: 0 1px;
 }
@@ -1383,7 +1514,7 @@ body {
   margin-top: 8px;
   background: var(--surface);
   border: 1px solid var(--line);
-  color: var(--cream);
+  color: var(--text);
   border-radius: var(--r-sm);
   padding: 7px 10px;
   font-family: var(--sans);
@@ -1391,7 +1522,7 @@ body {
 }
 .pex-note:focus {
   outline: none;
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .pex-meta {
   display: flex;
@@ -1407,7 +1538,7 @@ body {
   min-width: 0;
   background: var(--surface);
   border: 1px dashed var(--line-hi);
-  color: var(--taupe);
+  color: var(--text-soft);
   border-radius: var(--r-sm);
   padding: 5px 8px;
   font-family: var(--mono);
@@ -1415,16 +1546,16 @@ body {
 }
 .pex-tag-in:not(:placeholder-shown) {
   border-style: solid;
-  color: var(--cream);
+  color: var(--text);
 }
 .pex-tag-in:focus {
   outline: none;
-  border-color: var(--marigold);
-  color: var(--cream);
+  border-color: var(--accent);
+  color: var(--text);
 }
 .pex-note::placeholder,
 .pex-tag-in::placeholder {
-  color: var(--taupe-dim);
+  color: var(--text-faint);
 }
 .de-block {
   display: flex;
@@ -1432,9 +1563,9 @@ body {
   gap: 6px;
 }
 .de-block textarea {
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line-hi);
-  color: var(--cream);
+  color: var(--text);
   border-radius: var(--r-md);
   padding: 10px 12px;
   font-family: var(--sans);
@@ -1445,21 +1576,21 @@ body {
 }
 .de-block textarea:focus {
   outline: none;
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .de-block textarea::placeholder {
-  color: var(--taupe-dim);
+  color: var(--text-faint);
 }
 .set-target {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--taupe);
+  color: var(--text-soft);
   text-align: center;
   margin-top: 3px;
 }
 .set-note {
   font-size: 13px;
-  color: var(--taupe);
+  color: var(--text-soft);
   text-align: center;
   margin: 9px auto 0;
   max-width: 360px;
@@ -1485,7 +1616,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   padding: 6px 8px 6px 12px;
@@ -1493,7 +1624,7 @@ body {
 .ls-num {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--taupe);
+  color: var(--text-soft);
   min-width: 14px;
 }
 .ls-edit {
@@ -1513,17 +1644,17 @@ body {
 .ls-edit .u {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .ls-edit .x {
-  color: var(--taupe-dim);
+  color: var(--text-faint);
   padding: 0 2px;
 }
 .ls-edit button {
   appearance: none;
   border: none;
   background: var(--surface-hi);
-  color: var(--cream);
+  color: var(--text);
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -1534,8 +1665,8 @@ body {
   place-items: center;
 }
 .ls-edit button:hover {
-  background: var(--marigold);
-  color: var(--espresso);
+  background: var(--accent);
+  color: var(--bg);
 }
 .ls-warmup-btn {
   font-family: var(--mono);
@@ -1544,31 +1675,31 @@ body {
   margin-left: 4px;
 }
 .ls-warmup-btn.on {
-  background: var(--marigold-dim);
-  color: var(--cream);
+  background: var(--accent-mute);
+  color: var(--text);
 }
 .ls-del {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe-dim);
+  color: var(--text-faint);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
   padding: 0 4px;
 }
 .ls-del:hover {
-  color: var(--pomegranate);
+  color: var(--alert);
 }
 .back-link {
   display: inline-block;
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--taupe);
+  color: var(--text-soft);
   text-decoration: none;
 }
 .back-link:hover {
-  color: var(--marigold);
+  color: var(--accent);
 }
 .rest-bar {
   position: fixed;
@@ -1589,7 +1720,7 @@ body {
   top: 0;
   left: 0;
   height: 100%;
-  background: rgba(242, 164, 60, 0.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   transition: width 0.25s linear;
   z-index: 0;
 }
@@ -1613,19 +1744,19 @@ body {
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .rest-time {
   font-variant-numeric: tabular-nums;
   font-size: 22px;
   font-weight: 800;
-  color: var(--marigold);
+  color: var(--accent);
 }
 .rest-adj {
   appearance: none;
   border: 1px solid var(--line-hi);
-  background: var(--espresso);
-  color: var(--cream);
+  background: var(--bg);
+  color: var(--text);
   border-radius: 999px;
   padding: 8px 12px;
   font-family: var(--mono);
@@ -1633,13 +1764,13 @@ body {
   cursor: pointer;
 }
 .rest-adj:hover {
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .rest-skip {
   appearance: none;
   border: none;
-  background: var(--marigold);
-  color: var(--espresso);
+  background: var(--accent);
+  color: var(--bg);
   font-weight: 800;
   border-radius: 999px;
   padding: 8px 15px;
@@ -1650,7 +1781,7 @@ body {
   margin: 8px 0 0;
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .start-days {
   display: grid;
@@ -1667,28 +1798,28 @@ body {
   border-radius: var(--r-md);
   padding: 15px 16px 16px;
   text-decoration: none;
-  color: var(--cream);
+  color: var(--text);
   cursor: pointer;
   transition:
     border-color 0.12s ease,
     transform 0.08s ease;
 }
 .start-day:hover {
-  border-color: var(--marigold);
+  border-color: var(--accent);
   transform: translateY(-1px);
 }
 .start-day.is-next {
-  border-color: var(--marigold-dim);
+  border-color: var(--accent-mute);
 }
 .start-day.is-resume {
-  border-color: var(--marigold);
+  border-color: var(--accent);
   background: linear-gradient(180deg, var(--surface-hi), var(--surface));
 }
 .start-day.is-done {
   border-style: dashed;
 }
 .start-day.is-done .sd-name {
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .sd-top {
   display: flex;
@@ -1702,7 +1833,7 @@ body {
   height: 24px;
   border-radius: 7px;
   background: var(--surface-hi);
-  color: var(--marigold);
+  color: var(--accent);
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 700;
@@ -1713,8 +1844,8 @@ body {
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--espresso);
-  background: var(--marigold);
+  color: var(--bg);
+  background: var(--accent);
   border-radius: 5px;
   padding: 2px 7px;
   white-space: nowrap;
@@ -1724,7 +1855,7 @@ body {
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
   background: var(--surface-hi);
   border: 1px solid var(--line-hi);
   border-radius: 5px;
@@ -1739,7 +1870,7 @@ body {
 .sd-meta {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 
 /* ---- TRENDS ---- */
@@ -1759,7 +1890,7 @@ body {
 .card-head .readout {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--marigold);
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
 .metric-big {
@@ -1776,16 +1907,16 @@ body {
 }
 .metric-big .u {
   font-size: 15px;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-weight: 700;
 }
 .metric-big .d {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--sage);
+  color: var(--good);
 }
 .metric-big .d.flat {
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .lift-select {
   display: flex;
@@ -1796,8 +1927,8 @@ body {
 .ls {
   appearance: none;
   border: 1px solid var(--line-hi);
-  background: var(--espresso);
-  color: var(--taupe);
+  background: var(--bg);
+  color: var(--text-soft);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 12px;
@@ -1805,8 +1936,8 @@ body {
   cursor: pointer;
 }
 .ls.on {
-  border-color: var(--marigold);
-  color: var(--marigold);
+  border-color: var(--accent);
+  color: var(--accent);
   background: var(--surface-hi);
 }
 .expand-row {
@@ -1816,7 +1947,7 @@ body {
 }
 .seg {
   display: inline-flex;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line-hi);
   border-radius: 999px;
   padding: 3px;
@@ -1825,7 +1956,7 @@ body {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-family: var(--mono);
   font-size: 11px;
   padding: 5px 12px;
@@ -1833,8 +1964,8 @@ body {
   cursor: pointer;
 }
 .seg button.on {
-  background: var(--marigold);
-  color: var(--espresso);
+  background: var(--accent);
+  color: var(--bg);
   font-weight: 700;
 }
 svg.chart {
@@ -1865,7 +1996,7 @@ svg.chart {
 }
 .stat .v .u {
   font-size: 14px;
-  color: var(--taupe);
+  color: var(--text-soft);
   margin-left: 2px;
 }
 .stat .k {
@@ -1875,7 +2006,7 @@ svg.chart {
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .cal-grid {
   display: grid;
@@ -1886,14 +2017,14 @@ svg.chart {
   text-align: center;
   font-family: var(--mono);
   font-size: 9px;
-  color: var(--taupe);
+  color: var(--text-soft);
   text-transform: uppercase;
   padding-bottom: 2px;
 }
 .cal-day {
   aspect-ratio: 1;
   border-radius: 9px;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -1902,7 +2033,7 @@ svg.chart {
   gap: 3px;
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-variant-numeric: tabular-nums;
 }
 .cal-day.empty {
@@ -1910,7 +2041,7 @@ svg.chart {
   border: none;
 }
 .cal-day.done {
-  color: var(--cream);
+  color: var(--text);
   border-color: transparent;
   background: var(--surface-hi);
 }
@@ -1921,11 +2052,11 @@ svg.chart {
   background: transparent;
 }
 .cal-day.done .cd-dot {
-  background: var(--marigold);
+  background: var(--accent);
 }
 .cal-day.today {
-  border-color: var(--marigold);
-  color: var(--marigold);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .sess-list {
   list-style: none;
@@ -1951,13 +2082,13 @@ svg.chart {
     transform 0.08s ease;
 }
 .sess:hover {
-  border-color: var(--marigold);
+  border-color: var(--accent);
   transform: translateY(-1px);
 }
 .sess .sdate {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--taupe);
+  color: var(--text-soft);
   width: 44px;
   flex: none;
 }
@@ -1974,15 +2105,15 @@ svg.chart {
 .sess .ssum {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-variant-numeric: tabular-nums;
 }
 .sess .ssum.untrained {
-  color: var(--taupe-dim);
+  color: var(--text-faint);
   font-style: italic;
 }
 .sess .schev {
-  color: var(--taupe-dim);
+  color: var(--text-faint);
   font-size: 20px;
   flex: none;
 }
@@ -1998,7 +2129,7 @@ svg.chart {
   display: flex;
   justify-content: space-around;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, rgba(23, 17, 13, 0.4), var(--espresso) 55%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 40%, transparent), var(--bg) 55%);
   backdrop-filter: blur(12px);
   border-top: 1px solid var(--line);
   z-index: 10;
@@ -2015,7 +2146,7 @@ svg.chart {
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--taupe-dim);
+  color: var(--text-faint);
   padding: 4px 10px;
   text-decoration: none;
 }
@@ -2026,10 +2157,10 @@ svg.chart {
   background: transparent;
 }
 .tab.active {
-  color: var(--marigold);
+  color: var(--accent);
 }
 .tab.active .dot {
-  background: var(--marigold);
+  background: var(--accent);
 }
 .tabbar-brand {
   display: none;
@@ -2056,7 +2187,7 @@ svg.chart {
     align-items: stretch;
     gap: 4px;
     padding: 26px 16px;
-    background: linear-gradient(180deg, rgba(23, 17, 13, 0.55), var(--espresso) 40%);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 55%, transparent), var(--bg) 40%);
     border-top: none;
     border-right: 1px solid var(--line);
     backdrop-filter: none;
@@ -2072,11 +2203,11 @@ svg.chart {
     font-size: 12px;
     padding: 11px 14px;
     border-radius: 10px;
-    color: var(--taupe);
+    color: var(--text-soft);
   }
   .tab:hover {
     background: var(--surface);
-    color: var(--cream);
+    color: var(--text);
   }
   .tab .dot {
     width: 6px;
@@ -2084,7 +2215,7 @@ svg.chart {
   }
   .tab.active {
     background: var(--surface);
-    color: var(--marigold);
+    color: var(--accent);
   }
   .topbar {
     justify-content: flex-end;
@@ -2106,17 +2237,17 @@ svg.chart {
   margin: -8px 0 0;
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .sd-note {
   margin: 0;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--marigold-dim);
+  border-left: 3px solid var(--accent-mute);
   border-radius: var(--r-sm);
   padding: 10px 12px;
   font-size: 14px;
-  color: var(--cream);
+  color: var(--text);
   line-height: 1.45;
 }
 .sd-ex-list {
@@ -2147,7 +2278,7 @@ svg.chart {
 .sd-total {
   font-family: var(--mono);
   font-size: 13px;
-  color: var(--marigold);
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -2157,8 +2288,8 @@ svg.chart {
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--espresso);
-  background: var(--sage);
+  color: var(--bg);
+  background: var(--good);
   border-radius: 5px;
   padding: 1px 5px;
   vertical-align: middle;
@@ -2176,17 +2307,17 @@ svg.chart {
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
 }
 .sd-set.best {
-  border-color: var(--marigold-dim);
+  border-color: var(--accent-mute);
 }
 .sd-set-n {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--taupe);
+  color: var(--text-soft);
   min-width: 16px;
 }
 .sd-set-v {
@@ -2202,7 +2333,7 @@ svg.chart {
   font-size: 9px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--marigold);
+  color: var(--accent);
 }
 /* Recap of a session that was started and never logged into. The History row stays
    visible on purpose, so the way out of the dead end lives here. */
@@ -2219,17 +2350,17 @@ svg.chart {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-family: var(--mono);
   font-size: 12px;
   cursor: pointer;
   padding: 0;
 }
 .sd-remove:hover {
-  color: var(--pomegranate);
+  color: var(--alert);
 }
 .sd-remove.armed {
-  color: var(--pomegranate);
+  color: var(--alert);
   font-weight: 600;
 }
 .sd-remove:disabled {
@@ -2243,7 +2374,7 @@ svg.chart {
   width: 100%;
   background: var(--surface);
   border: 1px dashed var(--line-hi);
-  color: var(--taupe);
+  color: var(--text-soft);
   border-radius: var(--r-md);
   padding: 13px;
   font-family: var(--sans);
@@ -2255,8 +2386,8 @@ svg.chart {
     color 0.15s ease;
 }
 .add-ex-open:hover {
-  border-color: var(--marigold);
-  color: var(--cream);
+  border-color: var(--accent);
+  color: var(--text);
 }
 .review-session {
   display: flex;
@@ -2272,15 +2403,15 @@ svg.chart {
   font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
   text-decoration: none;
   transition:
     border-color 0.15s ease,
     color 0.15s ease;
 }
 .review-session:hover {
-  border-color: var(--marigold-dim);
-  color: var(--cream);
+  border-color: var(--accent-mute);
+  color: var(--text);
 }
 .add-ex-panel {
   background: var(--surface);
@@ -2300,13 +2431,13 @@ svg.chart {
   appearance: none;
   border: none;
   background: none;
-  color: var(--taupe);
+  color: var(--text-soft);
   font-family: var(--mono);
   font-size: 12px;
   cursor: pointer;
 }
 .add-ex-close:hover {
-  color: var(--marigold);
+  color: var(--accent);
 }
 .add-ex-new {
   display: flex;
@@ -2317,9 +2448,9 @@ svg.chart {
 .add-ex-new input {
   flex: 1;
   min-width: 140px;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line-hi);
-  color: var(--cream);
+  color: var(--text);
   border-radius: var(--r-md);
   padding: 11px 13px;
   font-family: var(--sans);
@@ -2327,13 +2458,13 @@ svg.chart {
 }
 .add-ex-new input:focus {
   outline: none;
-  border-color: var(--marigold);
+  border-color: var(--accent);
 }
 .add-ex-create {
   appearance: none;
   border: none;
-  background: var(--marigold);
-  color: var(--espresso);
+  background: var(--accent);
+  color: var(--bg);
   font-weight: 800;
   border-radius: var(--r-md);
   padding: 0 18px;
@@ -2351,7 +2482,7 @@ svg.chart {
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--taupe-dim);
+  color: var(--text-faint);
   white-space: nowrap;
 }
 
@@ -2363,7 +2494,7 @@ svg.chart {
 }
 .swap-panel {
   margin-top: 12px;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: 12px;
@@ -2392,14 +2523,14 @@ svg.chart {
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   padding: 9px 11px;
-  color: var(--cream);
+  color: var(--text);
   font-family: var(--sans);
   font-size: 14px;
   text-align: left;
   cursor: pointer;
 }
 .swap-list button:hover {
-  border-color: var(--marigold-dim);
+  border-color: var(--accent-mute);
 }
 .swap-list button:disabled {
   opacity: 0.5;
@@ -2419,15 +2550,15 @@ svg.chart {
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--marigold);
-  border: 1px solid var(--marigold-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-mute);
   border-radius: 5px;
   padding: 1px 5px;
 }
 .swap-note {
   margin: 0;
   font-size: 13px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 
 /* ---- PERSONAL RECORDS ---- */
@@ -2437,8 +2568,8 @@ svg.chart {
   gap: 10px;
   padding: 12px 14px;
   border-radius: var(--r-md);
-  background: linear-gradient(90deg, rgba(242, 164, 60, 0.2), rgba(242, 164, 60, 0.06));
-  border: 1px solid var(--marigold-dim);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--accent) 6%, transparent));
+  border: 1px solid var(--accent-mute);
   animation: pr-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes pr-pop {
@@ -2457,10 +2588,10 @@ svg.chart {
 }
 .pr-text {
   font-size: 13px;
-  color: var(--cream);
+  color: var(--text);
 }
 .pr-text b {
-  color: var(--marigold);
+  color: var(--accent);
   font-weight: 800;
 }
 
@@ -2471,19 +2602,19 @@ svg.chart {
   gap: 10px;
   padding: 12px 14px;
   border-radius: var(--r-md);
-  background: linear-gradient(90deg, rgba(224, 83, 47, 0.18), rgba(224, 83, 47, 0.06));
-  border: 1px solid var(--pomegranate);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--alert) 18%, transparent), color-mix(in srgb, var(--alert) 6%, transparent));
+  border: 1px solid var(--alert);
 }
 .eb-text {
   flex: 1;
   font-size: 13px;
-  color: var(--cream);
+  color: var(--text);
 }
 .eb-retry {
   appearance: none;
-  border: 1px solid var(--pomegranate);
+  border: 1px solid var(--alert);
   background: none;
-  color: var(--cream);
+  color: var(--text);
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.06em;
@@ -2493,8 +2624,8 @@ svg.chart {
   cursor: pointer;
 }
 .eb-retry:hover {
-  background: var(--pomegranate);
-  color: var(--espresso);
+  background: var(--alert);
+  color: var(--bg);
 }
 .ls-pr {
   font-size: 14px;
@@ -2506,7 +2637,7 @@ svg.chart {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--taupe);
+  color: var(--text-soft);
   background: var(--surface-hi);
   border: 1px solid var(--line-hi);
   border-radius: 5px;
@@ -2514,16 +2645,16 @@ svg.chart {
   flex: none;
 }
 .sd-set.pr {
-  border-color: var(--marigold);
-  background: rgba(242, 164, 60, 0.08);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .sd-pr-tag {
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--espresso);
-  background: var(--marigold);
+  color: var(--bg);
+  background: var(--accent);
   border-radius: 5px;
   padding: 2px 6px;
   font-weight: 700;
@@ -2559,7 +2690,7 @@ svg.chart {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  background: var(--espresso);
+  background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 5px 11px;
@@ -2569,13 +2700,13 @@ svg.chart {
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .rec-pr-v {
   font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--cream);
+  color: var(--text);
 }
 
 /* ---- BODY ---- */
@@ -2583,7 +2714,7 @@ svg.chart {
   margin: 0;
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--taupe);
+  color: var(--text-soft);
 }
 .bm-log {
   display: flex;
@@ -2603,7 +2734,7 @@ svg.chart {
   font-family: var(--sans);
   font-size: 14px;
   font-weight: 700;
-  color: var(--taupe);
+  color: var(--text-soft);
   margin-left: 4px;
 }
 .bm-save {
@@ -2617,4 +2748,72 @@ svg.chart {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---- settings: palette picker ---- */
+.palettes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.palette {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+}
+.palette.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.palette-swatch {
+  display: flex;
+  flex: none;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--line-hi);
+}
+.palette-swatch > i {
+  height: 30px;
+  width: 15px;
+}
+.pal-bg {
+  background: var(--bg);
+}
+.pal-surface {
+  background: var(--surface-hi);
+}
+.palette-swatch > i.pal-accent {
+  background: var(--accent);
+  width: 22px;
+}
+.pal-alert {
+  background: var(--alert);
+}
+.pal-good {
+  background: var(--good);
+}
+.palette-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.palette-text b {
+  font-size: 15px;
+  font-weight: 700;
+}
+.palette-text small {
+  font-size: 12px;
+  color: var(--text-soft);
 }

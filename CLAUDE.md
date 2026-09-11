@@ -102,6 +102,38 @@ records what is specific to 3afya.
 - **Chart scrubbing**: Both charts scrub by pointer position (`clientX`), not per-mark hover. Touch support via `onTouchStart`/`onTouchMove`/`onTouchEnd`.
 - **CSS naming**: `.ls`/`.ls.on` (generic toggle) vs `ls-*` (logged-set internals) are unrelated.
 
+## Theming
+
+- **Colour is addressed by role, never by hue.** `theme.css` exposes eleven
+  tokens — `--bg`, `--surface`, `--surface-hi`, `--accent`, `--accent-deep`,
+  `--accent-mute`, `--alert`, `--good`, `--text`, `--text-soft`, `--text-faint`
+  — and nothing outside the palette blocks at the top of the file names a
+  colour. The old hue names (`--marigold`, `--espresso`, `--cream`, `--taupe`,
+  `--sage`, `--pomegranate`) are gone; reintroducing one makes the token a lie
+  the moment the palette changes.
+- **Shades and tints derive with `color-mix`**, e.g.
+  `color-mix(in srgb, var(--accent) 12%, transparent)`. Never hardcode an rgba
+  of a palette colour — it will not follow the theme. `rgba(0,0,0,…)` shadows
+  and the `rgba(255,255,255,0.04)` inset are the deliberate exceptions.
+- **Palettes are `[data-theme="…"]` blocks, not `:root`-only**, so a palette
+  applies to any subtree. The Settings swatches rely on this: each swatch is an
+  element carrying `data-theme`, so the preview *is* the palette rather than a
+  duplicate of it. Keep new palettes as element-scoped selectors.
+- **`--line`/`--line-hi` are declared on `:root, [data-theme]`**, not on `:root`
+  alone. A custom property resolves its `var()`s on the element that declares
+  it, so a root-only declaration would freeze the hairlines at the root palette
+  and leave every swatch wrong.
+- **Charts take CSS vars, not hex.** SVG `fill`/`stroke` accept `var(--accent)`;
+  `LineChart`'s `color` prop defaults to `var(--accent)`. `BodyScreen`'s
+  `METRICS` carry var strings for the same reason.
+- **Selection is per device, in `localStorage` (`afya.theme`)** — no schema, no
+  API, no account sync. `applyTheme` is called from `main.tsx` before the first
+  render so the chosen palette paints instead of the default, and it also
+  restamps the `theme-color` meta. Unknown or unreadable stored values fall back
+  to `DEFAULT_THEME` (`graphite`).
+- Adding a palette is a CSS block plus one entry in `THEMES` in
+  `apps/web/src/lib/theme.ts`. Nothing else.
+
 ## Critical Implementation Conventions
 
 - **DB changes**: Edit Drizzle schema, then `db:generate` + `db:migrate`. Never hand-edit `apps/api/drizzle/`.
