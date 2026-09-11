@@ -1,14 +1,15 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { authDb } from "./db";
-import { redis } from "./redis/client";
 import { env } from "./env";
 
 /**
- * Better Auth — embedded, open-source auth.
- * - Users/accounts/verification live in Postgres (Drizzle adapter).
- * - Sessions, verification tokens, and the auth rate-limit counters live in
- *   Redis via secondary storage (offloads them from Postgres).
+ * Better Auth — embedded, open-source auth. The auth tables (including
+ * `session`) live in mi7rab's database, which every app in the umbrella shares;
+ * 3afya only reads and writes them, it never migrates them.
+ *
+ * Sessions are in Postgres. A 60s signed cookie cache keeps that off the hot
+ * path — most requests verify the cookie and never reach the session table.
  */
 export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
@@ -21,29 +22,7 @@ export const auth = betterAuth({
     requireEmailVerification: false, // personal app: keep onboarding simple
   },
 
-  // Redis-backed secondary storage. get() tolerates both JSON values (sessions)
-  // and plain values (counters); the cache/rate-limit client is shared.
-  secondaryStorage: {
-    get: async (key) => {
-      const value = await redis.get(key);
-      if (value === null) return null;
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value;
-      }
-    },
-    set: async (key, value, ttl) => {
-      if (ttl) await redis.set(key, value, "EX", ttl);
-      else await redis.set(key, value);
-    },
-    delete: async (key) => {
-      await redis.del(key);
-    },
-  },
-
   session: {
-    storeSessionInDatabase: false, // sessions are pure-Redis
     cookieCache: { enabled: true, maxAge: 60 }, // signed 60s cookie cache
   },
 
@@ -51,11 +30,14 @@ export const auth = betterAuth({
   // Kept identical to the CORS allowlist.
   trustedOrigins: env.CORS_ORIGINS,
 
+  // In-memory brute-force guard on /api/auth/* only. Per-instance rather than
+  // global, which is the point: it needs no infrastructure, and a login
+  // throttle that resets on cold start still beats none.
   rateLimit: {
     enabled: true,
     window: 60,
     max: 100,
-    storage: "secondary-storage",
+    storage: "memory",
   },
 
   advanced: {

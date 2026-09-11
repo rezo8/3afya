@@ -6,7 +6,6 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import type { ApiErrorBody } from "@afya/shared";
 import { env } from "./env";
 import { auth } from "./auth";
-import { rateLimit } from "./middleware/rate-limit";
 import exercises from "./routes/exercises";
 import programs from "./routes/programs";
 import sessions from "./routes/sessions";
@@ -58,12 +57,10 @@ app.use(
 app.get("/health", (c) => c.json({ ok: true }));
 
 // Better Auth owns all /api/auth/* routes (sign-up, sign-in, session, sign-out…).
-// It has its own rate limiter, so it sits outside our application limiter.
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
-// Application routes: session-guarded (per-router) and rate-limited (here).
+// Application routes: session-guarded (per-router).
 const api = new Hono();
-api.use("*", rateLimit());
 api.route("/exercises", exercises);
 api.route("/programs", programs);
 api.route("/sessions", sessions);

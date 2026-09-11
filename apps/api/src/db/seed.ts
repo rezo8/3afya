@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import type { ExerciseKind } from "@afya/shared";
 import { db, pool } from "./index";
 import { auth } from "../auth";
-import { redis } from "../redis/client";
 import { user } from "./schema/auth";
 import {
   bodyMetric,
@@ -180,5 +179,4 @@ main()
   })
   .finally(async () => {
     await pool.end();
-    redis.disconnect();
   });

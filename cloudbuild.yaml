@@ -32,7 +32,7 @@ steps:
       - --service-account=mi7rab-run@mi7rab.iam.gserviceaccount.com
       - --set-env-vars=NODE_ENV=production,BETTER_AUTH_URL=https://afya-qjyft4sfwa-uc.a.run.app,CORS_ORIGINS=*
       - >-
-        --set-secrets=DATABASE_URL=afya-database-url:latest,AUTH_DATABASE_URL=database-url:latest,REDIS_URL=redis-url:latest,BETTER_AUTH_SECRET=better-auth-secret:latest
+        --set-secrets=DATABASE_URL=afya-database-url:latest,AUTH_DATABASE_URL=database-url:latest,BETTER_AUTH_SECRET=better-auth-secret:latest
 
 images:
   - us-central1-docker.pkg.dev/mi7rab/mi7rab/afya:$SHORT_SHA

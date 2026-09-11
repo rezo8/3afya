@@ -5,11 +5,11 @@
 
 Track your workout program and eating over time; look back and see the trend.
 Built to the same blueprint as [mi7rab](https://github.com/rezo8/mi7rab) —
-pnpm + Turborepo, Hono + Drizzle + Postgres, Better Auth with Redis sessions,
+pnpm + Turborepo, Hono + Drizzle + Postgres, Better Auth with Postgres sessions,
 React + Vite + Tailwind.
 
 > **Status:** full scaffold built and running locally. Runs entirely on your
-> machine (Docker Postgres + Redis). Cloud deploy is deferred — see
+> machine (Docker Postgres). Cloud deploy is deferred — see
 > [Later](#later-deploy).
 
 ## Stack
@@ -19,16 +19,15 @@ React + Vite + Tailwind.
 | Monorepo | pnpm workspaces + Turborepo (Node 22, ESM), scope `@afya/*`      |
 | Frontend | React + Vite + TS · TanStack Router + Query · Tailwind v4        |
 | Backend  | Hono · Drizzle ORM · node-postgres → **Postgres**                |
-| Auth     | **Better Auth** (email + password, sessions in Redis)           |
-| Cache    | **Redis** — sessions, rate limiting                              |
-| Local    | **Docker Compose** — Postgres + Redis                            |
+| Auth     | **Better Auth** (email + password, sessions in Postgres)         |
+| Local    | **Docker Compose** — Postgres                                    |
 
 ## Quickstart
 
 Prereqs: Node 22, pnpm, Docker.
 
 ```bash
-# 1. Local Postgres (5435) + Redis (6380) — ports chosen to avoid clashing with mi7rab
+# 1. Local Postgres (5435) — port chosen to avoid clashing with mi7rab
 docker compose up -d
 
 # 2. API env (dotenv loads it from apps/api)
@@ -56,7 +55,6 @@ afya@local.dev  /  afya-dev-123
 | Web      | 5174  | 5173   |
 | API      | 3001  | 3000   |
 | Postgres | 5435  | 5433   |
-| Redis    | 6380  | 6379   |
 
 ## Structure
 
