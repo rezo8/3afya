@@ -1,4 +1,4 @@
-import { Outlet } from "@tanstack/react-router";
+import { Link, Outlet } from "@tanstack/react-router";
 import { signOut, useSession } from "@/lib/auth/auth-client";
 import { queryClient } from "@/lib/query/query-client";
 import { router } from "@/router";
@@ -28,14 +28,17 @@ function AppShell() {
     <>
       <div className="app" id="main">
         <header className="topbar">
-          <div className="brand">
+          <Link to="/program" className="brand">
             <span className="ar">عافية</span>
             <span className="lat">3afya</span>
-          </div>
+          </Link>
           <div className="topbar-right">
             <span className="date">{today.replace(",", " ·")}</span>
+            <Link to="/settings" className="topbar-link">
+              Settings
+            </Link>
             {data ? (
-              <button className="signout" onClick={handleSignOut}>
+              <button className="topbar-link leave" onClick={handleSignOut}>
                 Sign out
               </button>
             ) : null}

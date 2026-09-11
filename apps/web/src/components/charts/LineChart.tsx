@@ -16,7 +16,7 @@ const PT = 18;
 const PB = 26;
 
 /** Single-hue area+line with an emphasized endpoint and a hover crosshair. */
-export function LineChart({ data, labels, color = "#f2a43c", onHover, onLeave }: Props) {
+export function LineChart({ data, labels, color = "var(--accent)", onHover, onLeave }: Props) {
   const gid = useId();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
@@ -74,7 +74,7 @@ export function LineChart({ data, labels, color = "#f2a43c", onHover, onLeave }:
         </linearGradient>
       </defs>
       {gridY.map((gy, i) => (
-        <line key={i} x1={PL} y1={gy} x2={W - PR} y2={gy} stroke="rgba(243,233,218,0.06)" strokeWidth="1" />
+        <line key={i} x1={PL} y1={gy} x2={W - PR} y2={gy} stroke="color-mix(in srgb, var(--text) 6%, transparent)" strokeWidth="1" />
       ))}
       <path d={area} fill={`url(#${gid})`} />
       <path d={line} fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
@@ -83,7 +83,7 @@ export function LineChart({ data, labels, color = "#f2a43c", onHover, onLeave }:
           key={i}
           x={x(i)}
           y={H - 6}
-          fill="#a58e74"
+          fill="var(--text-soft)"
           fontSize="12"
           fontFamily="ui-monospace,Menlo,monospace"
           textAnchor={i === 0 ? "start" : i === data.length - 1 ? "end" : "middle"}
@@ -94,7 +94,7 @@ export function LineChart({ data, labels, color = "#f2a43c", onHover, onLeave }:
       {hover !== null && (
         <line x1={pts[cur]![0]} y1={PT} x2={pts[cur]![0]} y2={H - PB} stroke={color} strokeWidth="1.5" strokeDasharray="3 3" />
       )}
-      <circle cx={pts[cur]![0]} cy={pts[cur]![1]} r="6.5" fill={color} stroke="#211a12" strokeWidth="3" />
+      <circle cx={pts[cur]![0]} cy={pts[cur]![1]} r="6.5" fill={color} stroke="var(--surface)" strokeWidth="3" />
     </svg>
   );
 }

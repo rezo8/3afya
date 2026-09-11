@@ -73,7 +73,7 @@ export function BarChart({ data, goal, labels, onHover, onLeave }: Props) {
               height={GAP_MARK_H}
               rx="5"
               fill="none"
-              stroke="#a58e74"
+              stroke="var(--text-soft)"
               strokeWidth="1.5"
               strokeDasharray="4 4"
               opacity={hover === i ? 0.85 : 0.45}
@@ -85,14 +85,14 @@ export function BarChart({ data, goal, labels, onHover, onLeave }: Props) {
               width={bw.toFixed(1)}
               height={Math.max(2, H - PB - y(v)).toFixed(1)}
               rx="5"
-              fill={v >= goal ? "#a6bd6a" : "#6d5327"}
+              fill={v >= goal ? "var(--good)" : "var(--accent-mute)"}
               opacity={hover === i ? 0.75 : 1}
             />
           )}
           <text
             x={(barX(i) + bw / 2).toFixed(1)}
             y={H - 7}
-            fill="#a58e74"
+            fill="var(--text-soft)"
             fontSize="12"
             fontFamily="ui-monospace,Menlo,monospace"
             textAnchor="middle"
@@ -102,8 +102,8 @@ export function BarChart({ data, goal, labels, onHover, onLeave }: Props) {
           </text>
         </g>
       ))}
-      <line x1={PL} y1={gy.toFixed(1)} x2={W - PR} y2={gy.toFixed(1)} stroke="#f4ead9" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.6" />
-      <text x={W - PR} y={(gy - 7).toFixed(1)} fill="#f4ead9" fontSize="12" fontFamily="ui-monospace,Menlo,monospace" textAnchor="end" opacity="0.7">
+      <line x1={PL} y1={gy.toFixed(1)} x2={W - PR} y2={gy.toFixed(1)} stroke="var(--text)" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.6" />
+      <text x={W - PR} y={(gy - 7).toFixed(1)} fill="var(--text)" fontSize="12" fontFamily="ui-monospace,Menlo,monospace" textAnchor="end" opacity="0.7">
         goal {goal}
       </text>
     </svg>

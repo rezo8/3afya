@@ -151,7 +151,7 @@ export function TrendsScreen() {
             <LineChart
               data={progVals}
               labels={progLabels}
-              color="#f2a43c"
+              color="var(--accent)"
               onHover={(_i, v, l) => setProgReadout(`${l} · ${fmtVal(v)}`)}
               onLeave={() => setProgReadout(null)}
             />
