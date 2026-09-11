@@ -39,7 +39,6 @@ gcloud secrets add-iam-policy-binding afya-database-url \
 echo
 echo "==> Reused as-is from mi7rab (no new resources, no extra cost):"
 echo "      database-url        -> AUTH_DATABASE_URL   (shared auth store: user/account/verification)"
-echo "      redis-url           -> REDIS_URL           (shared Upstash, sessions)"
 echo "      better-auth-secret  -> BETTER_AUTH_SECRET  (MUST match mi7rab for SSO)"
 echo
 echo "==> Apply 3afya's DOMAIN migrations only (never the auth DB):"

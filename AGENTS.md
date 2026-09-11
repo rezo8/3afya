@@ -15,15 +15,15 @@ one; it means the action is the kind that needs a human, not a retry.
 
 - Monorepo: pnpm workspaces (`apps/*`, `packages/*`) + Turborepo.
 - API (`apps/api`, contract types in `@afya/shared`): Hono +
-  `@hono/node-server`, Drizzle ORM + drizzle-kit, `pg` → Postgres, `ioredis`
-  → Redis, Zod for validation.
-- Auth: Better Auth, sessions in Redis, shared with the `mi7rab` project — see
+  `@hono/node-server`, Drizzle ORM + drizzle-kit, `pg` → Postgres, Zod for
+  validation.
+- Auth: Better Auth, sessions in Postgres, shared with the `mi7rab` project — see
   `.devin/rules/deployment-and-infra.md`. Don't roll custom auth; extend
   `apps/api/src/auth.ts` and the web auth client.
 - Web (`apps/web`): React 19 + Vite 6, TanStack Router + TanStack Query,
   Tailwind v4.
-- Local ports: web **5174** · api **3001** · Postgres **5435** · Redis
-  **6380**. Local DB name/user: `afya`.
+- Local ports: web **5174** · api **3001** · Postgres **5435**. Local DB
+  name/user: `afya`.
 - Local dev: `docker compose up -d` → `cp .env.example apps/api/.env` (set a
   real `BETTER_AUTH_SECRET`) → `pnpm install` → `pnpm --filter @afya/api
   db:migrate` (+ `db:seed` for a demo account) → `pnpm dev`.
