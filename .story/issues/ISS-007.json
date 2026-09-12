@@ -1,0 +1,25 @@
+{
+  "components": [
+    "apps/web/src/screens/program/ProgramScreen.tsx",
+    "apps/web/src/styles/theme.css"
+  ],
+  "createdBy": "user-report",
+  "dedupeKey": "user-report:superset-field-unusable",
+  "discoveredDate": "2026-09-12",
+  "id": "ISS-007",
+  "impact": "Reported from real use: \"I can't edit the superset stuff in my program.\"\n\nWhat is verified. The server path is fine — PATCH /api/programs/day-exercises/:id with supersetGroup null (or \"\") clears the group and persists, confirmed against the running API on six real rows. updateEx invalidates on success. So whatever the user hit is in the builder UI, not the API.\n\nWhat the control actually is. `.pex-tag-in` is an 11px mono input with 5px vertical padding — roughly a 25px-tall target against the 44px the rest of the app uses, two of them sharing one flex row inside a layout already sized against a 390px budget. It is labelled only by its placeholder, has no clear affordance, and the CSS carries a comment admitting the earlier solid-border version \"read as inert tags with nothing inviting a tap\", so the dashed border was already one attempt at this problem.\n\nWhy it can look like the edit does not stick. The input is uncontrolled (`defaultValue`) with a `key` that is stable across refetches, so its displayed value never re-syncs from the server. Combined with ProgramScreen having 13 mutations and no `onError` at all (T-001), a failed PATCH leaves the field showing the new value with nothing reported — it reads as saved until a reload brings the old value back.\n\nWhich of these the user hit is not established, and the fixes differ: a target-size problem wants sizing, a silent-failure problem is T-001, a discoverability problem wants a label and an explicit clear button. Worth asking before building.\n\nWorth considering alongside the fix: supersets and sections are advanced features shown on every exercise row whether or not the user has ever used one. For someone who does not superset, both fields are permanent clutter on the highest-density screen in the app. A \"show advanced fields\" disclosure would remove the problem for that user rather than making the target bigger.",
+  "location": [
+    "apps/web/src/screens/program/ProgramScreen.tsx:422",
+    "apps/web/src/styles/theme.css:1594"
+  ],
+  "phase": "trust",
+  "relatedTickets": [
+    "T-001",
+    "T-009"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "high",
+  "status": "open",
+  "title": "Superset and section fields in the program builder are a ~25px target that can't report a failure"
+}

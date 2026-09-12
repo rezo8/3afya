@@ -1,0 +1,20 @@
+{
+  "content": "When a TanStack mutation's onError needs to re-run that same mutation, do not reference the binding being declared (`onError: retryWith(() =&gt; myMutation)`) — its type becomes circular and TypeScript infers `any`, which strict projects forbid. Wrap useMutation in a custom hook that self-references through an internal ref, and take the failed variables from onError's second argument, which is the only place they are still reachable.",
+  "context": "T-001, 2026-09-12, commit 5afaa18. Adding failure surfacing to 23 mutation declarations across 5 screens in apps/web.\n\nTHE CIRCULARITY: the natural shape `const updateEx = useMutation({ onError: onErrorFor(() =&gt; updateEx) })` makes updateEx's type depend on its own initializer. TypeScript resolves that to implicit any, which CLAUDE.md bans outright. Caught during planning, before writing five screens against a shape that would not compile. The fix is `useTrackedMutation(slot, options)`, which calls useMutation itself, holds the result in a ref updated in a useEffect, and closes over `latest.current?.mutate(variables)`. The caller never writes the self-reference, so there is nothing circular to infer.\n\nWHY onError's VARIABLES, NOT THE CALL SITE: roughly half the call sites cannot rebuild their own arguments. ProgramScreen's updateEx has 15 call sites, all inside a flatMap over server data (ProgramScreen.tsx:302-436); renameDay and updateDay read e.target.value from uncontrolled defaultValue inputs on blur, so the value is gone by the time the request fails; reorderDays/reorderEx take arrays computed in a helper; addExercise's call sites clear their input immediately after firing. onError(err, vars) works uniformly for all of them without touching a single call site. SessionDetailScreen proves the negative: removeSession was its ONLY working retry, purely because `data.id` happened to be in scope where the banner rendered.\n\nSECOND FINDING — A DEAD RETRY BUTTON IS WORSE THAN NONE: SessionDetailScreen.tsx:184-186 rendered a Retry whose onRetry called invalidateSets(), which refetches queries and never re-issues the failed PATCH/DELETE. isError stayed true, so the button did not even dismiss. It looked like error handling and was not. Retry is now omitted entirely when it cannot help: isRetryableError reads ApiError.status (carried since the class was written, never read anywhere in apps/web until now) and hides the button on 4xx except 408/429. Verified against the running API — writes return 400 with a human message, 404, and 401 on an expired session.\n\nTHIRD: TanStack v5.101 mutation callbacks take FOUR arguments (data, variables, onMutateResult, context), not the three most examples show. A wrapper that names them positionally silently drops the last on upgrade; spreading rest args into the caller's callback is version-proof.",
+  "createdDate": "2026-09-12",
+  "id": "L-002",
+  "lastValidated": "2026-09-12",
+  "reinforcements": 0,
+  "source": "postmortem",
+  "status": "active",
+  "supersedes": null,
+  "tags": [
+    "react",
+    "tanstack-query",
+    "typescript",
+    "error-handling",
+    "web"
+  ],
+  "title": "A mutation cannot name itself in its own declaration — wrap it instead of passing a callback",
+  "updatedDate": "2026-09-12"
+}
