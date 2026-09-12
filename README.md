@@ -75,9 +75,13 @@ All rows are user-scoped.
   measurement **kind** that decides what a set records:
   - `weighted` → weight (lb) × reps — e.g. bench press
   - `reps` → a count only — e.g. pull-ups, soccer drills
-  - `time` → a duration — e.g. planks, timed holds
+  - `time` → a duration — e.g. planks, timed holds, yoga
+  - `distance` → a distance (mi/km/m) and optionally a time — e.g. runs, rides
 - A **program** is a set of named **days** in a rotation order (not weekday-
   pinned); "Today" is the next day after your last session.
+- A **session** need not belong to a program day. **Log something else** on the
+  Start screen opens a *freeform* session — a ride, a run, a class, a few sets
+  of push-ups — which is logged the same way but never touches the rotation.
 - A day holds ordered exercises with targets (sets × reps, or sets × time) — no
   planned weight. Working weight lives in **logged sets**; Today pre-fills it
   from your last session so you can beat it.

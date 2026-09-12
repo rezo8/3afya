@@ -6,6 +6,8 @@ const set = (overrides: Partial<RecordSet>): RecordSet => ({
   weight: 0,
   reps: 0,
   durationSec: 0,
+  distance: 0,
+  distanceUnit: null,
   isWarmup: false,
   completedAt: new Date("2026-01-01T00:00:00Z"),
   ...overrides,
@@ -41,5 +43,30 @@ describe("detectPrs", () => {
     const prs = detectPrs("weighted", priorSets, newWorkingSet);
 
     expect(prs).toContain("weight");
+  });
+});
+
+describe("distance records", () => {
+  it("ranks a distance PR by real length, not by the number the user typed", () => {
+    const km = set({ id: "km", distance: 9, distanceUnit: "km", completedAt: new Date("2026-01-01T00:00:00Z") });
+    const miles = set({ id: "miles", distance: 7, distanceUnit: "mi", completedAt: new Date("2026-01-02T00:00:00Z") });
+
+    const [record] = computeRecords("distance", [km, miles]);
+
+    expect(record?.kind).toBe("distance");
+    expect(record?.setId).toBe("miles");
+  });
+
+  it("holds no duration record for a ride that was never timed", () => {
+    const ride = set({ distance: 7, distanceUnit: "mi", durationSec: 0 });
+
+    expect(computeRecords("distance", [ride]).map((r) => r.kind)).toEqual(["distance"]);
+  });
+
+  it("breaks a distance PR when a later ride goes further", () => {
+    const first = set({ id: "first", distance: 5, distanceUnit: "mi" });
+    const further = set({ id: "further", distance: 7, distanceUnit: "mi" });
+
+    expect(detectPrs("distance", [first], further)).toEqual(["distance"]);
   });
 });

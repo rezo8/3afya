@@ -1,25 +1,40 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import type { SessionDetail, SessionExercise, SetLog } from "@afya/shared";
+import type { SessionDetail, SessionExercise, SetLog, UpdateSetBody } from "@afya/shared";
+import { SetEditor } from "@/components/SetEditor";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
+import { fmtDist, fmtDur } from "@/lib/format";
 
 /** Matches ProgramScreen's "Delete day" arming window — same guard, same feel. */
 const DELETE_ARM_MS = 4000;
 
-const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 const est1rm = (s: SetLog) => s.weight * (1 + s.reps / 30);
+
+/**
+ * Distance sets are summed only within one unit — the unit of the session's first such
+ * set. Mixing units in one session is rare enough that showing the sets rather than a
+ * converted total is the honest answer.
+ */
+function distanceTotal(e: SessionExercise): string {
+  const unit = e.sets.find((s) => s.distanceUnit)?.distanceUnit;
+  if (!unit) return `${e.sets.length} logged`;
+  const total = e.sets.filter((s) => s.distanceUnit === unit).reduce((n, s) => n + s.distance, 0);
+  return fmtDist(total, unit);
+}
 
 function exerciseTotal(e: SessionExercise): string {
   if (e.kind === "weighted") return `${Math.round(e.sets.reduce((n, s) => n + s.weight * s.reps, 0)).toLocaleString()} lb`;
   if (e.kind === "reps") return `${e.sets.reduce((n, s) => n + s.reps, 0)} reps`;
+  if (e.kind === "distance") return distanceTotal(e);
   return fmtDur(e.sets.reduce((n, s) => n + s.durationSec, 0));
 }
 
 function bestSetIndex(e: SessionExercise): number {
-  const score = (s: SetLog) => (e.kind === "weighted" ? est1rm(s) : e.kind === "reps" ? s.reps : s.durationSec);
+  const score = (s: SetLog) =>
+    e.kind === "weighted" ? est1rm(s) : e.kind === "reps" ? s.reps : e.kind === "distance" ? s.distance : s.durationSec;
   let best = -1;
   let bestScore = -Infinity;
   e.sets.forEach((s, i) => {
@@ -46,6 +61,13 @@ function setValue(e: SessionExercise, s: SetLog) {
         <b>{s.reps}</b> reps
       </>
     );
+  if (e.kind === "distance")
+    return (
+      <>
+        <b>{fmtDist(s.distance, s.distanceUnit ?? "mi")}</b>
+        {s.durationSec > 0 ? <> · {fmtDur(s.durationSec)}</> : null}
+      </>
+    );
   return <b>{fmtDur(s.durationSec)}</b>;
 }
 
@@ -59,12 +81,33 @@ export function SessionDetailScreen() {
     enabled: !!sessionId,
   });
   const [armedRemove, setArmedRemove] = useState(false);
+  /** Editing is opt-in, one exercise at a time: this screen is a recap first. */
+  const [editing, setEditing] = useState<string | null>(null);
 
   useEffect(() => {
     if (!armedRemove) return;
     const t = setTimeout(() => setArmedRemove(false), DELETE_ARM_MS);
     return () => clearTimeout(t);
   }, [armedRemove]);
+
+  /** A set logged into any session is corrected the same way, so every view of it refreshes. */
+  const invalidateSets = () => {
+    qc.invalidateQueries({ queryKey: ["session-detail", sessionId] });
+    qc.invalidateQueries({ queryKey: ["sessions"] });
+    qc.invalidateQueries({ queryKey: ["session"] });
+    qc.invalidateQueries({ queryKey: ["today"] });
+    qc.invalidateQueries({ queryKey: ["records"] });
+    qc.invalidateQueries({ queryKey: ["trends"] });
+  };
+  const editSet = useMutation({
+    mutationFn: ({ setId, patch }: { setId: string; patch: UpdateSetBody }) =>
+      api.patch(`/api/sessions/${sessionId}/sets/${setId}`, patch),
+    onSuccess: invalidateSets,
+  });
+  const deleteSet = useMutation({
+    mutationFn: (setId: string) => api.delete(`/api/sessions/${sessionId}/sets/${setId}`),
+    onSuccess: invalidateSets,
+  });
 
   const removeSession = useMutation({
     mutationFn: (id: string) => api.delete(`/api/sessions/${id}`),
@@ -138,6 +181,10 @@ export function SessionDetailScreen() {
         </div>
       </div>
 
+      {(editSet.isError || deleteSet.isError) && (
+        <ErrorBanner message={errorMessage(editSet.error ?? deleteSet.error)} onRetry={() => invalidateSets()} />
+      )}
+
       {data.exercises.length === 0 ? (
         <section className="sd-empty">
           <p className="center-note">No sets were logged in this session.</p>
@@ -168,22 +215,43 @@ export function SessionDetailScreen() {
                   </span>
                   <span className="sd-total">{exerciseTotal(e)}</span>
                 </div>
+                <div className="sd-ex-actions">
+                  <button
+                    type="button"
+                    className={`ls${editing === e.exerciseId ? " on" : ""}`}
+                    aria-pressed={editing === e.exerciseId}
+                    onClick={() => setEditing(editing === e.exerciseId ? null : e.exerciseId)}
+                  >
+                    {editing === e.exerciseId ? "Done" : "Edit sets"}
+                  </button>
+                </div>
                 <ul className="sd-sets">
                   {e.sets.map((s, i) => {
                     const isPr = recordSetIds.has(s.id);
                     return (
                       <li key={s.id} className={`sd-set${isPr ? " pr" : i === best ? " best" : ""}`}>
                         <span className="sd-set-n">{s.setNumber}</span>
-                        <span className="sd-set-v">{setValue(e, s)}</span>
-                        {s.isWarmup && (
-                          <span className="ls-warmup-tag" title="Warm-up set">
-                            W
-                          </span>
-                        )}
-                        {isPr ? (
-                          <span className="sd-pr-tag">🏆 PR</span>
+                        {editing === e.exerciseId ? (
+                          <>
+                            <SetEditor kind={e.kind} set={s} onPatch={(patch) => editSet.mutate({ setId: s.id, patch })} />
+                            <button className="ls-del" aria-label="Remove set" onClick={() => deleteSet.mutate(s.id)}>
+                              ×
+                            </button>
+                          </>
                         ) : (
-                          i === best && e.sets.length > 1 && <span className="sd-best-tag">best</span>
+                          <>
+                            <span className="sd-set-v">{setValue(e, s)}</span>
+                            {s.isWarmup && (
+                              <span className="ls-warmup-tag" title="Warm-up set">
+                                W
+                              </span>
+                            )}
+                            {isPr ? (
+                              <span className="sd-pr-tag">🏆 PR</span>
+                            ) : (
+                              i === best && e.sets.length > 1 && <span className="sd-best-tag">best</span>
+                            )}
+                          </>
                         )}
                       </li>
                     );

@@ -5,6 +5,16 @@ import { api } from "@/lib/api/client";
 import { isExerciseDone } from "@/lib/session";
 import { FuelPanel } from "@/screens/start/FuelPanel";
 
+/** The way into a session that belongs to no program day — always available, program or not. */
+function FreeformEntry() {
+  return (
+    <Link to="/session/freeform" className="freeform-entry">
+      <span className="fe-name">＋ Log something else</span>
+      <span className="fe-meta">a ride, a run, a class, anything off-program</span>
+    </Link>
+  );
+}
+
 type DayMark = { kind: "resume"; done: number; total: number } | { kind: "done" } | { kind: "next" } | { kind: "none" };
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -64,6 +74,7 @@ export function StartScreen() {
             Build a program
           </Link>
         </section>
+        <FreeformEntry />
       </>
     );
   }
@@ -83,6 +94,7 @@ export function StartScreen() {
             Add days
           </Link>
         </section>
+        <FreeformEntry />
       </>
     );
   }
@@ -130,6 +142,8 @@ export function StartScreen() {
           })}
         </div>
       </div>
+
+      <FreeformEntry />
 
       <FuelPanel />
     </>

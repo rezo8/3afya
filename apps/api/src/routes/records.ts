@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import type { ExerciseKind, ExerciseRecords } from "@afya/shared";
 import { db } from "../db";
+import { recordSetColumns } from "../db/record-set-columns";
 import { exercise, setLog, workoutSession } from "../db/schema/tracker";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
 import { computeRecords, type RecordSet } from "../records";
@@ -11,17 +12,7 @@ app.use("*", requireAuth);
 
 app.get("/", async (c) => {
   const rows = await db
-    .select({
-      exerciseId: exercise.id,
-      name: exercise.name,
-      kind: exercise.kind,
-      id: setLog.id,
-      weight: setLog.weight,
-      reps: setLog.reps,
-      durationSec: setLog.durationSec,
-      isWarmup: setLog.isWarmup,
-      completedAt: setLog.completedAt,
-    })
+    .select({ exerciseId: exercise.id, name: exercise.name, kind: exercise.kind, ...recordSetColumns })
     .from(setLog)
     .innerJoin(workoutSession, eq(setLog.sessionId, workoutSession.id))
     .innerJoin(exercise, eq(setLog.exerciseId, exercise.id))
@@ -31,7 +22,7 @@ app.get("/", async (c) => {
   for (const r of rows) {
     let g = byExercise.get(r.exerciseId);
     if (!g) byExercise.set(r.exerciseId, (g = { name: r.name, kind: r.kind, sets: [] }));
-    g.sets.push({ id: r.id, weight: r.weight, reps: r.reps, durationSec: r.durationSec, isWarmup: r.isWarmup, completedAt: r.completedAt });
+    g.sets.push(r);
   }
 
   const out: ExerciseRecords[] = [...byExercise.entries()]

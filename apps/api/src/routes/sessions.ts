@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import type {
   ApiErrorBody,
   ExerciseKind,
@@ -10,13 +10,16 @@ import type {
   SessionExercise,
   SetLog,
   StartSessionBody,
+  TodayExercise,
   TodayResponse,
   UpdateSetBody,
 } from "@afya/shared";
 import { db } from "../db";
+import { recordSetColumns } from "../db/record-set-columns";
 import { exercise, program, programDay, programExercise, setLog, workoutSession } from "../db/schema/tracker";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
-import { computeRecords, detectPrs, type RecordSet } from "../records";
+import { parseDistanceUnit } from "../distance";
+import { computeRecords, detectPrs } from "../records";
 
 const app = new Hono<AuthedEnv>();
 app.use("*", requireAuth);
@@ -35,6 +38,8 @@ const toSet = (r: typeof setLog.$inferSelect): SetLog => ({
   weight: r.weight,
   reps: r.reps,
   durationSec: r.durationSec,
+  distance: r.distance,
+  distanceUnit: r.distanceUnit,
   isWarmup: r.isWarmup,
   completedAt: r.completedAt.toISOString(),
 });
@@ -95,10 +100,12 @@ async function rotationState(userId: string) {
     .orderBy(asc(programDay.position));
   if (!days.length) return { program: active, days, currentDay: null, session: null } as const;
 
+  // Freeform sessions belong to no day, so they neither resume a rotation day nor
+  // advance the rotation — a bike ride on Tuesday must leave "next up" where it was.
   const [latestSession] = await db
     .select()
     .from(workoutSession)
-    .where(eq(workoutSession.userId, userId))
+    .where(and(eq(workoutSession.userId, userId), isNotNull(workoutSession.dayId)))
     .orderBy(desc(workoutSession.performedAt))
     .limit(1);
 
@@ -111,7 +118,7 @@ async function rotationState(userId: string) {
     .select({ dayId: workoutSession.dayId })
     .from(workoutSession)
     .innerJoin(setLog, eq(setLog.sessionId, workoutSession.id))
-    .where(eq(workoutSession.userId, userId))
+    .where(and(eq(workoutSession.userId, userId), isNotNull(workoutSession.dayId)))
     .orderBy(desc(workoutSession.performedAt))
     .limit(1);
 
@@ -143,6 +150,17 @@ async function ownedDay(userId: string, dayId: string) {
   return row?.day ?? null;
 }
 
+/** Today's freeform session — the one belonging to no program day — if it exists. */
+async function todayFreeformSession(userId: string) {
+  const [row] = await db
+    .select()
+    .from(workoutSession)
+    .where(and(eq(workoutSession.userId, userId), isNull(workoutSession.dayId)))
+    .orderBy(desc(workoutSession.performedAt))
+    .limit(1);
+  return row && isToday(row.performedAt) ? row : null;
+}
+
 async function todaySessionForDay(userId: string, dayId: string) {
   const [row] = await db
     .select()
@@ -151,6 +169,52 @@ async function todaySessionForDay(userId: string, dayId: string) {
     .orderBy(desc(workoutSession.performedAt))
     .limit(1);
   return row && isToday(row.performedAt) ? row : null;
+}
+
+/** What the exercise's inputs pre-fill with, from the most recent set of it. */
+const lastNumbers = (last: typeof setLog.$inferSelect | null) => ({
+  lastWeight: last?.weight ?? null,
+  lastReps: last?.reps ?? null,
+  lastDurationSec: last?.durationSec ?? null,
+  lastDistance: last?.distance ?? null,
+  lastDistanceUnit: last?.distanceUnit ?? null,
+});
+
+/**
+ * The exercises a session logged that no program day planned: everything in a freeform
+ * session, and anything added mid-workout to a program day. An ad-hoc exercise has no
+ * targets, so its "target" is simply what has been logged so far.
+ */
+async function adhocExercises(
+  userId: string,
+  session: typeof workoutSession.$inferSelect | null,
+  liveSets: (typeof setLog.$inferSelect)[],
+  plannedIds: Set<string>,
+): Promise<TodayExercise[]> {
+  const ids = [...new Set(liveSets.map((s) => s.exerciseId).filter((id) => !plannedIds.has(id)))];
+  const meta = await exerciseMeta(userId, ids);
+  return Promise.all(
+    ids.map(async (id) => {
+      const m = meta.get(id);
+      const loggedSets = liveSets.filter((s) => s.exerciseId === id).map(toSet);
+      return {
+        exerciseId: id,
+        name: m?.name ?? "Exercise",
+        kind: m?.kind ?? ("weighted" as ExerciseKind),
+        fromProgram: false,
+        targetSets: loggedSets.length,
+        targetReps: 0,
+        targetRepsMax: null,
+        targetDurationSec: null,
+        restSec: null,
+        note: null,
+        supersetGroup: null,
+        section: null,
+        ...lastNumbers(await lastSetFor(userId, id, session?.id)),
+        loggedSets,
+      };
+    }),
+  );
 }
 
 async function buildDayExercises(userId: string, dayId: string, session: typeof workoutSession.$inferSelect | null) {
@@ -183,43 +247,13 @@ async function buildDayExercises(userId: string, dayId: string, session: typeof 
         note: pe.note,
         supersetGroup: pe.supersetGroup,
         section: pe.section,
-        lastWeight: last?.weight ?? null,
-        lastReps: last?.reps ?? null,
-        lastDurationSec: last?.durationSec ?? null,
+        ...lastNumbers(last),
         loggedSets: liveSets.filter((s) => s.exerciseId === ex.id).map(toSet),
       };
     }),
   );
 
-  const adhocIds = [...new Set(liveSets.map((s) => s.exerciseId).filter((id) => !programIds.has(id)))];
-  const adhocMeta = await exerciseMeta(userId, adhocIds);
-  const adhoc = await Promise.all(
-    adhocIds.map(async (id) => {
-      const m = adhocMeta.get(id);
-      const loggedSets = liveSets.filter((s) => s.exerciseId === id).map(toSet);
-      const last = await lastSetFor(userId, id, session?.id);
-      return {
-        exerciseId: id,
-        name: m?.name ?? "Exercise",
-        kind: m?.kind ?? ("weighted" as ExerciseKind),
-        fromProgram: false,
-        targetSets: loggedSets.length,
-        targetReps: 0,
-        targetRepsMax: null,
-        targetDurationSec: null,
-        restSec: null,
-        note: null,
-        supersetGroup: null,
-        section: null,
-        lastWeight: last?.weight ?? null,
-        lastReps: last?.reps ?? null,
-        lastDurationSec: last?.durationSec ?? null,
-        loggedSets,
-      };
-    }),
-  );
-
-  return [...planned, ...adhoc];
+  return [...planned, ...(await adhocExercises(userId, session, liveSets, programIds))];
 }
 
 /** Next-up rotation day payload: per-exercise history + any live session. */
@@ -257,7 +291,24 @@ app.get("/day/:dayId", async (c) => {
   } satisfies TodayResponse);
 });
 
-/** Find-or-create today's session (for an explicit day, or the next-up day). */
+/**
+ * Today's freeform session: no program day, so every exercise in it is one the user
+ * added by hand. `day: null` is what tells the screen it is in freeform mode.
+ */
+app.get("/freeform", async (c) => {
+  const userId = c.get("userId");
+  const session = await todayFreeformSession(userId);
+  const liveSets = session
+    ? await db.select().from(setLog).where(eq(setLog.sessionId, session.id)).orderBy(asc(setLog.setNumber))
+    : [];
+  return c.json({
+    day: null,
+    session: session ? { id: session.id, performedAt: session.performedAt.toISOString() } : null,
+    exercises: await adhocExercises(userId, session, liveSets, new Set()),
+  } satisfies TodayResponse);
+});
+
+/** Find-or-create today's session (for an explicit day, a freeform one, or the next-up day). */
 app.post("/", async (c) => {
   const userId = c.get("userId");
   const body = await c.req.json<StartSessionBody>().catch(() => null);
@@ -270,6 +321,15 @@ app.post("/", async (c) => {
       return c.json({ id: existing.id, dayId: existing.dayId, performedAt: existing.performedAt.toISOString() });
     }
     const [row] = await db.insert(workoutSession).values({ userId, dayId: day.id, dayName: day.name }).returning();
+    return c.json({ id: row!.id, dayId: row!.dayId, performedAt: row!.performedAt.toISOString() }, 201);
+  }
+
+  if (body?.freeform) {
+    const existing = await todayFreeformSession(userId);
+    if (existing) {
+      return c.json({ id: existing.id, dayId: existing.dayId, performedAt: existing.performedAt.toISOString() });
+    }
+    const [row] = await db.insert(workoutSession).values({ userId, dayId: null, dayName: null }).returning();
     return c.json({ id: row!.id, dayId: row!.dayId, performedAt: row!.performedAt.toISOString() }, 201);
   }
 
@@ -316,19 +376,16 @@ app.post("/:id/sets", async (c) => {
       weight: Math.max(0, body.weight ?? 0),
       reps: Math.max(0, Math.round(body.reps ?? 0)),
       durationSec: Math.max(0, Math.round(body.durationSec ?? 0)),
+      distance: Math.max(0, body.distance ?? 0),
+      // A distance with no recognized unit is not a distance — drop both rather than
+      // guessing at miles.
+      distanceUnit: parseDistanceUnit(body.distanceUnit),
       isWarmup: body.isWarmup ?? false,
     })
     .returning();
 
   const priorSets = await db
-    .select({
-      id: setLog.id,
-      weight: setLog.weight,
-      reps: setLog.reps,
-      durationSec: setLog.durationSec,
-      isWarmup: setLog.isWarmup,
-      completedAt: setLog.completedAt,
-    })
+    .select(recordSetColumns)
     .from(setLog)
     .innerJoin(workoutSession, eq(setLog.sessionId, workoutSession.id))
     .where(and(eq(workoutSession.userId, userId), eq(setLog.exerciseId, ex.id), ne(setLog.id, row!.id)));
@@ -337,6 +394,8 @@ app.post("/:id/sets", async (c) => {
     weight: row!.weight,
     reps: row!.reps,
     durationSec: row!.durationSec,
+    distance: row!.distance,
+    distanceUnit: row!.distanceUnit,
     isWarmup: row!.isWarmup,
     completedAt: row!.completedAt,
   });
@@ -359,6 +418,9 @@ app.patch("/:id/sets/:setId", async (c) => {
   if (typeof body.weight === "number") patch.weight = Math.max(0, body.weight);
   if (typeof body.reps === "number") patch.reps = Math.max(0, Math.round(body.reps));
   if (typeof body.durationSec === "number") patch.durationSec = Math.max(0, Math.round(body.durationSec));
+  if (typeof body.distance === "number") patch.distance = Math.max(0, body.distance);
+  const distanceUnit = parseDistanceUnit(body.distanceUnit);
+  if (distanceUnit) patch.distanceUnit = distanceUnit;
   if (typeof body.isWarmup === "boolean") patch.isWarmup = body.isWarmup;
   if (!Object.keys(patch).length) return c.json({ error: "bad_request" }, 400);
 
@@ -469,15 +531,7 @@ app.get("/:id", async (c) => {
   const exIds = [...new Set(sets.map((r) => r.exerciseId))];
   const allTimeSets = exIds.length
     ? await db
-        .select({
-          exerciseId: setLog.exerciseId,
-          id: setLog.id,
-          weight: setLog.weight,
-          reps: setLog.reps,
-          durationSec: setLog.durationSec,
-          isWarmup: setLog.isWarmup,
-          completedAt: setLog.completedAt,
-        })
+        .select({ exerciseId: setLog.exerciseId, ...recordSetColumns })
         .from(setLog)
         .innerJoin(workoutSession, eq(setLog.sessionId, workoutSession.id))
         .where(and(eq(workoutSession.userId, userId), inArray(setLog.exerciseId, exIds)))
@@ -488,7 +542,7 @@ app.get("/:id", async (c) => {
     if (!m) continue;
     const recs = computeRecords(
       m.kind,
-      allTimeSets.filter((s) => s.exerciseId === id) as RecordSet[],
+      allTimeSets.filter((s) => s.exerciseId === id),
     );
     if (recs.length) records.push({ exerciseId: id, name: m.name, kind: m.kind, records: recs });
   }

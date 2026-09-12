@@ -65,20 +65,62 @@ records what is specific to 3afya.
 - **Resurrection on name collision**: Because `(userId, name)` is unique, `POST /api/exercises` with an archived exercise's exact name clears `archivedAt` rather than erroring.
 - **`programExercise.exerciseId` is `onDelete: "cascade"`**: Template references are disposable; historical training data is not.
 
+### Freeform Sessions
+- **A freeform session is `workout_session.dayId is null`** — the same session row every
+  program day uses, just belonging to no day. There is no separate activity table: a ride,
+  a run and a set of push-ups are exercises with a kind, logged as sets like anything else.
+- **Freeform sessions are invisible to the rotation**: both `rotationState` queries filter
+  `isNotNull(dayId)`, so a Tuesday bike ride neither resumes a day nor advances "next up".
+  Removing either filter silently resets the rotation to day A.
+- **One freeform session per calendar day**, find-or-create via `POST /api/sessions`
+  `{ freeform: true }` → `todayFreeformSession`. Same shape as the per-day find-or-create,
+  same non-guarantee under concurrency.
+- **`GET /api/sessions/freeform` returns `day: null`** and only ad-hoc exercises. `day: null`
+  is what puts `SessionView` into freeform mode; both modes are one component parameterized
+  by `SessionTarget`, so the log/edit/PR behaviour cannot drift between them.
+
+### The `distance` Kind
+- **`distance` sets store the unit they were entered in** (`set_log.distance_unit`), never a
+  normalized number: a 7-mile ride reads back as 7 mi. Comparisons convert to metres
+  (`apps/api/src/distance.ts`); display never does.
+- **A distance with no recognized unit is not a distance.** `parseDistanceUnit` returns null
+  for anything but `mi`/`km`/`m`, and `toMetres` scores a unit-less distance as 0.
+- **Duration is optional on a distance set.** An untimed ride holds no duration PR, which is
+  why `prKindsFor("distance")` can return both kinds safely.
+- **The web never converts units.** The session delta is shown only when the last set used
+  the same unit, and history totals sum only within one unit — both say less rather than
+  convert behind the user's back. Trends is the one place that converts, server-side, and
+  charts in the exercise's most recently logged unit.
+
 ### Session Immutability
-- **No session-exercise join table**: Exercises belong to a session iff they have ≥1 logged set. Ad-hoc exercises are surfaced by `buildDayExercises` with `fromProgram: false`. This keeps sessions immutable records and programs reusable templates.
+- **No session-exercise join table**: Exercises belong to a session iff they have ≥1 logged set. Ad-hoc exercises are surfaced by `adhocExercises` with `fromProgram: false`. This keeps sessions immutable records and programs reusable templates.
 - **Day name snapshot**: `workoutSession.dayName` is set at creation (both paths) and read as stored snapshot → live join → null. Reading the join first would re-break history on a rename.
-- **Two latest-session queries**: `rotationState` runs both `latestSession` (any kind, for resume) and `latestSessionWithSets` (with sets, for rotation). Empty sessions must not advance rotation.
+- **Two latest-session queries**: `rotationState` runs both `latestSession` (for resume) and `latestSessionWithSets` (with sets, for rotation); both are restricted to sessions that have a `dayId`. Empty sessions must not advance rotation, and neither must freeform ones.
 - **Empty session deletion**: `DELETE /api/sessions/:id` refuses once the session has any `set_log` row.
 - **`POST /api/sessions` is find-or-create per (day, calendar day)** via `todaySessionForDay` — a second POST with the same `dayId` returns the existing row with 200 rather than inserting. It's not a concurrency guarantee.
 - **`nutritionTarget` is append-only**: `PUT /api/fuel/target` INSERTs; nothing ever updates or upserts it. This lets historical adherence be scored against the target in force *then*.
-- **`isWarmup` filtering**: `apps/api/src/records.ts` filters warm-ups internally. Every caller must include `isWarmup` in its `RecordSet`-shaped query/object or silently treat all sets as working sets.
+- **`isWarmup` filtering**: `apps/api/src/records.ts` filters warm-ups internally. Every caller must include `isWarmup` in its `RecordSet`-shaped query/object or silently treat all sets as working sets. Select `recordSetColumns` (`db/record-set-columns.ts`) rather than listing columns by hand — that list is where a forgotten column stops being possible.
 - **Frequent fuel labels**: Derived from user's own entries only — exact match on `lower(trim(label))`, no food catalog, no fuzzy matching.
 
 ## Critical Web Implementation Rules
 
 **For general web architecture, see [`ARCHITECTURE.md`](./ARCHITECTURE.md).**
 
+- **Freeform is the same screen**: `SessionScreen` and `FreeformSessionScreen` are thin
+  wrappers over `SessionView({ target })`. Add session behaviour to `SessionView`, not to a
+  wrapper, or the two modes diverge.
+- **`isExerciseDone` is false for ad-hoc exercises** (it requires `fromProgram`), which is
+  what keeps a freeform session focused on what you just added instead of declaring itself
+  finished after one set.
+- **Typed numbers go through `DraftInput`**: it holds the raw keystrokes so half-finished
+  text ("7.", "12:") doesn't collapse to a number mid-entry, and commits only what parses.
+  Give it a `key` on the thing being edited — remounting is how a stale draft is abandoned.
+- **Durations are typed as clocks**: `parseDuration` accepts `45`, `45s`, `12:30` and
+  `1:05:00`; `fmtClock` is its inverse. Steppers stay for nudging, but a 40-minute ride is
+  typed, not tapped.
+- **One `SetEditor` for every logged set**: the session screen and history both correct sets
+  through `components/SetEditor.tsx`. Per-kind editing behaviour goes there, or the two
+  surfaces drift.
 - **Rest timer context**: The app's one React Context is mounted in `AppLayout` (not `SessionScreen`) so it survives navigation. Follow the outer-provider/inner-consumer split pattern for any future shell-level context.
 - **SessionScreen focus is derived**: `activeId` = override if still valid/incomplete, else first incomplete in program order. `completeSet()` must stay pinned on the just-logged exercise until that exercise (or both superset members) is done.
 - **Extra sets pin focus**: `completeSet()` tests `loggedSets.length >= targetSets` before superset logic and re-pins `override`, so extra sets never advance focus.
@@ -92,7 +134,7 @@ records what is specific to 3afya.
 - **Placeholder-shown**: `.pex-tag-in` empty state uses `:placeholder-shown` — the `placeholder` attribute is load-bearing.
 - **History stat presentation**: When streak is 0 but something was trained, render `Nd ago / Last trained` instead of `0d / Current streak` to avoid confusion.
 - **BodyScreen staleness**: Shows `last logged Nd ago` rather than guarding the tap — re-logging unchanged weight is legitimate.
-- **Session recap never locks**: `/history/$sessionId` is post-workout recap; sets can still be logged/edited after. Use "Review session" wording.
+- **Session recap never locks**: `/history/$sessionId` is post-workout recap; sets can still be logged/edited after. Use "Review session" wording. Editing there is opt-in per exercise ("Edit sets"), one exercise at a time — the screen reads as a recap first. Any set edit invalidates `session-detail`/`sessions`/`session`/`today`/`records`/`trends`.
 - **Zero-set sessions**: Visible in History with muted "started · nothing logged", but excluded from stats. Empty state has armed confirm to remove.
 - **Warm-up toggle state**: Per-set UI state (`nextIsWarmup`), not derived. Reset on `logSet` success, dayId reset, and exercise switch via `focusExercise` wrapper.
 - **Exercise swap details**: Catalog-only alternatives created with `createEx.mutateAsync({ name })` and no `kind` so server resolves from catalog. Panel state held as `swapFor` (exercise id), cleared on focus change. Taxonomy tags use shared `TaxonomyTags` component.

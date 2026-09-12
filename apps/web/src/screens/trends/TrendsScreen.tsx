@@ -3,12 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import type { ExerciseRecords, FuelHistory, PrEntry, ProgressTrend, TrendExercise } from "@afya/shared";
 import { api } from "@/lib/api/client";
 import { PR_LABEL } from "@/lib/pr";
+import { fmtDur } from "@/lib/format";
 import { LineChart } from "@/components/charts/LineChart";
 import { BarChart } from "@/components/charts/BarChart";
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 const weekday = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "short" });
-const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 
 const RECENT_RECORDS = 3;
 const VISIBLE_LIFT_CHIPS = 8;
@@ -17,9 +17,13 @@ const METRIC_LABEL: Record<ProgressTrend["metric"], string> = {
   est1rm: "Estimated 1RM",
   reps: "Best set",
   time: "Best hold",
+  distance: "Furthest",
 };
 
 const fmtRecord = (r: PrEntry) => {
+  // A distance record is scored in metres so units compare, but reads back in the
+  // unit it was ridden or run in.
+  if (r.kind === "distance" && r.distanceUnit) return `${r.distance} ${r.distanceUnit}`;
   if (r.kind === "duration") return fmtDur(r.value);
   if (r.kind === "reps") return `${r.value} reps`;
   if (r.kind === "weight") return `${r.value} lb`;

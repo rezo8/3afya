@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Exercise, ExerciseKind, Program, ProgramDay, TodayResponse, UpdateDayBody, UpdateDayExerciseBody, UpdateProgramBody } from "@afya/shared";
 import { api } from "@/lib/api/client";
+import { fmtDur } from "@/lib/format";
 
-const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 
 /**
  * How long an armed confirm — "Delete day", "remove exercise" — stays armed after

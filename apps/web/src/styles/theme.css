@@ -577,6 +577,64 @@ body {
   transform: scale(0.9);
   background: var(--surface-hi);
 }
+.dist {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.dist-input {
+  font-family: var(--display);
+  font-size: clamp(48px, 16vw, 70px);
+  font-weight: 400;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line-hi);
+  width: 4ch;
+  text-align: center;
+  padding: 0;
+  line-height: 1;
+}
+.dist-input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+.time-input {
+  width: 7.5ch;
+  max-width: 100%;
+  font-size: clamp(34px, 11vw, 50px);
+}
+.ls-time-in {
+  font-family: var(--mono);
+  font-size: 13px;
+  flex: none;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line-hi);
+  color: var(--text);
+  width: 7.5ch;
+  text-align: center;
+  padding: 0 2px;
+  font-variant-numeric: tabular-nums;
+}
+.ls-time-in:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+.sd-ex-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 6px 0 2px;
+}
+.dist-time {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
 .delta {
   display: inline-flex;
   align-items: center;
@@ -1819,6 +1877,33 @@ body {
   border-style: dashed;
 }
 .start-day.is-done .sd-name {
+  color: var(--text-soft);
+}
+.freeform-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 15px 16px 16px;
+  background: var(--surface);
+  border: 1px dashed var(--line-hi);
+  border-radius: var(--r-md);
+  text-decoration: none;
+  color: var(--text);
+  transition:
+    border-color 0.12s ease,
+    transform 0.08s ease;
+}
+.freeform-entry:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.fe-name {
+  font-weight: 700;
+}
+.fe-meta {
+  font-family: var(--mono);
+  font-size: 11px;
   color: var(--text-soft);
 }
 .sd-top {

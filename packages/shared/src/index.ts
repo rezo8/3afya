@@ -7,8 +7,11 @@
  *  - Each exercise has a measurement KIND that decides what a set records:
  *      weighted → weight (lb) × reps   (bench press)
  *      reps     → reps / count only    (pull-ups, soccer drills)
- *      time     → duration in seconds  (planks, timed holds)
+ *      time     → duration in seconds  (planks, timed holds, yoga)
+ *      distance → distance + unit, and optionally a duration (runs, bike rides)
  *  - A program is a set of named days in a rotation order (not weekday-pinned).
+ *  - A session need not belong to a program day at all: a FREEFORM session has a
+ *    null dayId and holds whatever was actually done that day.
  *  - A day holds ordered exercises with targets (sets × reps, or sets × time).
  *    No planned weight — working weight lives in logged sets and "today"
  *    pre-fills it from the last session.
@@ -22,7 +25,14 @@ export interface ApiErrorBody {
 }
 
 /** How an exercise is measured — decides which fields a set records. */
-export type ExerciseKind = "weighted" | "reps" | "time";
+export type ExerciseKind = "weighted" | "reps" | "time" | "distance";
+
+/**
+ * The unit a distance set was entered in. Stored per set rather than converted on
+ * the way in, so a ride logged in miles still reads back as the miles that were
+ * ridden. Comparisons (records, trends) normalize to metres; display does not.
+ */
+export type DistanceUnit = "mi" | "km" | "m";
 
 /** The muscle group an exercise mainly trains — the axis substitutions pivot on. */
 export type MuscleGroup =
@@ -171,8 +181,12 @@ export interface SetLog {
   weight: number;
   /** Reps — used by weighted/reps kinds (0 for time). */
   reps: number;
-  /** Seconds — used by the time kind (0 for others). */
+  /** Seconds — used by the time kind, and optionally by distance (0 for others). */
   durationSec: number;
+  /** Distance in `distanceUnit` — used by the distance kind (0 for others). */
+  distance: number;
+  /** The unit `distance` was entered in; null on every set that records no distance. */
+  distanceUnit: DistanceUnit | null;
   isWarmup: boolean;
   completedAt: string;
 }
@@ -195,15 +209,18 @@ export interface SessionDetail {
   records?: ExerciseRecords[];
 }
 
-export type PrKind = "est1rm" | "weight" | "volume" | "reps" | "duration";
+export type PrKind = "est1rm" | "weight" | "volume" | "reps" | "duration" | "distance";
 
 export interface PrEntry {
   kind: PrKind;
+  /** The winning score. For the distance kind this is metres, so two units compare. */
   value: number;
   setId: string;
   weight: number;
   reps: number;
   durationSec: number;
+  distance: number;
+  distanceUnit: DistanceUnit | null;
   achievedAt: string;
 }
 
@@ -222,6 +239,8 @@ export interface LoggedSetResult {
 export interface StartSessionBody {
   /** Omit to start the next-up rotation day; pass a dayId to override. */
   dayId?: string | null;
+  /** Start a session belonging to no program day at all. Ignored when `dayId` is set. */
+  freeform?: boolean;
 }
 export interface LogSetBody {
   exerciseId: string;
@@ -230,12 +249,16 @@ export interface LogSetBody {
   weight?: number;
   reps?: number;
   durationSec?: number;
+  distance?: number;
+  distanceUnit?: DistanceUnit;
   isWarmup?: boolean;
 }
 export interface UpdateSetBody {
   weight?: number;
   reps?: number;
   durationSec?: number;
+  distance?: number;
+  distanceUnit?: DistanceUnit;
   isWarmup?: boolean;
 }
 
@@ -257,11 +280,16 @@ export interface TodayExercise {
   lastWeight: number | null;
   lastReps: number | null;
   lastDurationSec: number | null;
+  lastDistance: number | null;
+  lastDistanceUnit: DistanceUnit | null;
   /** Sets already logged in the in-progress session. */
   loggedSets: SetLog[];
 }
 
-/** The Today screen payload: next-up day + per-exercise history + any live session. */
+/**
+ * The session screen payload: a program day + per-exercise history + any live session.
+ * `day` is null for a freeform session, where every exercise is ad-hoc.
+ */
 export interface TodayResponse {
   day: { id: string; name: string; position: number; warmup: string | null; cooldown: string | null } | null;
   session: { id: string; performedAt: string } | null;
@@ -354,7 +382,7 @@ export interface TrendPoint {
 }
 
 /** What a progress trend measures, chosen by the exercise's kind. */
-export type ProgressMetric = "est1rm" | "reps" | "time";
+export type ProgressMetric = "est1rm" | "reps" | "time" | "distance";
 
 /** Progress over time for one exercise — best set per session, metric by kind. */
 export interface ProgressTrend {
@@ -362,7 +390,7 @@ export interface ProgressTrend {
   name: string;
   kind: ExerciseKind;
   metric: ProgressMetric;
-  /** Display unit for the values: "lb" | "reps" | "s". */
+  /** Display unit for the values: "lb" | "reps" | "s" | a DistanceUnit. */
   unit: string;
   points: TrendPoint[];
 }

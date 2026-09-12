@@ -3,11 +3,11 @@ import { Link } from "@tanstack/react-router";
 import type { SessionDetail } from "@afya/shared";
 import { api } from "@/lib/api/client";
 import { daysAgo } from "@/lib/dates";
+import { fmtDist, fmtDur } from "@/lib/format";
 
 const WD = ["M", "T", "W", "T", "F", "S", "S"];
 const localDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
 const allSets = (s: SessionDetail) => s.exercises.flatMap((e) => e.sets);
 const volume = (s: SessionDetail) => allSets(s).reduce((sum, x) => sum + x.weight * x.reps, 0);
 /** A session started but never logged into: it stays visible, but it isn't training. */
@@ -23,6 +23,12 @@ function summarize(s: SessionDetail): string {
   if (totalReps > 0) return `${lead} · ${totalReps} reps`;
   const totalTime = sets.reduce((n, x) => n + x.durationSec, 0);
   if (totalTime > 0) return `${lead} · ${fmtDur(totalTime)}`;
+  // Distances only add up within one unit, so the summary reports the unit it can total.
+  const distanceUnit = sets.find((x) => x.distanceUnit)?.distanceUnit;
+  if (distanceUnit) {
+    const total = sets.filter((x) => x.distanceUnit === distanceUnit).reduce((n, x) => n + x.distance, 0);
+    return `${lead} · ${fmtDist(total, distanceUnit)}`;
+  }
   return lead;
 }
 

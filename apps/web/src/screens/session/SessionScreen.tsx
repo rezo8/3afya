@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import type {
   CreateExerciseBody,
+  DistanceUnit,
   Equipment,
   Exercise,
   ExerciseAlternative,
@@ -17,13 +18,26 @@ import type {
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
+import { DraftInput } from "@/components/DraftInput";
+import { SetEditor, stepDistance } from "@/components/SetEditor";
 import { PR_LABEL } from "@/lib/pr";
+import { fmtClock, fmtDist, fmtDur, parseDuration, stepDuration } from "@/lib/format";
 import { isExerciseDone } from "@/lib/session";
 import { useRestTimer } from "./RestTimer";
 
-type Work = Record<string, { weight: number; reps: number; durationSec: number }>;
+type Work = Record<string, { weight: number; reps: number; durationSec: number; distance: number; distanceUnit: DistanceUnit }>;
 
-const fmtDur = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`);
+/** A session either works through a program day, or is freeform: whatever was actually done. */
+type SessionTarget = { kind: "day"; dayId: string } | { kind: "freeform" };
+
+const DISTANCE_UNITS: DistanceUnit[] = ["mi", "km", "m"];
+
+
+/** A plain decimal, or null while the text isn't one yet ("7." mid-keystroke). */
+const parseNonNegative = (text: string): number | null => {
+  const value = Number(text);
+  return text.trim() !== "" && Number.isFinite(value) && value >= 0 ? value : null;
+};
 
 const muscleLabel = (group: MuscleGroup) => group.replace("_", " ");
 
@@ -36,13 +50,67 @@ function TaxonomyTags({ muscleGroup, equipment }: { muscleGroup: MuscleGroup | n
   );
 }
 
+/** The entry card's headline control: − big value +, whatever the kind measures. */
+function BigStep({
+  decreaseLabel,
+  increaseLabel,
+  onDecrease,
+  onIncrease,
+  centered,
+  children,
+}: {
+  decreaseLabel: string;
+  increaseLabel: string;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  centered?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="weight" style={centered ? { justifyContent: "center" } : undefined}>
+      <button className="step" aria-label={decreaseLabel} onClick={onDecrease}>
+        −
+      </button>
+      <div className="bignum">{children}</div>
+      <button className="step" aria-label={increaseLabel} onClick={onIncrease}>
+        +
+      </button>
+    </div>
+  );
+}
+
+/** A session against one day of the program. */
 export function SessionScreen() {
-  const qc = useQueryClient();
   const { dayId } = useParams({ strict: false }) as { dayId?: string };
+  if (!dayId) return <SessionNotFound />;
+  return <SessionView target={{ kind: "day", dayId }} />;
+}
+
+/** A session belonging to no program day — a ride, a run, a class, anything. */
+export function FreeformSessionScreen() {
+  return <SessionView target={{ kind: "freeform" }} />;
+}
+
+function SessionNotFound() {
+  return (
+    <section className="empty-state">
+      <h2>Day not found</h2>
+      <p>This day may have been removed. Pick another from your program.</p>
+      <Link className="btn" to="/">
+        Back to days
+      </Link>
+    </section>
+  );
+}
+
+function SessionView({ target }: { target: SessionTarget }) {
+  const qc = useQueryClient();
+  // One key per target, so switching days (or into freeform) resets the screen's state.
+  const targetKey = target.kind === "day" ? target.dayId : "freeform";
   const { data, isLoading } = useQuery({
-    queryKey: ["session", dayId],
-    queryFn: () => api.get<TodayResponse>(`/api/sessions/day/${dayId}`),
-    enabled: !!dayId,
+    queryKey: ["session", targetKey],
+    queryFn: () =>
+      api.get<TodayResponse>(target.kind === "day" ? `/api/sessions/day/${target.dayId}` : "/api/sessions/freeform"),
   });
   const [work, setWork] = useState<Work>({});
   const [override, setOverride] = useState<string | null>(null);
@@ -80,7 +148,7 @@ export function SessionScreen() {
     setMutError(null);
     setNextIsWarmup(false);
     createdSessionId.current = null;
-  }, [dayId]);
+  }, [targetKey]);
 
   useEffect(() => {
     if (!prBanner) return;
@@ -98,6 +166,8 @@ export function SessionScreen() {
             weight: ex.lastWeight ?? 45,
             reps: ex.lastReps ?? ex.targetReps ?? 8,
             durationSec: ex.lastDurationSec ?? ex.targetDurationSec ?? 30,
+            distance: ex.lastDistance ?? 1,
+            distanceUnit: ex.lastDistanceUnit ?? "mi",
           };
         }
       }
@@ -106,14 +176,15 @@ export function SessionScreen() {
   }, [data]);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["session", dayId] });
+    qc.invalidateQueries({ queryKey: ["session", targetKey] });
     qc.invalidateQueries({ queryKey: ["today"] });
   };
   const logSet = useMutation({
     mutationFn: async ({ body }: { body: LogSetBody; name: string }) => {
       let sid = data?.session?.id ?? createdSessionId.current;
       if (!sid) {
-        sid = (await api.post<{ id: string }>("/api/sessions", { dayId })).id;
+        const start = target.kind === "day" ? { dayId: target.dayId } : { freeform: true };
+        sid = (await api.post<{ id: string }>("/api/sessions", start)).id;
         createdSessionId.current = sid;
       }
       return api.post<LoggedSetResult>(`/api/sessions/${sid}/sets`, body);
@@ -166,17 +237,9 @@ export function SessionScreen() {
 
   if (isLoading) return <p className="center-note">Loading…</p>;
 
-  if (!data || !data.day) {
-    return (
-      <section className="empty-state">
-        <h2>Day not found</h2>
-        <p>This day may have been removed. Pick another from your program.</p>
-        <Link className="btn" to="/">
-          Back to days
-        </Link>
-      </section>
-    );
-  }
+  // A freeform session has no day by definition; a day session without one is gone.
+  if (!data || (target.kind === "day" && !data.day)) return <SessionNotFound />;
+  const day = data.day;
 
   const serverIds = new Set(data.exercises.map((e) => e.exerciseId));
   const pending: TodayExercise[] = extras
@@ -197,6 +260,8 @@ export function SessionScreen() {
       lastWeight: null,
       lastReps: null,
       lastDurationSec: null,
+      lastDistance: null,
+      lastDistanceUnit: null,
       loggedSets: [],
     }));
   const exercises = [...data.exercises, ...pending];
@@ -217,7 +282,9 @@ export function SessionScreen() {
   };
   const addExercise = (ex: Exercise) => {
     setExtras((xs) => (xs.some((x) => x.id === ex.id) ? xs : [...xs, ex]));
-    setWork((wk) => (wk[ex.id] ? wk : { ...wk, [ex.id]: { weight: 45, reps: 8, durationSec: 30 } }));
+    setWork((wk) =>
+      wk[ex.id] ? wk : { ...wk, [ex.id]: { weight: 45, reps: 8, durationSec: 30, distance: 1, distanceUnit: "mi" } },
+    );
     focusExercise(ex.id);
     setShowAdd(false);
   };
@@ -271,6 +338,11 @@ export function SessionScreen() {
 
   const setWorkFor = (id: string, patch: Partial<Work[string]>) => setWork((wk) => ({ ...wk, [id]: { ...wk[id]!, ...patch } }));
 
+  const stepDistanceBy = (direction: 1 | -1) => {
+    if (!active || !w) return;
+    setWorkFor(active.exerciseId, { distance: stepDistance(w.distance, w.distanceUnit, direction) });
+  };
+
   function pickNextInGroup(justSet: TodayExercise, willBeDone: boolean): string | null {
     const group = programExercises.filter((e) => e.supersetGroup === justSet.supersetGroup);
     const idx = group.findIndex((e) => e.exerciseId === justSet.exerciseId);
@@ -291,6 +363,11 @@ export function SessionScreen() {
       body.reps = wk.reps;
     } else if (active.kind === "reps") {
       body.reps = wk.reps;
+    } else if (active.kind === "distance") {
+      body.distance = wk.distance;
+      body.distanceUnit = wk.distanceUnit;
+      // Timing a ride is optional — send a duration only when one was actually dialled in.
+      if (wk.durationSec > 0) body.durationSec = wk.durationSec;
     } else {
       body.durationSec = wk.durationSec;
     }
@@ -329,6 +406,11 @@ export function SessionScreen() {
     } else if (active.kind === "time" && active.lastDurationSec != null) {
       delta = w.durationSec - active.lastDurationSec;
       deltaUnit = "s";
+    } else if (active.kind === "distance" && active.lastDistance != null && active.lastDistanceUnit === w.distanceUnit) {
+      // Only comparable in the same unit — a cross-unit comparison is left unsaid
+      // rather than converted behind the user's back.
+      delta = +(w.distance - active.lastDistance).toFixed(2);
+      deltaUnit = w.distanceUnit;
     }
   }
 
@@ -351,6 +433,11 @@ export function SessionScreen() {
         </>
       );
     }
+    if (e.kind === "distance") {
+      const unit = ew?.distanceUnit ?? e.lastDistanceUnit ?? "mi";
+      const dist = ew ? ew.distance : (e.lastDistance ?? 0);
+      return <b>{fmtDist(dist, unit)}</b>;
+    }
     const dur = ew ? ew.durationSec : (e.lastDurationSec ?? e.targetDurationSec ?? 0);
     return <b>{fmtDur(dur)}</b>;
   };
@@ -362,19 +449,23 @@ export function SessionScreen() {
       </Link>
       <div className="today-head">
         <div>
-          <p className="eyebrow">Session</p>
-          <h1 className="day">{data.day.name}</h1>
+          <p className="eyebrow">{day ? "Session" : "Freeform"}</p>
+          <h1 className="day">{day ? day.name : "Anything else"}</h1>
         </div>
-        <div className="session-progress">
-          <span className="frac num">
-            <b>{doneCount}</b>/{exercises.length}
-          </span>
-          <span className="lbl">lifts</span>
+        {day && (
+          <div className="session-progress">
+            <span className="frac num">
+              <b>{doneCount}</b>/{exercises.length}
+            </span>
+            <span className="lbl">lifts</span>
+          </div>
+        )}
+      </div>
+      {day && (
+        <div className="track">
+          <i style={{ width: `${exercises.length ? (doneCount / exercises.length) * 100 : 0}%` }} />
         </div>
-      </div>
-      <div className="track">
-        <i style={{ width: `${exercises.length ? (doneCount / exercises.length) * 100 : 0}%` }} />
-      </div>
+      )}
 
       {prBanner && (
         <div className="pr-banner" role="status">
@@ -461,18 +552,15 @@ export function SessionScreen() {
               <div className="numbers">
                 {active.kind === "weighted" ? (
                   <>
-                    <div className="weight">
-                      <button className="step" aria-label="Decrease weight" onClick={() => setWorkFor(active.exerciseId, { weight: Math.max(0, w.weight - 5) })}>
-                        −
-                      </button>
-                      <div className="bignum">
-                        <span className="wval">{w.weight}</span>
-                        <span className="unit">lb</span>
-                      </div>
-                      <button className="step" aria-label="Increase weight" onClick={() => setWorkFor(active.exerciseId, { weight: w.weight + 5 })}>
-                        +
-                      </button>
-                    </div>
+                    <BigStep
+                      decreaseLabel="Decrease weight"
+                      increaseLabel="Increase weight"
+                      onDecrease={() => setWorkFor(active.exerciseId, { weight: Math.max(0, w.weight - 5) })}
+                      onIncrease={() => setWorkFor(active.exerciseId, { weight: w.weight + 5 })}
+                    >
+                      <span className="wval">{w.weight}</span>
+                      <span className="unit">lb</span>
+                    </BigStep>
                     <div className="reps">
                       <div className="repnum">×{w.reps}</div>
                       <div className="rlabel">reps</div>
@@ -487,29 +575,86 @@ export function SessionScreen() {
                     </div>
                   </>
                 ) : active.kind === "reps" ? (
-                  <div className="weight" style={{ justifyContent: "center" }}>
-                    <button className="step" aria-label="Fewer reps" onClick={() => setWorkFor(active.exerciseId, { reps: Math.max(1, w.reps - 1) })}>
-                      −
-                    </button>
-                    <div className="bignum">
-                      <span className="wval">{w.reps}</span>
-                      <span className="unit">reps</span>
+                  <BigStep
+                    centered
+                    decreaseLabel="Fewer reps"
+                    increaseLabel="More reps"
+                    onDecrease={() => setWorkFor(active.exerciseId, { reps: Math.max(1, w.reps - 1) })}
+                    onIncrease={() => setWorkFor(active.exerciseId, { reps: w.reps + 1 })}
+                  >
+                    <span className="wval">{w.reps}</span>
+                    <span className="unit">reps</span>
+                  </BigStep>
+                ) : active.kind === "distance" ? (
+                  <div className="dist">
+                    <BigStep
+                      centered
+                      decreaseLabel="Shorter distance"
+                      increaseLabel="Longer distance"
+                      onDecrease={() => stepDistanceBy(-1)}
+                      onIncrease={() => stepDistanceBy(1)}
+                    >
+                      <DraftInput
+                        key={active.exerciseId}
+                        className="dist-input"
+                        ariaLabel="Distance"
+                        value={w.distance}
+                        format={String}
+                        parse={parseNonNegative}
+                        onChange={(distance) => setWorkFor(active.exerciseId, { distance })}
+                      />
+                      <span className="unit">{w.distanceUnit}</span>
+                    </BigStep>
+                    <div className="seg dist-units">
+                      {DISTANCE_UNITS.map((u) => (
+                        <button
+                          key={u}
+                          className={w.distanceUnit === u ? "on" : ""}
+                          onClick={() => setWorkFor(active.exerciseId, { distanceUnit: u })}
+                        >
+                          {u}
+                        </button>
+                      ))}
                     </div>
-                    <button className="step" aria-label="More reps" onClick={() => setWorkFor(active.exerciseId, { reps: w.reps + 1 })}>
-                      +
-                    </button>
+                    <div className="dist-time">
+                      <span className="rlabel">time · h:mm:ss</span>
+                      <button className="step small" aria-label="Less time" onClick={() => setWorkFor(active.exerciseId, { durationSec: stepDuration(w.durationSec, -1) })}>
+                        −
+                      </button>
+                      <DraftInput
+                        key={active.exerciseId}
+                        className="ls-time-in"
+                        ariaLabel="Time"
+                        value={w.durationSec}
+                        format={fmtClock}
+                        parse={parseDuration}
+                        onChange={(durationSec) => setWorkFor(active.exerciseId, { durationSec })}
+                      />
+                      <button className="step small" aria-label="More time" onClick={() => setWorkFor(active.exerciseId, { durationSec: stepDuration(w.durationSec, 1) })}>
+                        +
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="weight" style={{ justifyContent: "center" }}>
-                    <button className="step" aria-label="Less time" onClick={() => setWorkFor(active.exerciseId, { durationSec: Math.max(5, w.durationSec - 5) })}>
-                      −
-                    </button>
-                    <div className="bignum">
-                      <span className="wval">{fmtDur(w.durationSec)}</span>
-                    </div>
-                    <button className="step" aria-label="More time" onClick={() => setWorkFor(active.exerciseId, { durationSec: w.durationSec + 5 })}>
-                      +
-                    </button>
+                  <div className="dist">
+                    <BigStep
+                      centered
+                      decreaseLabel="Less time"
+                      increaseLabel="More time"
+                      onDecrease={() => setWorkFor(active.exerciseId, { durationSec: stepDuration(w.durationSec, -1) })}
+                      onIncrease={() => setWorkFor(active.exerciseId, { durationSec: stepDuration(w.durationSec, 1) })}
+                    >
+                      <DraftInput
+                        key={active.exerciseId}
+                        className="dist-input time-input"
+                        ariaLabel="Time"
+                        value={w.durationSec}
+                        format={fmtClock}
+                        parse={parseDuration}
+                        onChange={(durationSec) => setWorkFor(active.exerciseId, { durationSec })}
+                      />
+                    </BigStep>
+                    <span className="rlabel">type 45s · 12:30 · 1:05:00</span>
                   </div>
                 )}
               </div>
@@ -556,57 +701,7 @@ export function SessionScreen() {
                 {active.loggedSets.map((s) => (
                   <li key={s.id} className="logged-set">
                     <span className="ls-num">{s.setNumber}</span>
-                    <div className="ls-edit">
-                      {active.kind === "weighted" ? (
-                        <>
-                          <button aria-label="Less weight" onClick={() => editSet.mutate({ setId: s.id, patch: { weight: Math.max(0, s.weight - 5) } })}>
-                            −
-                          </button>
-                          <b>{s.weight}</b>
-                          <span className="u">lb</span>
-                          <button aria-label="More weight" onClick={() => editSet.mutate({ setId: s.id, patch: { weight: s.weight + 5 } })}>
-                            +
-                          </button>
-                          <span className="x">×</span>
-                          <button aria-label="Fewer reps" onClick={() => editSet.mutate({ setId: s.id, patch: { reps: Math.max(1, s.reps - 1) } })}>
-                            −
-                          </button>
-                          <b>{s.reps}</b>
-                          <button aria-label="More reps" onClick={() => editSet.mutate({ setId: s.id, patch: { reps: s.reps + 1 } })}>
-                            +
-                          </button>
-                        </>
-                      ) : active.kind === "reps" ? (
-                        <>
-                          <button aria-label="Fewer reps" onClick={() => editSet.mutate({ setId: s.id, patch: { reps: Math.max(1, s.reps - 1) } })}>
-                            −
-                          </button>
-                          <b>{s.reps}</b>
-                          <span className="u">reps</span>
-                          <button aria-label="More reps" onClick={() => editSet.mutate({ setId: s.id, patch: { reps: s.reps + 1 } })}>
-                            +
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button aria-label="Less time" onClick={() => editSet.mutate({ setId: s.id, patch: { durationSec: Math.max(5, s.durationSec - 5) } })}>
-                            −
-                          </button>
-                          <b>{fmtDur(s.durationSec)}</b>
-                          <button aria-label="More time" onClick={() => editSet.mutate({ setId: s.id, patch: { durationSec: s.durationSec + 5 } })}>
-                            +
-                          </button>
-                        </>
-                      )}
-                      <button
-                        className={`ls-warmup-btn${s.isWarmup ? " on" : ""}`}
-                        aria-label={s.isWarmup ? "Mark as working set" : "Mark as warm-up"}
-                        aria-pressed={s.isWarmup}
-                        onClick={() => editSet.mutate({ setId: s.id, patch: { isWarmup: !s.isWarmup } })}
-                      >
-                        W
-                      </button>
-                    </div>
+                    <SetEditor kind={active.kind} set={s} onPatch={(patch) => editSet.mutate({ setId: s.id, patch })} />
                     {s.isWarmup && (
                       <span className="ls-warmup-tag" title="Warm-up set">
                         W
@@ -627,13 +722,20 @@ export function SessionScreen() {
           )}
         </div>
       ) : exercises.length === 0 ? (
-        <section className="empty-state">
-          <h2>This day has no exercises yet</h2>
-          <p>Add lifts to this day in your program, then come back here to log them.</p>
-          <Link className="btn" to="/program">
-            Edit program
-          </Link>
-        </section>
+        day ? (
+          <section className="empty-state">
+            <h2>This day has no exercises yet</h2>
+            <p>Add lifts to this day in your program, then come back here to log them.</p>
+            <Link className="btn" to="/program">
+              Edit program
+            </Link>
+          </section>
+        ) : (
+          <section className="empty-state">
+            <h2>Nothing logged yet</h2>
+            <p>Add whatever you did — a ride, a run, a class, a set of push-ups — and log it below.</p>
+          </section>
+        )
       ) : (
         <div className="setcard">
           <p className="eyebrow">Session</p>
@@ -652,23 +754,24 @@ export function SessionScreen() {
         </div>
       )}
 
-      {(data.day.warmup || data.day.cooldown) && (
+      {day && (day.warmup || day.cooldown) && (
         <div className="day-notes">
-          {data.day.warmup && (
+          {day.warmup && (
             <div>
               <p className="eyebrow section-eyebrow">Warm-up</p>
-              <p className="day-note-text">{data.day.warmup}</p>
+              <p className="day-note-text">{day.warmup}</p>
             </div>
           )}
-          {data.day.cooldown && (
+          {day.cooldown && (
             <div>
               <p className="eyebrow section-eyebrow">Cool-down</p>
-              <p className="day-note-text">{data.day.cooldown}</p>
+              <p className="day-note-text">{day.cooldown}</p>
             </div>
           )}
         </div>
       )}
 
+      {programExercises.length > 0 && (
       <div className="lifts">
         <p className="eyebrow section-eyebrow">This day</p>
         <ul>
@@ -704,10 +807,11 @@ export function SessionScreen() {
           })}
         </ul>
       </div>
+      )}
 
       {addedExercises.length > 0 && (
         <div className="lifts">
-          <p className="eyebrow section-eyebrow">Added this session</p>
+          <p className="eyebrow section-eyebrow">{day ? "Added this session" : "Logged this session"}</p>
           <ul>
             {addedExercises.map((e) => (
               <li key={e.exerciseId}>
@@ -728,7 +832,7 @@ export function SessionScreen() {
         {showAdd ? (
           <div className="add-ex-panel">
             <div className="add-ex-head">
-              <p className="eyebrow">Add to this session</p>
+              <p className="eyebrow">{day ? "Add to this session" : "What did you do?"}</p>
               <button className="add-ex-close" onClick={() => setShowAdd(false)}>
                 Close
               </button>
@@ -752,7 +856,7 @@ export function SessionScreen() {
                 onKeyDown={(e) => e.key === "Enter" && createAndAdd()}
               />
               <div className="seg">
-                {(["weighted", "reps", "time"] as const).map((k) => (
+                {(["weighted", "reps", "time", "distance"] as const).map((k) => (
                   <button key={k} className={newKind === k ? "on" : ""} onClick={() => setNewKind(k)}>
                     {k}
                   </button>
@@ -765,7 +869,7 @@ export function SessionScreen() {
           </div>
         ) : (
           <button className="add-ex-open" onClick={openAdd}>
-            ＋ Add an exercise
+            {day ? "＋ Add an exercise" : "＋ Add what you did"}
           </button>
         )}
       </div>

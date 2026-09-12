@@ -10,7 +10,7 @@ import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
 const app = new Hono<AuthedEnv>();
 app.use("*", requireAuth);
 
-const KINDS: ExerciseKind[] = ["weighted", "reps", "time"];
+const KINDS: ExerciseKind[] = ["weighted", "reps", "time", "distance"];
 /** The caller's kind if they sent a valid one, else null — so the catalog can fill the gap. */
 const parseKind = (value: unknown): ExerciseKind | null =>
   typeof value === "string" ? (KINDS.find((kind) => kind === value) ?? null) : null;

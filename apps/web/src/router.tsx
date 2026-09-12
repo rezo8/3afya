@@ -4,7 +4,7 @@ import { AppLayout } from "@/app/AppLayout";
 import { SignInScreen } from "@/screens/auth/SignInScreen";
 import { SignUpScreen } from "@/screens/auth/SignUpScreen";
 import { StartScreen } from "@/screens/start/StartScreen";
-import { SessionScreen } from "@/screens/session/SessionScreen";
+import { FreeformSessionScreen, SessionScreen } from "@/screens/session/SessionScreen";
 import { ProgramScreen } from "@/screens/program/ProgramScreen";
 import { TrendsScreen } from "@/screens/trends/TrendsScreen";
 import { HistoryScreen } from "@/screens/history/HistoryScreen";
@@ -58,6 +58,8 @@ const appRoute = createRoute({
   component: AppLayout,
 });
 const startRoute = createRoute({ getParentRoute: () => appRoute, path: "/", component: StartScreen });
+// Declared before the $dayId route so the static segment wins the match.
+const freeformSessionRoute = createRoute({ getParentRoute: () => appRoute, path: "/session/freeform", component: FreeformSessionScreen });
 const sessionRoute = createRoute({ getParentRoute: () => appRoute, path: "/session/$dayId", component: SessionScreen });
 const programRoute = createRoute({ getParentRoute: () => appRoute, path: "/program", component: ProgramScreen });
 const trendsRoute = createRoute({ getParentRoute: () => appRoute, path: "/trends", component: TrendsScreen });
@@ -69,7 +71,7 @@ const settingsRoute = createRoute({ getParentRoute: () => appRoute, path: "/sett
 const routeTree = rootRoute.addChildren([
   signInRoute,
   signUpRoute,
-  appRoute.addChildren([startRoute, sessionRoute, programRoute, trendsRoute, historyRoute, sessionDetailRoute, bodyRoute, settingsRoute]),
+  appRoute.addChildren([startRoute, freeformSessionRoute, sessionRoute, programRoute, trendsRoute, historyRoute, sessionDetailRoute, bodyRoute, settingsRoute]),
 ]);
 
 export const router = createRouter({ routeTree, defaultPreload: "intent", scrollRestoration: true });

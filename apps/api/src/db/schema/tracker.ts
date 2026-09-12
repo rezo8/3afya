@@ -10,7 +10,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import type { BodyMetricKind, Equipment, ExerciseKind, MuscleGroup } from "@afya/shared";
+import type { BodyMetricKind, DistanceUnit, Equipment, ExerciseKind, MuscleGroup } from "@afya/shared";
 
 /**
  * Tracker schema. Everything is user-scoped via a `user_id` FK to Better Auth's
@@ -137,9 +137,14 @@ export const setLog = pgTable(
     setNumber: integer("set_number").notNull(),
     // Which fields matter depends on the exercise kind:
     //   weighted → weight + reps · reps → reps · time → durationSec
+    //   distance → distance + distanceUnit, and durationSec when the user timed it
     weight: real("weight").default(0).notNull(),
     reps: integer("reps").default(0).notNull(),
     durationSec: integer("duration_sec").default(0).notNull(),
+    distance: real("distance").default(0).notNull(),
+    // Kept as entered rather than normalized: a 7-mile ride reads back in miles.
+    // Records and trends convert to metres to compare across units.
+    distanceUnit: text("distance_unit").$type<DistanceUnit>(),
     isWarmup: boolean("is_warmup").default(false).notNull(),
     completedAt: timestamp("completed_at").defaultNow().notNull(),
   },

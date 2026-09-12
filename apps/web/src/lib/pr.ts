@@ -6,4 +6,5 @@ export const PR_LABEL: Record<PrKind, string> = {
   volume: "Best volume",
   reps: "Most reps",
   duration: "Longest hold",
+  distance: "Furthest",
 };
