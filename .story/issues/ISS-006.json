@@ -1,0 +1,23 @@
+{
+  "components": [
+    "apps/web/src/lib/query/query-client.ts",
+    "apps/web/src/screens/start/FuelPanel.tsx"
+  ],
+  "createdBy": "iss-005-followup",
+  "dedupeKey": "iss-005:stale-fuel-across-midnight",
+  "discoveredDate": "2026-09-12",
+  "id": "ISS-006",
+  "impact": "ISS-005 fixed the server's answer to \"what day is it\". This is the other half of the reported symptom and is not addressed by it.\n\nThe query client sets `refetchOnWindowFocus: false` with `staleTime: 10_000`. Any remount refetches, so navigating between tabs self-corrects. The gap is the app left open on the Start screen across midnight: FuelPanel stays mounted, the window regains focus without a refetch, and yesterday's totals stay on screen against today's target until something else triggers a fetch. On a phone, where the app is backgrounded rather than closed, that is the normal way to use it.\n\nWorth being clear that this is a distinct cause from ISS-005 with the same user-visible effect, which is why it needs its own fix rather than being assumed closed: after the timezone fix, a stale cache is now the only remaining way to see a counter that did not reset.\n\nOptions, roughly in order of directness: re-enable `refetchOnWindowFocus` for the fuel queries specifically (the global default was set to avoid thrash on every screen, so a per-query override is narrower than flipping it); or have FuelPanel invalidate `[\"fuel\",\"today\"]` when the local calendar date changes, which is the condition actually being waited on rather than a proxy for it. A date-change check also covers the tab that is never refocused because it was never backgrounded.\n\nNot filed as part of ISS-005 because that issue is about the day boundary being computed in the wrong zone, and this is about not asking again once it changes.",
+  "location": [
+    "apps/web/src/lib/query/query-client.ts:8"
+  ],
+  "phase": "trust",
+  "relatedTickets": [
+    "T-001"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "Fuel totals can survive local midnight in an open tab: no refetch on focus"
+}

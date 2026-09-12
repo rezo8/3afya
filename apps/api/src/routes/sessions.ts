@@ -14,6 +14,7 @@ import type {
   TodayResponse,
   UpdateSetBody,
 } from "@afya/shared";
+import { isToday } from "../day";
 import { db } from "../db";
 import { recordSetColumns } from "../db/record-set-columns";
 import { exercise, program, programDay, programExercise, setLog, workoutSession } from "../db/schema/tracker";
@@ -23,13 +24,6 @@ import { computeRecords, detectPrs } from "../records";
 
 const app = new Hono<AuthedEnv>();
 app.use("*", requireAuth);
-
-const startOfDay = (d: Date) => {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-};
-const isToday = (d: Date) => startOfDay(d).getTime() === startOfDay(new Date()).getTime();
 
 const toSet = (r: typeof setLog.$inferSelect): SetLog => ({
   id: r.id,
@@ -84,7 +78,7 @@ function groupSets(
  *  - today's in-progress session if one was already started today,
  *  - otherwise the next-up day = the one after the last day they actually logged sets on.
  */
-async function rotationState(userId: string) {
+async function rotationState(userId: string, zone: string) {
   const [active] = await db
     .select()
     .from(program)
@@ -109,7 +103,7 @@ async function rotationState(userId: string) {
     .orderBy(desc(workoutSession.performedAt))
     .limit(1);
 
-  if (latestSession && isToday(latestSession.performedAt)) {
+  if (latestSession && isToday(latestSession.performedAt, zone)) {
     const currentDay = days.find((d) => d.id === latestSession.dayId) ?? days[0]!;
     return { program: active, days, currentDay, session: latestSession } as const;
   }
@@ -151,24 +145,24 @@ async function ownedDay(userId: string, dayId: string) {
 }
 
 /** Today's freeform session — the one belonging to no program day — if it exists. */
-async function todayFreeformSession(userId: string) {
+async function todayFreeformSession(userId: string, zone: string) {
   const [row] = await db
     .select()
     .from(workoutSession)
     .where(and(eq(workoutSession.userId, userId), isNull(workoutSession.dayId)))
     .orderBy(desc(workoutSession.performedAt))
     .limit(1);
-  return row && isToday(row.performedAt) ? row : null;
+  return row && isToday(row.performedAt, zone) ? row : null;
 }
 
-async function todaySessionForDay(userId: string, dayId: string) {
+async function todaySessionForDay(userId: string, dayId: string, zone: string) {
   const [row] = await db
     .select()
     .from(workoutSession)
     .where(and(eq(workoutSession.userId, userId), eq(workoutSession.dayId, dayId)))
     .orderBy(desc(workoutSession.performedAt))
     .limit(1);
-  return row && isToday(row.performedAt) ? row : null;
+  return row && isToday(row.performedAt, zone) ? row : null;
 }
 
 /** What the exercise's inputs pre-fill with, from the most recent set of it. */
@@ -259,7 +253,7 @@ async function buildDayExercises(userId: string, dayId: string, session: typeof 
 /** Next-up rotation day payload: per-exercise history + any live session. */
 app.get("/today", async (c) => {
   const userId = c.get("userId");
-  const state = await rotationState(userId);
+  const state = await rotationState(userId, c.get("timeZone"));
   if (!state.currentDay) {
     return c.json({ day: null, session: null, exercises: [] } satisfies TodayResponse);
   }
@@ -282,7 +276,7 @@ app.get("/day/:dayId", async (c) => {
   const userId = c.get("userId");
   const day = await ownedDay(userId, c.req.param("dayId"));
   if (!day) return c.json({ error: "not_found" }, 404);
-  const session = await todaySessionForDay(userId, day.id);
+  const session = await todaySessionForDay(userId, day.id, c.get("timeZone"));
   const exercises = await buildDayExercises(userId, day.id, session);
   return c.json({
     day: { id: day.id, name: day.name, position: day.position, warmup: day.warmup, cooldown: day.cooldown },
@@ -297,7 +291,7 @@ app.get("/day/:dayId", async (c) => {
  */
 app.get("/freeform", async (c) => {
   const userId = c.get("userId");
-  const session = await todayFreeformSession(userId);
+  const session = await todayFreeformSession(userId, c.get("timeZone"));
   const liveSets = session
     ? await db.select().from(setLog).where(eq(setLog.sessionId, session.id)).orderBy(asc(setLog.setNumber))
     : [];
@@ -316,7 +310,7 @@ app.post("/", async (c) => {
   if (body?.dayId) {
     const day = await ownedDay(userId, body.dayId);
     if (!day) return c.json({ error: "bad_request", message: "Unknown day." }, 400);
-    const existing = await todaySessionForDay(userId, day.id);
+    const existing = await todaySessionForDay(userId, day.id, c.get("timeZone"));
     if (existing) {
       return c.json({ id: existing.id, dayId: existing.dayId, performedAt: existing.performedAt.toISOString() });
     }
@@ -325,7 +319,7 @@ app.post("/", async (c) => {
   }
 
   if (body?.freeform) {
-    const existing = await todayFreeformSession(userId);
+    const existing = await todayFreeformSession(userId, c.get("timeZone"));
     if (existing) {
       return c.json({ id: existing.id, dayId: existing.dayId, performedAt: existing.performedAt.toISOString() });
     }
@@ -333,7 +327,7 @@ app.post("/", async (c) => {
     return c.json({ id: row!.id, dayId: row!.dayId, performedAt: row!.performedAt.toISOString() }, 201);
   }
 
-  const state = await rotationState(userId);
+  const state = await rotationState(userId, c.get("timeZone"));
   if (state.session) {
     return c.json({ id: state.session.id, dayId: state.session.dayId, performedAt: state.session.performedAt.toISOString() });
   }

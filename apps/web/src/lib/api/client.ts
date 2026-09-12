@@ -4,6 +4,21 @@ import { ApiError } from "./errors";
 
 type Options = RequestInit & { signal?: AbortSignal };
 
+/**
+ * The browser's IANA zone, sent on every request so the API can answer "what is today" in the
+ * user's calendar rather than the server's. Read per call rather than cached: a laptop that
+ * crosses a timezone reports the new one without a reload.
+ *
+ * A query parameter rather than a header on purpose — a custom header would make every GET a
+ * preflighted cross-origin request, costing an extra round-trip against a scale-to-zero
+ * backend. Anything the API doesn't recognize falls back to UTC there.
+ */
+const withTimeZone = (path: string): string => {
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!zone) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}tz=${encodeURIComponent(zone)}`;
+};
+
 async function request<T>(path: string, options: Options = {}): Promise<T> {
   // Only set a JSON Content-Type when there's a body, so GETs stay "simple"
   // requests and don't trigger a cross-origin CORS preflight. Normalize via
@@ -13,7 +28,7 @@ async function request<T>(path: string, options: Options = {}): Promise<T> {
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${env.apiUrl}${path}`, {
+  const res = await fetch(`${env.apiUrl}${withTimeZone(path)}`, {
     credentials: "include", // send/receive the HttpOnly auth cookie
     ...options,
     headers,

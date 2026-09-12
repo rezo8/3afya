@@ -2,8 +2,12 @@ import type { MiddlewareHandler } from "hono";
 import type { ApiErrorBody } from "@afya/shared";
 import { auth } from "../auth";
 
-/** Hono environment for authenticated routes — `userId` is set by requireAuth. */
-export type AuthedEnv = { Variables: { userId: string } };
+/**
+ * Hono environment for authenticated routes — `userId` is set by requireAuth, and `timeZone`
+ * by resolveTimeZone. Both are resolved before a handler runs so none of them re-derives a
+ * user id or a calendar zone from the request.
+ */
+export type AuthedEnv = { Variables: { userId: string; timeZone: string } };
 
 /**
  * Gate a route group behind a valid Better Auth session. On success it stashes

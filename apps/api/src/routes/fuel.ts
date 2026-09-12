@@ -9,6 +9,7 @@ import type {
   FuelHistory,
   NutritionTarget,
 } from "@afya/shared";
+import { localDate, startOfDay, startOfDaysAgo } from "../day";
 import { db } from "../db";
 import { fuelEntry, nutritionTarget } from "../db/schema/tracker";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
@@ -18,14 +19,6 @@ app.use("*", requireAuth);
 
 const DEFAULT_TARGET: NutritionTarget = { proteinG: 180, calories: 2600 };
 const FREQUENT_LIMIT = 8;
-
-const startOfDay = (d: Date) => {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-};
-const localDate = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const toEntry = (r: typeof fuelEntry.$inferSelect): FuelEntry => ({
   id: r.id,
@@ -71,19 +64,20 @@ async function frequentFor(userId: string): Promise<FrequentFuel[]> {
 
 /** Today's fuel: target, entries, running totals, and the user's frequent labels. */
 app.get("/today", async (c) => {
+  const zone = c.get("timeZone");
   const userId = c.get("userId");
   const target = await targetFor(userId);
   const entries = await db
     .select()
     .from(fuelEntry)
-    .where(and(eq(fuelEntry.userId, userId), gte(fuelEntry.loggedAt, startOfDay(new Date()))))
+    .where(and(eq(fuelEntry.userId, userId), gte(fuelEntry.loggedAt, startOfDay(new Date(), zone))))
     .orderBy(asc(fuelEntry.loggedAt));
   const totals = entries.reduce(
     (acc, e) => ({ proteinG: acc.proteinG + e.proteinG, calories: acc.calories + e.calories }),
     { proteinG: 0, calories: 0 },
   );
   return c.json({
-    date: localDate(new Date()),
+    date: localDate(new Date(), zone),
     target,
     entries: entries.map(toEntry),
     totals,
@@ -135,8 +129,8 @@ app.put("/target", async (c) => {
 app.get("/history", async (c) => {
   const userId = c.get("userId");
   const days = Math.min(60, Math.max(1, Number(c.req.query("days")) || 7));
-  const start = startOfDay(new Date());
-  start.setDate(start.getDate() - (days - 1));
+  const zone = c.get("timeZone");
+  const start = startOfDaysAgo(days - 1, zone);
 
   const entries = await db
     .select()
@@ -145,13 +139,11 @@ app.get("/history", async (c) => {
     .orderBy(asc(fuelEntry.loggedAt));
 
   const byDate = new Map<string, { proteinG: number; calories: number; entryCount: number }>();
-  for (let i = 0; i < days; i++) {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    byDate.set(localDate(d), { proteinG: 0, calories: 0, entryCount: 0 });
+  for (let i = days - 1; i >= 0; i--) {
+    byDate.set(localDate(startOfDaysAgo(i, zone), zone), { proteinG: 0, calories: 0, entryCount: 0 });
   }
   for (const e of entries) {
-    const key = localDate(e.loggedAt);
+    const key = localDate(e.loggedAt, zone);
     const bucket = byDate.get(key);
     if (bucket) {
       bucket.proteinG += e.proteinG;

@@ -13,6 +13,7 @@ import fuel from "./routes/fuel";
 import metrics from "./routes/metrics";
 import trends from "./routes/trends";
 import records from "./routes/records";
+import { resolveTimeZone } from "./middleware/time-zone";
 
 export const app = new Hono();
 
@@ -61,6 +62,9 @@ app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 // Application routes: session-guarded (per-router).
 const api = new Hono();
+// The caller's calendar zone, resolved once for every application route rather than parsed
+// per handler. Auth routes are mounted above and never ask what day it is.
+api.use("*", resolveTimeZone);
 api.route("/exercises", exercises);
 api.route("/programs", programs);
 api.route("/sessions", sessions);

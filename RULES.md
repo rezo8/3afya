@@ -36,44 +36,54 @@ that* list.
    column that is readable but never writable — or the reverse — is worse than
    not having the field, because it looks finished when it isn't.
 
+6. **Datetimes carry their zone, and a calendar day belongs to the user.** Every
+   datetime column is `timestamptz` (Drizzle `{ withTimezone: true }`) or a UTC
+   epoch — never a naive `timestamp`. Anything that means "today", "this week",
+   a streak, or a daily reset resolves its boundary through `apps/api/src/day.ts`
+   against the IANA zone the client sends as `?tz=`, never through `setHours` or
+   `getDate`, which answer in the server's zone. An IANA name, never an offset:
+   an offset carries no DST rule, and `Intl` will happily accept `-05:00`, so the
+   validator rejects offset forms itself. Learned the hard way in ISS-005, when
+   fuel stopped resetting at midnight for anyone not living in UTC.
+
 ## The workout loop
 
-6. **The active workout loop is the highest-frequency, highest-stakes surface in
+7. **The active workout loop is the highest-frequency, highest-stakes surface in
    the app.** Judge every change to it by tap count, ability to recover from a
    mistake, and behaviour on a flaky connection — not by the happy path. It is
    used one-handed, mid-set, on gym wifi.
 
-7. **Every state-changing mutation has a visible pending, success, and failure
+8. **Every state-changing mutation has a visible pending, success, and failure
    outcome.** Silent failure on a write path the user just acted on is never
    acceptable. A retry belongs next to the failure, not in a reload.
 
 ## Building
 
-8. **No generic repository layer, validation framework, or structural
+9. **No generic repository layer, validation framework, or structural
    abstraction until at least two concrete call sites need it.** Deduplicate the
    moment a second copy exists — not before, and not "just in case". Duplicated
    *knowledge* is a defect; duplicated *shape* often isn't.
 
-9. **Don't build personalization on data that isn't trustworthy yet.** Fix the
-   underlying signal before building something smarter on top of it. Warm-up
-   flagging had to land before PR math meant anything.
+10. **Don't build personalization on data that isn't trustworthy yet.** Fix the
+    underlying signal before building something smarter on top of it. Warm-up
+    flagging had to land before PR math meant anything.
 
-10. **Test the math, not the plumbing.** Records, rotation, unit conversion, and
+11. **Test the math, not the plumbing.** Records, rotation, unit conversion, and
     progression rules are pure functions with real consequences; they get tests
     beside the code they test. A bug fixed there gets the test that would have
     caught it.
 
 ## Scope
 
-11. **A feature ships only if it improves logging, progression, understanding,
+12. **A feature ships only if it improves logging, progression, understanding,
     or personalization.** "A competitor has it" is not a reason on its own.
 
-12. **This is a personal, single-user, self-hosted app** unless a future decision
+13. **This is a personal, single-user, self-hosted app** unless a future decision
     explicitly changes that framing. Don't add multi-tenant, social,
     unit-preference, or localization scaffolding speculatively.
 
 ---
 
-Source: `PROJECT_RECOMMENDATIONS.md` §15, plus rule 10 drawn from the existing
-test layout. Change these deliberately — a rule quietly dropped is how the thing
+Source: `PROJECT_RECOMMENDATIONS.md` §15, plus rule 11 from the existing test
+layout and rule 6 from ISS-005. Change these deliberately — a rule quietly dropped is how the thing
 it prevented comes back.

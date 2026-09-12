@@ -39,8 +39,8 @@ export const exercise = pgTable(
     // per-muscle volume.
     primaryMuscleGroup: text("primary_muscle_group").$type<MuscleGroup>(),
     equipment: text("equipment").$type<Equipment>(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    archivedAt: timestamp("archived_at"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("exercise_user_name_idx").on(t.userId, t.name)],
 );
@@ -54,8 +54,8 @@ export const program = pgTable(
     userId: text("user_id").notNull(),
     name: text("name").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
@@ -118,7 +118,7 @@ export const workoutSession = pgTable(
     // what this workout was called. Null only for genuinely freeform sessions (and
     // for sessions orphaned before this column existed).
     dayName: text("day_name"),
-    performedAt: timestamp("performed_at").defaultNow().notNull(),
+    performedAt: timestamp("performed_at", { withTimezone: true }).defaultNow().notNull(),
     note: text("note"),
   },
   (t) => [index("session_user_performed_idx").on(t.userId, t.performedAt)],
@@ -146,7 +146,7 @@ export const setLog = pgTable(
     // Records and trends convert to metres to compare across units.
     distanceUnit: text("distance_unit").$type<DistanceUnit>(),
     isWarmup: boolean("is_warmup").default(false).notNull(),
-    completedAt: timestamp("completed_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index("set_log_session_idx").on(t.sessionId),
@@ -165,7 +165,7 @@ export const fuelEntry = pgTable(
     label: text("label").notNull(),
     proteinG: real("protein_g").default(0).notNull(),
     calories: integer("calories").default(0).notNull(),
-    loggedAt: timestamp("logged_at").defaultNow().notNull(),
+    loggedAt: timestamp("logged_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("fuel_entry_user_logged_idx").on(t.userId, t.loggedAt)],
 );
@@ -183,7 +183,7 @@ export const nutritionTarget = pgTable(
     userId: text("user_id").notNull(),
     proteinG: integer("protein_g").default(180).notNull(),
     calories: integer("calories").default(2600).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("nutrition_target_user_created_idx").on(t.userId, t.createdAt)],
 );
@@ -197,7 +197,7 @@ export const bodyMetric = pgTable(
     userId: text("user_id").notNull(),
     kind: text("kind").$type<BodyMetricKind>().notNull(),
     value: real("value").notNull(),
-    measuredAt: timestamp("measured_at").defaultNow().notNull(),
+    measuredAt: timestamp("measured_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("body_metric_user_kind_idx").on(t.userId, t.kind, t.measuredAt)],
 );
