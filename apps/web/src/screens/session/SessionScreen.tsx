@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import type {
   CreateExerciseBody,
@@ -18,6 +18,7 @@ import type {
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
+import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 import { DraftInput } from "@/components/DraftInput";
 import { SetEditor, stepDistance } from "@/components/SetEditor";
 import { PR_LABEL } from "@/lib/pr";
@@ -121,7 +122,7 @@ function SessionView({ target }: { target: SessionTarget }) {
   const [newKind, setNewKind] = useState<Exercise["kind"]>("weighted");
   const [prBanner, setPrBanner] = useState<{ prs: PrKind[]; name: string } | null>(null);
   const [prSets, setPrSets] = useState<Set<string>>(new Set());
-  const [mutError, setMutError] = useState<{ message: string; retry: () => void } | null>(null);
+  const errors = useMutationError();
   const [nextIsWarmup, setNextIsWarmup] = useState(false);
   /**
    * The session `logSet` lazily created, held until an invalidated query reports it.
@@ -145,10 +146,10 @@ function SessionView({ target }: { target: SessionTarget }) {
     setOverride(null);
     setPrBanner(null);
     setPrSets(new Set());
-    setMutError(null);
+    errors.clear();
     setNextIsWarmup(false);
     createdSessionId.current = null;
-  }, [targetKey]);
+  }, [targetKey, errors.clear]);
 
   useEffect(() => {
     if (!prBanner) return;
@@ -179,7 +180,7 @@ function SessionView({ target }: { target: SessionTarget }) {
     qc.invalidateQueries({ queryKey: ["session", targetKey] });
     qc.invalidateQueries({ queryKey: ["today"] });
   };
-  const logSet = useMutation({
+  const logSet = useTrackedMutation(errors, {
     mutationFn: async ({ body }: { body: LogSetBody; name: string }) => {
       let sid = data?.session?.id ?? createdSessionId.current;
       if (!sid) {
@@ -190,7 +191,6 @@ function SessionView({ target }: { target: SessionTarget }) {
       return api.post<LoggedSetResult>(`/api/sessions/${sid}/sets`, body);
     },
     onSuccess: (result, vars) => {
-      setMutError(null);
       setNextIsWarmup(false);
       createdSessionId.current = null;
       invalidate();
@@ -200,39 +200,18 @@ function SessionView({ target }: { target: SessionTarget }) {
         navigator.vibrate?.([40, 40, 120]);
       }
     },
-    onError: (err, vars) => {
-      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); logSet.mutate(vars); } });
-    },
   });
-  const editSet = useMutation({
+  const editSet = useTrackedMutation(errors, {
     mutationFn: ({ setId, patch }: { setId: string; patch: UpdateSetBody }) => api.patch(`/api/sessions/${data!.session!.id}/sets/${setId}`, patch),
-    onSuccess: () => {
-      setMutError(null);
-      invalidate();
-    },
-    onError: (err, vars) => {
-      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); editSet.mutate(vars); } });
-    },
+    onSuccess: () => invalidate(),
   });
-  const deleteSet = useMutation({
+  const deleteSet = useTrackedMutation(errors, {
     mutationFn: (setId: string) => api.delete(`/api/sessions/${data!.session!.id}/sets/${setId}`),
-    onSuccess: () => {
-      setMutError(null);
-      invalidate();
-    },
-    onError: (err, vars) => {
-      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); deleteSet.mutate(vars); } });
-    },
+    onSuccess: () => invalidate(),
   });
-  const createEx = useMutation({
+  const createEx = useTrackedMutation(errors, {
     mutationFn: (body: CreateExerciseBody) => api.post<Exercise>("/api/exercises", body),
-    onSuccess: () => {
-      setMutError(null);
-      qc.invalidateQueries({ queryKey: ["exercises"] });
-    },
-    onError: (err, vars) => {
-      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); createEx.mutate(vars); } });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["exercises"] }),
   });
 
   if (isLoading) return <p className="center-note">Loading…</p>;
@@ -476,7 +455,7 @@ function SessionView({ target }: { target: SessionTarget }) {
         </div>
       )}
 
-      {mutError && <ErrorBanner message={mutError.message} onRetry={mutError.retry} />}
+      {errors.failure && <ErrorBanner message={errors.failure.message} onRetry={errors.failure.retry} />}
 
       {active ? (
         <div className="setcard">

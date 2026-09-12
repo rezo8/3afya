@@ -45,15 +45,17 @@ app.use("*", secureHeaders());
 
 // CORS restricted to the configured browser origins; credentials for cookies.
 const isPublicOrigin = env.CORS_ORIGINS.length === 1 && env.CORS_ORIGINS[0] === "*";
-app.use(
-  "/api/*",
-  cors({
-    origin: isPublicOrigin ? (origin) => origin : env.CORS_ORIGINS,
-    credentials: true,
-    allowHeaders: ["Content-Type", "Authorization"],
-    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  }),
-);
+const browserCors = cors({
+  origin: isPublicOrigin ? (origin) => origin : env.CORS_ORIGINS,
+  credentials: true,
+  allowHeaders: ["Content-Type", "Authorization"],
+  allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+});
+app.use("/api/*", browserCors);
+// The web app's reachability probe fetches this cross-origin whenever VITE_API_URL points at
+// a separate origin, so it needs the same CORS treatment as /api — without it the probe is
+// blocked by the browser and a healthy API reads as down.
+app.use("/health", browserCors);
 
 app.get("/health", (c) => c.json({ ok: true }));
 

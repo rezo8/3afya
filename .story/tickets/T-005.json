@@ -1,12 +1,13 @@
 {
   "blockedBy": [],
-  "completedDate": null,
+  "completedDate": "2026-09-12",
   "createdDate": "2026-09-12",
   "description": "requireUser in router.tsx destructures { data } and redirects on anything falsy, so a dropped connection mid-workout is indistinguishable from being signed out. Every in-app navigation re-runs this live network check, which means a flaky gym connection can eject you from a session in progress.\n\nDistinguish \"no session\" from \"request failed\", keep the user where they are on a failure, and add a router error boundary so the failure is visible rather than a silent bounce to the sign-in screen.",
+  "displayId": "T-005",
   "id": "T-005",
   "order": 50,
   "phase": "trust",
-  "status": "open",
+  "status": "complete",
   "title": "Survive a failed auth check instead of redirecting to sign-in",
   "type": "task"
 }

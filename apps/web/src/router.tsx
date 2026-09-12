@@ -1,5 +1,9 @@
-import { Outlet, createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
+import { Outlet, createRootRoute, createRoute, createRouter, redirect, useRouter } from "@tanstack/react-router";
 import { authClient } from "@/lib/auth/auth-client";
+import { checkSession } from "@/lib/auth/session-check";
+import { requestProbe } from "@/lib/api/api-status";
+import { ApiStatusBar } from "@/components/ApiStatusBar";
+import { errorMessage } from "@/lib/api/errors";
 import { AppLayout } from "@/app/AppLayout";
 import { SignInScreen } from "@/screens/auth/SignInScreen";
 import { SignUpScreen } from "@/screens/auth/SignUpScreen";
@@ -20,6 +24,7 @@ function RootComponent() {
       <a href="#main" className="skip-link">
         Skip to content
       </a>
+      <ApiStatusBar />
       <Outlet />
     </>
   );
@@ -27,14 +32,52 @@ function RootComponent() {
 
 /** Bounce signed-in users away from the auth pages. */
 async function requireGuest() {
-  const { data } = await authClient.getSession();
-  if (data) throw redirect({ to: "/" });
+  const check = await checkSession(() => authClient.getSession());
+  if (check.answered) {
+    if (check.signedIn) throw redirect({ to: "/" });
+    return;
+  }
+  // Ran before any screen query, so this is the earliest an outage can be noticed.
+  requestProbe();
 }
 
-/** Gate the app behind a session (server-truthful, so no post-load flicker). */
+/** Gate the app behind a session. An unanswered check leaves you where you are. */
 async function requireUser() {
-  const { data } = await authClient.getSession();
-  if (!data) throw redirect({ to: "/sign-in" });
+  const check = await checkSession(() => authClient.getSession());
+  if (check.answered) {
+    if (!check.signedIn) throw redirect({ to: "/sign-in" });
+    return;
+  }
+  // Ran before any screen query, so this is the earliest an outage can be noticed.
+  requestProbe();
+}
+
+/**
+ * Anything thrown out of a route gets a screen rather than a blank page. Reset retries the
+ * failed navigation, which is the whole recovery when the cause was a dropped connection.
+ *
+ * Registered as the router's default rather than on the root route: a root `errorComponent`
+ * replaces `RootComponent` itself, which would unmount `ApiStatusBar` and stop the probe at
+ * exactly the moment a dropped connection needs it. As the default it renders inside the
+ * root's `<Outlet />`, so the bar survives and still reports recovery.
+ */
+function RouteError({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <section className="empty-state">
+      <h2>Something went wrong</h2>
+      <p>{errorMessage(error)}</p>
+      <button
+        className="btn"
+        onClick={() => {
+          reset();
+          void router.invalidate();
+        }}
+      >
+        Try again
+      </button>
+    </section>
+  );
 }
 
 const signInRoute = createRoute({
@@ -74,7 +117,12 @@ const routeTree = rootRoute.addChildren([
   appRoute.addChildren([startRoute, freeformSessionRoute, sessionRoute, programRoute, trendsRoute, historyRoute, sessionDetailRoute, bodyRoute, settingsRoute]),
 ]);
 
-export const router = createRouter({ routeTree, defaultPreload: "intent", scrollRestoration: true });
+export const router = createRouter({
+  routeTree,
+  defaultPreload: "intent",
+  scrollRestoration: true,
+  defaultErrorComponent: RouteError,
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

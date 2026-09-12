@@ -40,6 +40,12 @@ records what is specific to 3afya.
   that is deleted after 14 days idle; when it vanished every app in the umbrella
   500'd on `/api/auth/*`. See mi7rab's `CLAUDE.md` for the full account,
   including why Better Auth's stateless mode does not apply.
+- **Asking whether you are signed in has three outcomes, not two.** A signed-out visitor
+  gets `{ data: null, error: null }`; an unreachable API makes `authClient.getSession()`
+  **throw** before it resolves at all. `lib/auth/session-check.ts` is the only place that
+  distinction is made — the router's guards act only on `answered: true`. Treating a failed
+  request as "signed out" ejected people mid-workout on gym wifi (T-005). An offline app
+  cannot prove you are signed out, so it must not act as though it had.
 - `session` is declared in `apps/api/src/db/schema/auth.ts` (regenerate with the
   Better Auth CLI, don't hand-edit). Because `drizzle.config.ts` globs
   `src/db/schema/*`, a migration also creates an **unused copy** of the auth
@@ -118,6 +124,30 @@ records what is specific to 3afya.
 - **Durations are typed as clocks**: `parseDuration` accepts `45`, `45s`, `12:30` and
   `1:05:00`; `fmtClock` is its inverse. Steppers stay for nudging, but a 40-minute ride is
   typed, not tapped.
+- **An outage is confirmed by a probe, never inferred from one failure.** `lib/api/api-status.ts`
+  holds the reachability flag; a failed request only calls `requestProbe()`, and `ApiStatusBar`
+  decides by asking `/health` and checking the body is `{ ok: true }`. A single 500 from a
+  handler is not an outage, and a 200 of HTML is not health.
+- **The same outage looks different in dev and prod.** In prod the browser reaches the API
+  directly, so a dead server throws before any response exists. In dev the Vite proxy answers
+  for it and turns a refused connection into a plain **500 text/plain**. Classifying failures
+  by status alone misses one of the two — which is why the probe, not the classifier, is the
+  source of truth. `/health` also lives at the API **root**, not under `/api`, so
+  `vite.config.ts` proxies it explicitly: without that line it resolves to the dev server's
+  SPA fallback and answers 200 with `index.html`, making a down API look healthy.
+- **Every mutation goes through `useTrackedMutation`**: `lib/query/use-mutation-error.ts`.
+  A screen holds one `useMutationError()` slot; each mutation reports into it and the
+  banner renders `errors.failure`. Never write a bare `useMutation` — a write with no
+  `onError` fails silently, which [`RULES.md`](./RULES.md) rule 8 forbids. The wrapper exists
+  because a mutation cannot name itself inside its own declaration (the retry needs `mutate`,
+  and referencing the binding being declared makes its type circular), and because the failed
+  variables are only still in hand inside `onError`: most call sites fire from inside a `map`
+  over server data, or from an input whose value is gone by the time the request fails.
+- **Retry is hidden on 4xx**: `isRetryableError` (`lib/api/errors.ts`) reads `ApiError.status`.
+  A rejected `fetch` never becomes an `ApiError`, so anything that isn't one is a transport
+  failure and stays retryable; 408 and 429 are the two 4xx that do. A dead Retry button is
+  worse than none — that was the bug on the history screen, where "retry" refetched queries
+  instead of re-issuing the write.
 - **One `SetEditor` for every logged set**: the session screen and history both correct sets
   through `components/SetEditor.tsx`. Per-kind editing behaviour goes there, or the two
   surfaces drift.

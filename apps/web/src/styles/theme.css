@@ -2902,3 +2902,38 @@ svg.chart {
   font-size: 12px;
   color: var(--text-soft);
 }
+
+/* ---- API REACHABILITY ---- */
+.api-down {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--alert) 24%, var(--surface)), color-mix(in srgb, var(--alert) 10%, var(--surface)));
+  border-bottom: 1px solid var(--alert);
+}
+.api-down .ad-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--alert);
+  animation: ad-pulse 1.4s ease-in-out infinite;
+}
+.api-down .ad-text {
+  font-size: 13px;
+  color: var(--text);
+}
+@keyframes ad-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .api-down .ad-dot {
+    animation: none;
+  }
+}

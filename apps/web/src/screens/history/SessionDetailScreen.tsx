@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import type { SessionDetail, SessionExercise, SetLog, UpdateSetBody } from "@afya/shared";
 import { SetEditor } from "@/components/SetEditor";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
-import { errorMessage } from "@/lib/api/errors";
+import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 import { fmtDist, fmtDur } from "@/lib/format";
 
 /** Matches ProgramScreen's "Delete day" arming window — same guard, same feel. */
@@ -80,6 +80,7 @@ export function SessionDetailScreen() {
     queryFn: () => api.get<SessionDetail>(`/api/sessions/${sessionId}`),
     enabled: !!sessionId,
   });
+  const errors = useMutationError();
   const [armedRemove, setArmedRemove] = useState(false);
   /** Editing is opt-in, one exercise at a time: this screen is a recap first. */
   const [editing, setEditing] = useState<string | null>(null);
@@ -99,17 +100,17 @@ export function SessionDetailScreen() {
     qc.invalidateQueries({ queryKey: ["records"] });
     qc.invalidateQueries({ queryKey: ["trends"] });
   };
-  const editSet = useMutation({
+  const editSet = useTrackedMutation(errors, {
     mutationFn: ({ setId, patch }: { setId: string; patch: UpdateSetBody }) =>
       api.patch(`/api/sessions/${sessionId}/sets/${setId}`, patch),
     onSuccess: invalidateSets,
   });
-  const deleteSet = useMutation({
+  const deleteSet = useTrackedMutation(errors, {
     mutationFn: (setId: string) => api.delete(`/api/sessions/${sessionId}/sets/${setId}`),
     onSuccess: invalidateSets,
   });
 
-  const removeSession = useMutation({
+  const removeSession = useTrackedMutation(errors, {
     mutationFn: (id: string) => api.delete(`/api/sessions/${id}`),
     onSuccess: () => {
       setArmedRemove(false);
@@ -181,16 +182,11 @@ export function SessionDetailScreen() {
         </div>
       </div>
 
-      {(editSet.isError || deleteSet.isError) && (
-        <ErrorBanner message={errorMessage(editSet.error ?? deleteSet.error)} onRetry={() => invalidateSets()} />
-      )}
+      {errors.failure && <ErrorBanner message={errors.failure.message} onRetry={errors.failure.retry} />}
 
       {data.exercises.length === 0 ? (
         <section className="sd-empty">
           <p className="center-note">No sets were logged in this session.</p>
-          {removeSession.isError && (
-            <ErrorBanner message={errorMessage(removeSession.error)} onRetry={() => removeSession.mutate(data.id)} />
-          )}
           {armedRemove ? (
             <button className="sd-remove armed" disabled={removeSession.isPending} onClick={() => removeSession.mutate(data.id)}>
               Tap again to remove this empty session · this can’t be undone

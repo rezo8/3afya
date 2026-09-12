@@ -14,7 +14,10 @@ export function AppLayout() {
 }
 
 function AppShell() {
-  const { data } = useSession();
+  const { data, error } = useSession();
+  // An unreachable server cannot prove you are signed out, so keep the signed-in chrome
+  // rather than flipping the bar to a signed-out look every time the API blinks (T-005).
+  const signedIn = data != null || error != null;
   const rest = useRestTimer();
   const today = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
@@ -37,7 +40,7 @@ function AppShell() {
             <Link to="/settings" className="topbar-link">
               Settings
             </Link>
-            {data ? (
+            {signedIn ? (
               <button className="topbar-link leave" onClick={handleSignOut}>
                 Sign out
               </button>

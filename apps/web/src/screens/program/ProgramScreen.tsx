@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Exercise, ExerciseKind, Program, ProgramDay, TodayResponse, UpdateDayBody, UpdateDayExerciseBody, UpdateProgramBody } from "@afya/shared";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
+import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 import { fmtDur } from "@/lib/format";
 
 
@@ -40,6 +42,7 @@ export function ProgramScreen() {
   const [newExKind, setNewExKind] = useState<ExerciseKind>("weighted");
   const [armedDeleteDayId, setArmedDeleteDayId] = useState<string | null>(null);
   const [armedRemoveExId, setArmedRemoveExId] = useState<string | null>(null);
+  const errors = useMutationError();
 
   useEffect(() => {
     if (program && (!selDayId || !program.days.some((d) => d.id === selDayId))) {
@@ -69,37 +72,37 @@ export function ProgramScreen() {
     qc.invalidateQueries({ queryKey: ["today"] });
   };
 
-  const createProgram = useMutation({
+  const createProgram = useTrackedMutation(errors, {
     mutationFn: (name: string) => api.post<Program>("/api/programs", { name }),
     onSuccess: () => invalidate(),
   });
-  const renameProgram = useMutation({
+  const renameProgram = useTrackedMutation(errors, {
     mutationFn: (name: string) => api.patch(`/api/programs/${program!.id}`, { name } satisfies UpdateProgramBody),
     onSuccess: () => invalidate(),
   });
-  const addDay = useMutation({
+  const addDay = useTrackedMutation(errors, {
     mutationFn: (name: string) => api.post<ProgramDay>(`/api/programs/${program!.id}/days`, { name }),
     onSuccess: (day) => {
       setSelDayId(day.id);
       invalidate();
     },
   });
-  const renameDay = useMutation({
+  const renameDay = useTrackedMutation(errors, {
     mutationFn: ({ dayId, name }: { dayId: string; name: string }) => api.patch(`/api/programs/days/${dayId}`, { name }),
     onSuccess: () => invalidate(),
   });
-  const deleteDay = useMutation({
+  const deleteDay = useTrackedMutation(errors, {
     mutationFn: (dayId: string) => api.delete(`/api/programs/days/${dayId}`),
     onSuccess: () => {
       setArmedDeleteDayId(null);
       invalidate();
     },
   });
-  const reorderDays = useMutation({
+  const reorderDays = useTrackedMutation(errors, {
     mutationFn: (order: string[]) => api.post(`/api/programs/${program!.id}/days/reorder`, { order }),
     onSuccess: () => invalidate(),
   });
-  const addExercise = useMutation({
+  const addExercise = useTrackedMutation(errors, {
     mutationFn: async ({ dayId, name, kind }: { dayId: string; name: string; kind: ExerciseKind }) => {
       const trimmed = name.trim();
       let ex = libraryQ.data?.find((e) => e.name.toLowerCase() === trimmed.toLowerCase());
@@ -108,27 +111,27 @@ export function ProgramScreen() {
     },
     onSuccess: () => invalidate(),
   });
-  const addExerciseById = useMutation({
+  const addExerciseById = useTrackedMutation(errors, {
     mutationFn: ({ dayId, exerciseId }: { dayId: string; exerciseId: string }) =>
       api.post(`/api/programs/days/${dayId}/exercises`, { exerciseId }),
     onSuccess: () => invalidate(),
   });
-  const updateDay = useMutation({
+  const updateDay = useTrackedMutation(errors, {
     mutationFn: ({ dayId, patch }: { dayId: string; patch: UpdateDayBody }) => api.patch(`/api/programs/days/${dayId}`, patch),
     onSuccess: () => invalidate(),
   });
-  const updateEx = useMutation({
+  const updateEx = useTrackedMutation(errors, {
     mutationFn: ({ id, patch }: { id: string; patch: UpdateDayExerciseBody }) => api.patch(`/api/programs/day-exercises/${id}`, patch),
     onSuccess: () => invalidate(),
   });
-  const deleteEx = useMutation({
+  const deleteEx = useTrackedMutation(errors, {
     mutationFn: (id: string) => api.delete(`/api/programs/day-exercises/${id}`),
     onSuccess: () => {
       setArmedRemoveExId(null);
       invalidate();
     },
   });
-  const reorderEx = useMutation({
+  const reorderEx = useTrackedMutation(errors, {
     mutationFn: ({ dayId, order }: { dayId: string; order: string[] }) =>
       api.post(`/api/programs/days/${dayId}/exercises/reorder`, { order }),
     onSuccess: () => invalidate(),
@@ -143,6 +146,7 @@ export function ProgramScreen() {
           <p className="eyebrow">Program</p>
           <h1>New program</h1>
         </div>
+        {errors.failure && <ErrorBanner message={errors.failure.message} onRetry={errors.failure.retry} />}
         <section className="empty-state">
           <h2>Name your program</h2>
           <p>A program is a set of days you rotate through — Push, Pull, Legs, whatever you run.</p>
@@ -204,6 +208,8 @@ export function ProgramScreen() {
           />
         </div>
       </div>
+
+      {errors.failure && <ErrorBanner message={errors.failure.message} onRetry={errors.failure.retry} />}
 
       {days.length > 0 && (
         <div className="rotation">
