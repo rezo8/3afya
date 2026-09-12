@@ -118,6 +118,19 @@ records what is specific to 3afya.
 - **Durations are typed as clocks**: `parseDuration` accepts `45`, `45s`, `12:30` and
   `1:05:00`; `fmtClock` is its inverse. Steppers stay for nudging, but a 40-minute ride is
   typed, not tapped.
+- **Every mutation goes through `useTrackedMutation`**: `lib/query/use-mutation-error.ts`.
+  A screen holds one `useMutationError()` slot; each mutation reports into it and the
+  banner renders `errors.failure`. Never write a bare `useMutation` — a write with no
+  `onError` fails silently, which RULES 8 forbids. The wrapper exists because a mutation
+  cannot name itself inside its own declaration (the retry needs `mutate`, and referencing
+  the binding being declared makes its type circular), and because the failed variables are
+  only still in hand inside `onError`: most call sites fire from inside a `map` over server
+  data, or from an input whose value is gone by the time the request fails.
+- **Retry is hidden on 4xx**: `isRetryableError` (`lib/api/errors.ts`) reads `ApiError.status`.
+  A rejected `fetch` never becomes an `ApiError`, so anything that isn't one is a transport
+  failure and stays retryable; 408 and 429 are the two 4xx that do. A dead Retry button is
+  worse than none — that was the bug on the history screen, where "retry" refetched queries
+  instead of re-issuing the write.
 - **One `SetEditor` for every logged set**: the session screen and history both correct sets
   through `components/SetEditor.tsx`. Per-kind editing behaviour goes there, or the two
   surfaces drift.

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AddBodyMetricBody, BodyMetric, BodyMetricKind } from "@afya/shared";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
+import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 import { daysAgo } from "@/lib/dates";
 import { LineChart } from "@/components/charts/LineChart";
 
@@ -39,7 +41,9 @@ function MetricCard({ cfg }: { cfg: MetricCfg }) {
   const fmt = (n: number) => (cfg.precision === 0 ? String(Math.round(n)) : n.toFixed(cfg.precision));
   const bump = (d: number) => setVal(Math.max(0, +(current + d).toFixed(cfg.precision)));
 
-  const log = useMutation({
+  // Each card reports its own failure, so a failed weight log says nothing about sleep.
+  const errors = useMutationError();
+  const log = useTrackedMutation(errors, {
     mutationFn: (value: number) => api.post<BodyMetric>("/api/metrics", { kind: cfg.kind, value } satisfies AddBodyMetricBody),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["metrics", cfg.kind] }),
   });
@@ -83,6 +87,8 @@ function MetricCard({ cfg }: { cfg: MetricCfg }) {
           {log.isPending ? "…" : "Log"}
         </button>
       </div>
+
+      {errors.failure && <ErrorBanner message={errors.failure.message} onRetry={errors.failure.retry} />}
 
       {vals.length >= 2 && (
         <LineChart

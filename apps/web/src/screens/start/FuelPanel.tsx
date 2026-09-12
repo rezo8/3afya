@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AddFuelEntryBody, FuelDay, FuelEntry, NutritionTarget } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
-import { errorMessage } from "@/lib/api/errors";
+import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 
 const COLD_START_CHIPS: AddFuelEntryBody[] = [
   { label: "Chicken breast", proteinG: 30, calories: 200 },
@@ -32,7 +32,7 @@ const timeOfDay = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { h
 export function FuelPanel() {
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["fuel", "today"], queryFn: () => api.get<FuelDay>("/api/fuel/today") });
-  const [mutError, setMutError] = useState<{ message: string; retry: () => void } | null>(null);
+  const errors = useMutationError();
   const [showCustom, setShowCustom] = useState(false);
   const [customLabel, setCustomLabel] = useState("");
   const [customProtein, setCustomProtein] = useState<NumberDraft>("");
@@ -41,36 +41,20 @@ export function FuelPanel() {
   const [showAllEntries, setShowAllEntries] = useState(false);
 
   const invalidateToday = () => qc.invalidateQueries({ queryKey: ["fuel", "today"] });
-  const add = useMutation({
+  const add = useTrackedMutation(errors, {
     mutationFn: (body: AddFuelEntryBody) => api.post<FuelEntry>("/api/fuel", body),
-    onSuccess: () => {
-      setMutError(null);
-      invalidateToday();
-    },
-    onError: (err, vars) => {
-      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); add.mutate(vars); } });
-    },
+    onSuccess: () => invalidateToday(),
   });
-  const remove = useMutation({
+  const remove = useTrackedMutation(errors, {
     mutationFn: (id: string) => api.delete<{ ok: true }>(`/api/fuel/${id}`),
-    onSuccess: () => {
-      setMutError(null);
-      invalidateToday();
-    },
-    onError: (err, vars) => {
-      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); remove.mutate(vars); } });
-    },
+    onSuccess: () => invalidateToday(),
   });
-  const saveTarget = useMutation({
+  const saveTarget = useTrackedMutation(errors, {
     mutationFn: (target: NutritionTarget) => api.put<NutritionTarget>("/api/fuel/target", target),
     onSuccess: () => {
-      setMutError(null);
       setTargetDraft(null);
       invalidateToday();
       qc.invalidateQueries({ queryKey: ["fuel", "history"] });
-    },
-    onError: (err, vars) => {
-      setMutError({ message: errorMessage(err), retry: () => { setMutError(null); saveTarget.mutate(vars); } });
     },
   });
 
@@ -120,7 +104,7 @@ export function FuelPanel() {
         </button>
       </div>
 
-      {mutError && <ErrorBanner message={mutError.message} onRetry={mutError.retry} />}
+      {errors.failure && <ErrorBanner message={errors.failure.message} onRetry={errors.failure.retry} />}
 
       {targetDraft && (
         <form className="fuel-edit" onSubmit={submitTarget}>
