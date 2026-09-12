@@ -124,6 +124,17 @@ records what is specific to 3afya.
 - **Durations are typed as clocks**: `parseDuration` accepts `45`, `45s`, `12:30` and
   `1:05:00`; `fmtClock` is its inverse. Steppers stay for nudging, but a 40-minute ride is
   typed, not tapped.
+- **An outage is confirmed by a probe, never inferred from one failure.** `lib/api/api-status.ts`
+  holds the reachability flag; a failed request only calls `requestProbe()`, and `ApiStatusBar`
+  decides by asking `/health` and checking the body is `{ ok: true }`. A single 500 from a
+  handler is not an outage, and a 200 of HTML is not health.
+- **The same outage looks different in dev and prod.** In prod the browser reaches the API
+  directly, so a dead server throws before any response exists. In dev the Vite proxy answers
+  for it and turns a refused connection into a plain **500 text/plain**. Classifying failures
+  by status alone misses one of the two — which is why the probe, not the classifier, is the
+  source of truth. `/health` also lives at the API **root**, not under `/api`, so
+  `vite.config.ts` proxies it explicitly: without that line it resolves to the dev server's
+  SPA fallback and answers 200 with `index.html`, making a down API look healthy.
 - **Every mutation goes through `useTrackedMutation`**: `lib/query/use-mutation-error.ts`.
   A screen holds one `useMutationError()` slot; each mutation reports into it and the
   banner renders `errors.failure`. Never write a bare `useMutation` — a write with no

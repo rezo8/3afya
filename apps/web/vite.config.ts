@@ -17,6 +17,9 @@ export default defineConfig({
     // HttpOnly auth cookies "just work" (no CORS dance in development).
     proxy: {
       "/api": { target: "http://localhost:3001", changeOrigin: true },
+      // The reachability probe hits /health, which lives at the API root rather than
+      // under /api — without this it would resolve to the dev server and always pass.
+      "/health": { target: "http://localhost:3001", changeOrigin: true },
     },
   },
 });

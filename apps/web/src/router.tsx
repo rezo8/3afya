@@ -1,6 +1,8 @@
 import { Outlet, createRootRoute, createRoute, createRouter, redirect, useRouter } from "@tanstack/react-router";
 import { authClient } from "@/lib/auth/auth-client";
 import { checkSession } from "@/lib/auth/session-check";
+import { requestProbe } from "@/lib/api/api-status";
+import { ApiStatusBar } from "@/components/ApiStatusBar";
 import { errorMessage } from "@/lib/api/errors";
 import { AppLayout } from "@/app/AppLayout";
 import { SignInScreen } from "@/screens/auth/SignInScreen";
@@ -22,6 +24,7 @@ function RootComponent() {
       <a href="#main" className="skip-link">
         Skip to content
       </a>
+      <ApiStatusBar />
       <Outlet />
     </>
   );
@@ -30,13 +33,23 @@ function RootComponent() {
 /** Bounce signed-in users away from the auth pages. */
 async function requireGuest() {
   const check = await checkSession(() => authClient.getSession());
-  if (check.answered && check.signedIn) throw redirect({ to: "/" });
+  if (check.answered) {
+    if (check.signedIn) throw redirect({ to: "/" });
+    return;
+  }
+  // Ran before any screen query, so this is the earliest an outage can be noticed.
+  requestProbe();
 }
 
 /** Gate the app behind a session. An unanswered check leaves you where you are. */
 async function requireUser() {
   const check = await checkSession(() => authClient.getSession());
-  if (check.answered && !check.signedIn) throw redirect({ to: "/sign-in" });
+  if (check.answered) {
+    if (!check.signedIn) throw redirect({ to: "/sign-in" });
+    return;
+  }
+  // Ran before any screen query, so this is the earliest an outage can be noticed.
+  requestProbe();
 }
 
 /**
