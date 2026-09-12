@@ -1,5 +1,7 @@
-import { Outlet, createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
+import { Outlet, createRootRoute, createRoute, createRouter, redirect, useRouter } from "@tanstack/react-router";
 import { authClient } from "@/lib/auth/auth-client";
+import { checkSession } from "@/lib/auth/session-check";
+import { errorMessage } from "@/lib/api/errors";
 import { AppLayout } from "@/app/AppLayout";
 import { SignInScreen } from "@/screens/auth/SignInScreen";
 import { SignUpScreen } from "@/screens/auth/SignUpScreen";
@@ -12,7 +14,7 @@ import { SessionDetailScreen } from "@/screens/history/SessionDetailScreen";
 import { BodyScreen } from "@/screens/body/BodyScreen";
 import { SettingsScreen } from "@/screens/settings/SettingsScreen";
 
-const rootRoute = createRootRoute({ component: RootComponent });
+const rootRoute = createRootRoute({ component: RootComponent, errorComponent: RouteError });
 
 function RootComponent() {
   return (
@@ -27,14 +29,37 @@ function RootComponent() {
 
 /** Bounce signed-in users away from the auth pages. */
 async function requireGuest() {
-  const { data } = await authClient.getSession();
-  if (data) throw redirect({ to: "/" });
+  const check = await checkSession(() => authClient.getSession());
+  if (check.answered && check.signedIn) throw redirect({ to: "/" });
 }
 
-/** Gate the app behind a session (server-truthful, so no post-load flicker). */
+/** Gate the app behind a session. An unanswered check leaves you where you are. */
 async function requireUser() {
-  const { data } = await authClient.getSession();
-  if (!data) throw redirect({ to: "/sign-in" });
+  const check = await checkSession(() => authClient.getSession());
+  if (check.answered && !check.signedIn) throw redirect({ to: "/sign-in" });
+}
+
+/**
+ * Anything thrown out of a route gets a screen rather than a blank page. Reset retries the
+ * failed navigation, which is the whole recovery when the cause was a dropped connection.
+ */
+function RouteError({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <section className="empty-state">
+      <h2>Something went wrong</h2>
+      <p>{errorMessage(error)}</p>
+      <button
+        className="btn"
+        onClick={() => {
+          reset();
+          void router.invalidate();
+        }}
+      >
+        Try again
+      </button>
+    </section>
+  );
 }
 
 const signInRoute = createRoute({

@@ -40,6 +40,12 @@ records what is specific to 3afya.
   that is deleted after 14 days idle; when it vanished every app in the umbrella
   500'd on `/api/auth/*`. See mi7rab's `CLAUDE.md` for the full account,
   including why Better Auth's stateless mode does not apply.
+- **Asking whether you are signed in has three outcomes, not two.** A signed-out visitor
+  gets `{ data: null, error: null }`; an unreachable API makes `authClient.getSession()`
+  **throw** before it resolves at all. `lib/auth/session-check.ts` is the only place that
+  distinction is made — the router's guards act only on `answered: true`. Treating a failed
+  request as "signed out" ejected people mid-workout on gym wifi (T-005). An offline app
+  cannot prove you are signed out, so it must not act as though it had.
 - `session` is declared in `apps/api/src/db/schema/auth.ts` (regenerate with the
   Better Auth CLI, don't hand-edit). Because `drizzle.config.ts` globs
   `src/db/schema/*`, a migration also creates an **unused copy** of the auth
