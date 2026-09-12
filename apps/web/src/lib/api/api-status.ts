@@ -22,10 +22,15 @@ function emit(): void {
   for (const listener of listeners) listener();
 }
 
-/** A completed probe is the only thing that decides the flag, either way. */
+/**
+ * The API answered. This clears any outstanding probe request too — a request that completed
+ * is the same evidence a probe would have gathered, and leaving the counter raised would keep
+ * `ApiStatusBar` armed for the rest of the session, re-probing on every later emit.
+ */
 export function reportReachable(): void {
-  if (reachable) return;
+  if (reachable && probeRequests === 0) return;
   reachable = true;
+  probeRequests = 0;
   emit();
 }
 

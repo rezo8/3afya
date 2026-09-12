@@ -16,7 +16,7 @@ import { SessionDetailScreen } from "@/screens/history/SessionDetailScreen";
 import { BodyScreen } from "@/screens/body/BodyScreen";
 import { SettingsScreen } from "@/screens/settings/SettingsScreen";
 
-const rootRoute = createRootRoute({ component: RootComponent, errorComponent: RouteError });
+const rootRoute = createRootRoute({ component: RootComponent });
 
 function RootComponent() {
   return (
@@ -55,6 +55,11 @@ async function requireUser() {
 /**
  * Anything thrown out of a route gets a screen rather than a blank page. Reset retries the
  * failed navigation, which is the whole recovery when the cause was a dropped connection.
+ *
+ * Registered as the router's default rather than on the root route: a root `errorComponent`
+ * replaces `RootComponent` itself, which would unmount `ApiStatusBar` and stop the probe at
+ * exactly the moment a dropped connection needs it. As the default it renders inside the
+ * root's `<Outlet />`, so the bar survives and still reports recovery.
  */
 function RouteError({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
@@ -112,7 +117,12 @@ const routeTree = rootRoute.addChildren([
   appRoute.addChildren([startRoute, freeformSessionRoute, sessionRoute, programRoute, trendsRoute, historyRoute, sessionDetailRoute, bodyRoute, settingsRoute]),
 ]);
 
-export const router = createRouter({ routeTree, defaultPreload: "intent", scrollRestoration: true });
+export const router = createRouter({
+  routeTree,
+  defaultPreload: "intent",
+  scrollRestoration: true,
+  defaultErrorComponent: RouteError,
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

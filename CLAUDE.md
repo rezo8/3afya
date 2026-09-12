@@ -138,11 +138,11 @@ records what is specific to 3afya.
 - **Every mutation goes through `useTrackedMutation`**: `lib/query/use-mutation-error.ts`.
   A screen holds one `useMutationError()` slot; each mutation reports into it and the
   banner renders `errors.failure`. Never write a bare `useMutation` — a write with no
-  `onError` fails silently, which RULES 8 forbids. The wrapper exists because a mutation
-  cannot name itself inside its own declaration (the retry needs `mutate`, and referencing
-  the binding being declared makes its type circular), and because the failed variables are
-  only still in hand inside `onError`: most call sites fire from inside a `map` over server
-  data, or from an input whose value is gone by the time the request fails.
+  `onError` fails silently, which [`RULES.md`](./RULES.md) rule 8 forbids. The wrapper exists
+  because a mutation cannot name itself inside its own declaration (the retry needs `mutate`,
+  and referencing the binding being declared makes its type circular), and because the failed
+  variables are only still in hand inside `onError`: most call sites fire from inside a `map`
+  over server data, or from an input whose value is gone by the time the request fails.
 - **Retry is hidden on 4xx**: `isRetryableError` (`lib/api/errors.ts`) reads `ApiError.status`.
   A rejected `fetch` never becomes an `ApiError`, so anything that isn't one is a transport
   failure and stays retryable; 408 and 429 are the two 4xx that do. A dead Retry button is

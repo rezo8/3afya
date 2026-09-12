@@ -58,6 +58,14 @@ describe("the reachability flag", () => {
     expect(getApiReachable()).toBe(true);
   });
 
+  it("clears a pending probe request once the API answers", () => {
+    // Otherwise the bar stays armed for the rest of the session and re-probes on every emit.
+    reportFailure(new TypeError("Failed to fetch"));
+    expect(getProbeRequests()).toBe(1);
+    reportReachable();
+    expect(getProbeRequests()).toBe(0);
+  });
+
   it("notifies subscribers on a change and on every probe request", () => {
     const listener = vi.fn();
     const unsubscribe = subscribeToApiStatus(listener);

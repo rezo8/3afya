@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
 import {
@@ -38,10 +38,7 @@ export function ApiStatusBar() {
         const health = await api.get<{ ok?: boolean }>("/health");
         if (stopped) return;
         if (health?.ok === true) {
-          const wasDown = !getApiReachable();
           reportReachable();
-          // Every screen is holding a failed query; refill them instead of asking for a reload.
-          if (wasDown) void qc.invalidateQueries();
           return;
         }
         reportUnreachable();
@@ -57,7 +54,21 @@ export function ApiStatusBar() {
       stopped = true;
       if (timer) clearInterval(timer);
     };
-  }, [shouldProbe, reachable, probeRequests, qc]);
+  }, [shouldProbe, reachable, probeRequests]);
+
+  // Every screen is holding a failed query; refill them instead of asking for a reload. Keyed
+  // off the down→up transition rather than the probe, because a plain request succeeding is
+  // also proof the API is back and must refill the screens just the same.
+  const wasDown = useRef(false);
+  useEffect(() => {
+    if (!reachable) {
+      wasDown.current = true;
+      return;
+    }
+    if (!wasDown.current) return;
+    wasDown.current = false;
+    void qc.invalidateQueries();
+  }, [reachable, qc]);
 
   if (reachable) return null;
 
