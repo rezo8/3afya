@@ -1,0 +1,19 @@
+{
+  "components": [
+    "apps/web/src/screens/session/RestTimer.tsx",
+    "apps/web/src/styles/theme.css"
+  ],
+  "createdBy": "ux-active-workout-audit",
+  "dedupeKey": "ux-active-workout-audit:F11",
+  "discoveredDate": "2026-09-12",
+  "id": "ISS-003",
+  "impact": "The rest timer is fixed to the viewport and the page beneath it has no matching bottom padding, so while the timer is running it can cover the last rows of the logged-sets list and the controls under them. Worst exactly when it matters: between sets, with the timer up, reaching for the set you just logged.",
+  "location": [],
+  "phase": null,
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "Fixed rest-timer bar can overlap page content while scrolled"
+}

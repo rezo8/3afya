@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-09-11",
+  "createdDate": "2026-09-12",
+  "description": "Retrospective. Email and password auth through Better Auth, pointed at mi7rab's auth database so one account works across the umbrella's apps. Sessions were moved from Redis to Postgres after a free Upstash instance was reclaimed after 14 days idle and every app in the umbrella started 500ing on /api/auth/*. 3afya reads and writes the session table but never migrates it.",
+  "displayId": "T-032",
+  "id": "T-032",
+  "order": 20,
+  "phase": "foundation",
+  "status": "complete",
+  "title": "Stand up Better Auth against the shared auth database",
+  "type": "task"
+}

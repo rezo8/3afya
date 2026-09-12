@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-09-11",
+  "createdDate": "2026-09-12",
+  "description": "Retrospective. One scale-to-zero Cloud Run service serving the built web from the Hono API, a logical database on the shared mi7rab-db instance, secrets in Secret Manager, and a Cloud Build trigger on push to main. Migrations run against the app's own domain database on startup, never against the shared auth tables.",
+  "displayId": "T-033",
+  "id": "T-033",
+  "order": 30,
+  "phase": "foundation",
+  "status": "complete",
+  "title": "Ship to Cloud Run on the shared-infra model",
+  "type": "chore"
+}

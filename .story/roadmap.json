@@ -1,0 +1,56 @@
+{
+  "blockers": [],
+  "date": "2026-09-12",
+  "phases": [
+    {
+      "description": "Monorepo scaffold (pnpm + Turborepo), Better Auth on the shared mi7rab auth database, Drizzle schema and migrations, Docker Compose for local Postgres, and Cloud Run deployment on the umbrella's shared-infra model.",
+      "id": "foundation",
+      "label": "PHASE 0",
+      "name": "Foundation",
+      "summary": "Monorepo, auth, schema, deploy"
+    },
+    {
+      "description": "The workout loop itself: programs to days to sessions, logged sets across four exercise kinds, personal records, the muscle/equipment taxonomy and curated catalog, fuel and body tracking, the theme system, and freeform off-program sessions.",
+      "id": "core-loop",
+      "label": "PHASE 1",
+      "name": "Core loop",
+      "summary": "Programs, sessions, PRs, taxonomy, fuel, body, theming"
+    },
+    {
+      "description": "Make every write visible and every number honest. No mutation may fail silently, no tap may log twice, no destructive action may fire without confirmation, and no historical row may be rewritten by a later edit to the program that produced it.",
+      "id": "trust",
+      "label": "PHASE 2",
+      "name": "Trust",
+      "summary": "Every write visible, every number honest"
+    },
+    {
+      "description": "The active-workout surface, judged by tap count, touch-target size, and recovery from a mistake rather than the happy path. This is the highest-frequency screen in the app and the one most often used one-handed with a barbell waiting.",
+      "id": "loop",
+      "label": "PHASE 3",
+      "name": "Active loop",
+      "summary": "Taps, targets, and recovery on the session screen"
+    },
+    {
+      "description": "Capabilities the data model already half-supports: more than one program, back-dated sessions, validated request bodies, a database-backed test setup, and a screen that makes the exercise library reachable.",
+      "id": "depth",
+      "label": "PHASE 4",
+      "name": "Depth",
+      "summary": "Multiple programs, back-dating, validation, tests, library"
+    },
+    {
+      "description": "What the data can say that you did not already know: per-muscle volume, whole-workout trends, deterministic progression suggestions, a readiness signal from sleep and resting HR, and bodyweight read next to strength. Deterministic rules over data already held, never a model.",
+      "id": "insight",
+      "label": "PHASE 5",
+      "name": "Insight",
+      "summary": "Volume, progression, readiness, cross-domain trends"
+    },
+    {
+      "description": "Debt with a known shape: an N+1 in the session payload, a function duplicated across two routes, check-then-act races that gate any future multi-device work, installability, and documentation that has drifted from what shipped.",
+      "id": "upkeep",
+      "label": "PHASE 6",
+      "name": "Upkeep",
+      "summary": "Performance, duplication, races, installability"
+    }
+  ],
+  "title": "3afya"
+}

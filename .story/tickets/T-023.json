@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Sleep and resting HR are already logged and only ever read back as their own trend lines. Score today's values against a rolling personal baseline and surface a readiness signal on the Start screen.\n\nAgainst your own baseline, never population norms: a resting HR of 48 means nothing without knowing what yours usually is. Say nothing at all until there is enough history for a baseline to mean something, rather than showing a confident number computed from three days of data.",
+  "id": "T-023",
+  "order": 40,
+  "phase": "insight",
+  "status": "open",
+  "title": "Deterministic readiness flag from sleep and resting HR",
+  "type": "task"
+}

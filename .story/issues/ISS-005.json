@@ -1,0 +1,24 @@
+{
+  "components": [
+    "apps/api/src/routes/fuel.ts",
+    "apps/api/src/routes/sessions.ts",
+    "apps/api/src/db/schema/tracker.ts"
+  ],
+  "createdBy": "user-report",
+  "dedupeKey": "user-report:fuel-day-boundary-timezone",
+  "discoveredDate": "2026-09-12",
+  "id": "ISS-005",
+  "impact": "Reported from real use: the fuel tracker did not reset on a new day.\n\nCause. `startOfDay` (fuel.ts:22) calls `setHours(0,0,0,0)` and `localDate` (fuel.ts:27) calls `getFullYear/getMonth/getDate`. Both resolve against the *server process's* timezone. Nothing sets TZ in the Dockerfile, cloudbuild.yaml, or docker-compose.yml, so Cloud Run runs UTC. \"Local\" therefore means UTC, and the user's timezone is never sent, stored, or consulted anywhere in the codebase.\n\nSymptom this produces. For a US Eastern user the server's day rolls at 20:00 local. Anything eaten after 20:00 counts toward tomorrow, and at real midnight nothing resets, because the rollover already happened four hours earlier. Last night's late entries are still on the counter in the morning. The further from UTC, the worse: UTC+13 rolls a day early rather than late.\n\nBlast radius beyond fuel, which is why this should be fixed as one model rather than patched in fuel alone:\n- `GET /api/fuel/today` totals and `date` (fuel.ts:79, 86), and the day bucketing in fuel history (fuel.ts:138, 151, 154).\n- `sessions.ts:24` carries an identical `startOfDay`, so `isToday` is UTC too. A workout logged at 21:00 Eastern creates a session dated tomorrow, and the find-or-create rules (`todaySessionForDay`, `todayFreeformSession`) key on it, so the next morning's session is a second row rather than a resume. Streak and rotation read from the same dates.\n- `body_metric.measuredAt` shares the flaw for \"last logged Nd ago\".\n\nA wrinkle to check while fixing: `performed_at`, `completed_at`, `logged_at` and `measured_at` are all Drizzle `timestamp(...)` without `withTimezone`, so Postgres stores them as `timestamp without time zone`. UTC instants are being written into naive columns, which means the column type cannot disambiguate them either.\n\nThe fix needs a decision before code, so this is not a one-line change: either the client sends its IANA timezone or UTC offset on the requests that ask \"what is today\", or the user gets a stored timezone preference (there is no settings/account persistence today — theme is localStorage only). A stored preference is more honest for a single-user self-hosted app and survives a device in a different timezone; an offset sent per request is simpler but wrong across DST for historical buckets.",
+  "location": [
+    "apps/api/src/routes/fuel.ts:22",
+    "apps/api/src/routes/fuel.ts:27",
+    "apps/api/src/routes/sessions.ts:24"
+  ],
+  "phase": "trust",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "high",
+  "status": "open",
+  "title": "The day boundary is the server's timezone, not yours: fuel does not reset at local midnight"
+}

@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "TODO.md still lists four items as unchecked that have shipped: the muscle-group taxonomy and catalog, the warm-up flag, the fuel target edit UI, and surfacing supersets and warm-up/cool-down during a session.\n\nNow that the backlog lives in .story/, decide whether TODO.md stays as a narrative roadmap or is retired to avoid two ledgers disagreeing. If it stays, reconcile it; if it goes, make sure nothing in it is lost that has no ticket here.",
+  "id": "T-030",
+  "order": 50,
+  "phase": "upkeep",
+  "status": "open",
+  "title": "Refresh TODO.md against what shipped",
+  "type": "chore"
+}

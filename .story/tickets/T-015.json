@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "A workout remembered the next morning lands on the wrong calendar day, and nothing can move it. Accept a performedAt override on POST /api/sessions.\n\nThe trap is find-or-create: todaySessionForDay and todayFreeformSession both test isToday(performedAt), so a naive override returns today's session instead of creating the back-dated one. Both must key on the target calendar day. Rotation reads the latest session by performedAt, so back-dating can also reorder what \"next up\" means.",
+  "id": "T-015",
+  "order": 40,
+  "phase": "depth",
+  "status": "open",
+  "title": "Back-date a session",
+  "type": "task"
+}

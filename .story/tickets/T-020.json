@@ -1,0 +1,15 @@
+{
+  "blockedBy": [
+    "T-014"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Weekly sets and volume per muscle group, so an imbalance is visible before it becomes an injury. The taxonomy this needs has already shipped.\n\nScope is the aggregation endpoint plus the per-muscle view only. Workouts-per-week and top-movements are separate asks and should not ride along. Untagged exercises have no primaryMuscleGroup and must be reported as untagged rather than silently dropped or bucketed somewhere convenient. Gated behind multi-program switching per the roadmap's own sequencing, since per-muscle totals across two shadowing programs would be meaningless.",
+  "displayId": "T-020",
+  "id": "T-020",
+  "order": 10,
+  "phase": "insight",
+  "status": "open",
+  "title": "Muscle-group volume dashboard",
+  "type": "task"
+}

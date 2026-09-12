@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Three read-then-write sequences have a window between the read and the write: position assignment when adding to a day, the idempotent exercise create (select-then-insert on a unique index), and set numbering, which trusts a client-supplied setNumber.\n\nNone of them can bite a single user on one device, which is exactly why they should be closed before any multi-device work rather than discovered during it. The exercise create already has an FK-violation fallback that shows the shape of the fix: let the constraint arbitrate and handle the loser.",
+  "id": "T-028",
+  "order": 30,
+  "phase": "upkeep",
+  "status": "open",
+  "title": "Close the check-then-act races",
+  "type": "task"
+}

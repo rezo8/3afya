@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Session duration is nowhere in the app, though every set already carries completedAt. Derive it from the first and last set in the session rather than adding an endedAt column: no migration, and no second write path that can drift out of sync with the sets (RULES 5).\n\nShow it in the session recap and the history list. A session with a single set has no meaningful duration, so it should read as absent rather than 0:00.",
+  "id": "T-010",
+  "order": 40,
+  "phase": "loop",
+  "status": "open",
+  "title": "Show how long a workout took",
+  "type": "task"
+}

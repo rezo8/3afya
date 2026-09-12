@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-09-12",
+  "createdDate": "2026-09-12",
+  "description": "Initialize storybloq so project context survives between sessions instead of being re-derived from TODO.md and three audit documents each time.\n\nSeeded from what already existed: TODO.md, PROJECT_RECOMMENDATIONS.md (§6 roadmap, §15 rules) and UX_ACTIVE_WORKOUT_AUDIT.json. Every audit claim was verified against HEAD rather than trusted; eight findings turned out to be already fixed and were deliberately not filed. RULES.md was written from §15 so the durable rules are read at the start of every session rather than buried in a 772-line document.\n\nLeaves TODO.md as the open question T-030 covers: two ledgers that can disagree is the thing this was supposed to stop.",
+  "displayId": "T-040",
+  "id": "T-040",
+  "order": 60,
+  "phase": "upkeep",
+  "status": "complete",
+  "title": "Track the backlog in .story/",
+  "type": "chore"
+}

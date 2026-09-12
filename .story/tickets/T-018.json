@@ -1,0 +1,15 @@
+{
+  "blockedBy": [
+    "T-017"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Nothing in the web app calls DELETE /api/exercises/:id, and nothing would call the rename endpoint either: exercises are only ever created and shown in a picker. Two endpoints exist that no user can reach.\n\nAdd the screen that makes them reachable: list the library, rename, and remove, with the \"this will remove N sets\" confirmation the roadmap asks for. The server already archives rather than deletes when history exists, so the confirmation should say which of the two will happen. RULES 5: this is the read path the rename's write path needs to be finished.",
+  "displayId": "T-018",
+  "id": "T-018",
+  "order": 70,
+  "phase": "depth",
+  "status": "open",
+  "title": "Exercise library screen",
+  "type": "task"
+}

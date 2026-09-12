@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Four test files exist (records, distance, exercise-catalog, exercise-alternatives), all covering pure functions. rotationState has none, and it is the function most likely to break quietly: the rule that freeform sessions neither resume a day nor advance the rotation lives in two isNotNull(dayId) filters that nothing would catch the removal of.\n\nThe bulk of this ticket is the repo's first database-backed test setup, not the assertions. Sequenced before the multi-program work on purpose, so the rewrite has a net under it rather than tests written twice.",
+  "id": "T-012",
+  "order": 10,
+  "phase": "depth",
+  "status": "open",
+  "title": "Test rotationState and freeform isolation",
+  "type": "task"
+}

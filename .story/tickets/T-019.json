@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "body_fat is a supported BodyMetricKind in both the metrics route and the shared contract, with zero references anywhere in the web app. The backend half has been finished and waiting since it was written.\n\nSurface it in BodyScreen alongside weight, resting HR and sleep, following the same stepper-plus-trend-line shape. METRICS entries carry CSS var strings rather than hex, so the new metric must too or its chart will not follow the theme.",
+  "id": "T-019",
+  "order": 80,
+  "phase": "depth",
+  "status": "open",
+  "title": "Log body fat",
+  "type": "task"
+}

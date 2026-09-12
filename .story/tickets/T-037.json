@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-09-11",
+  "createdDate": "2026-09-12",
+  "description": "Retrospective. Protein and calorie entries against a daily target, with frequent-label chips derived from the user's own entries only (no food catalog, no fuzzy matching). nutritionTarget is append-only, one row per edit, so historical adherence stays scored against the target actually in force then. A Body screen logs weight, resting HR and sleep. Un-logged days are null, not zero, so the charts can tell \"did not log\" from \"ate nothing\".",
+  "displayId": "T-037",
+  "id": "T-037",
+  "order": 40,
+  "phase": "core-loop",
+  "status": "complete",
+  "title": "Fuel and body-metric tracking",
+  "type": "feature"
+}

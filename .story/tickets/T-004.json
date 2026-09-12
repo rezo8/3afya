@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "lastSetFor returns a single row ordered by completedAt, so set 4 of today is compared against whatever was logged last, which is usually set 1 of the previous session. The delta shown during a workout is therefore comparing a late fatigued set against a fresh one, and reads as regression when nothing regressed.\n\nKey the comparison on setNumber instead. Touches lastNumbers in the sessions route and the TodayExercise contract in @afya/shared, so web and api move together.",
+  "id": "T-004",
+  "order": 40,
+  "phase": "trust",
+  "status": "open",
+  "title": "Compare against the matching set number, not the most recent set",
+  "type": "task"
+}

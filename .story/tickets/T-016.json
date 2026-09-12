@@ -1,0 +1,15 @@
+{
+  "blockedBy": [
+    "T-015"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Route handlers hand-parse and clamp (Math.max(0, body.weight ?? 0)), so a malformed body becomes a silently coerced row rather than a 400. The clamping is deliberate and mostly correct, but it means the API cannot tell a caller it sent nonsense.\n\nStart with LogSetBody, UpdateSetBody and StartSessionBody. @afya/shared stays the source of truth for the types; the schemas validate against it rather than replacing it. Sequenced after back-dating so performedAt is schema'd once.",
+  "displayId": "T-016",
+  "id": "T-016",
+  "order": 50,
+  "phase": "depth",
+  "status": "open",
+  "title": "Validate request bodies with Zod at the HTTP boundary",
+  "type": "task"
+}

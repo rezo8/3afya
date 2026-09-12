@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Bodyweight lives on the Body screen and strength on Trends, so the one question that needs both — is this a real strength gain or am I just heavier — cannot be asked.\n\nPlot a strength trend against the bodyweight trend on a shared time axis. This is the thing a single-user app can do that a social one cannot, and the roadmap names it as the differentiation thesis. Two series with unrelated units on one chart is the hard part; a second axis is a lie unless both scales are stated.",
+  "id": "T-024",
+  "order": 50,
+  "phase": "insight",
+  "status": "open",
+  "title": "Put bodyweight next to strength on one view",
+  "type": "task"
+}

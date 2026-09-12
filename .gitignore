@@ -33,3 +33,8 @@ apps/api/gcp-key.json
 
 # Devin local config (rules/skills/hooks) — not checked in
 .devin/
+
+# storybloq — local session state, not shared history
+.story/snapshots/
+.story/sessions/
+.story/status.json

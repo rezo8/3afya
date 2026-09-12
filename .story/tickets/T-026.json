@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "buildDayExercises runs one lastSetFor query per program exercise, and adhocExercises runs another per ad-hoc one. A ten-exercise day is eleven round-trips to build one screen, on a scale-to-zero backend where the first one already pays a cold start.\n\nReplace with a single windowed query over the exercise ids. The exclusion of the current session (excludeSessionId) has to survive the rewrite, or \"last time\" starts comparing against sets logged minutes ago.",
+  "id": "T-026",
+  "order": 10,
+  "phase": "upkeep",
+  "status": "open",
+  "title": "Batch the per-exercise last-set queries",
+  "type": "task"
+}

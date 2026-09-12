@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-09-11",
+  "createdDate": "2026-09-12",
+  "description": "Retrospective. All-time bests per exercise, computed on the fly with no table: weighted tracks estimated 1RM (Epley), heaviest, and best volume; reps tracks most reps; time tracks longest hold; distance tracks furthest, scored in metres so units compare. A live PR banner and badge at log time, PR tags in the session recap, and a Records card on Trends. Warm-up sets are filtered out of every calculation.",
+  "displayId": "T-035",
+  "id": "T-035",
+  "order": 20,
+  "phase": "core-loop",
+  "status": "complete",
+  "title": "Personal records and new-PR moments",
+  "type": "feature"
+}

@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-09-11",
+  "createdDate": "2026-09-12",
+  "description": "Retrospective. primaryMuscleGroup and equipment on exercise, stamped from a curated catalog on exact case-insensitive name match only, never fuzzy: an unrecognised name stays untagged rather than guessed at. Drives mid-session substitute suggestions, ranked equipment-first, because you look for a substitute when the machine is taken. Tags are stamped on create only, so new catalog entries need their own backfill migration.",
+  "displayId": "T-036",
+  "id": "T-036",
+  "order": 30,
+  "phase": "core-loop",
+  "status": "complete",
+  "title": "Muscle-group taxonomy and curated exercise catalog",
+  "type": "feature"
+}

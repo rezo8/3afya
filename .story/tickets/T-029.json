@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "index.html carries a theme-color meta and nothing else: no manifest link, no icons, no public directory. A workout tracker used at the gym belongs on the home screen, not in a browser tab.\n\nManifest, icons and theme-color wiring only. Explicitly no offline write queue: queueing writes while failures are still invisible would hide them twice over, and the audit defers it behind error surfacing for that reason. The theme system already restamps theme-color on palette change, so the manifest must not fight it.",
+  "id": "T-029",
+  "order": 40,
+  "phase": "upkeep",
+  "status": "open",
+  "title": "Make the app installable (PWA)",
+  "type": "chore"
+}

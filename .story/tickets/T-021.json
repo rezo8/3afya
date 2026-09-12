@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Trends charts one exercise at a time, so there is no view of whether total work is rising or falling. Add a session-volume line, plus a 4w/12w/1y/all toggle that the existing charts can share.\n\nThe fuel history endpoint already accepts a days parameter; reuse that shape rather than inventing a second one. Volume only means something for weighted sets, so sessions of reps, time or distance work need an honest representation rather than a zero.",
+  "id": "T-021",
+  "order": 20,
+  "phase": "insight",
+  "status": "open",
+  "title": "Whole-workout volume trend with time ranges",
+  "type": "task"
+}

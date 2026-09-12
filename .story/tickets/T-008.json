@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Press-and-hold acceleration on the stepper buttons, so a long adjustment does not require one tap per increment. Applies to every BigStep in SessionScreen and every EditStep in SetEditor, which means it lands once and covers weight, reps, duration and distance together.\n\nDeliberately separate from T-007: typing is a different mechanism serving a different case (a known target value), and bundling them would hide the smaller ergonomics change behind the larger one.",
+  "id": "T-008",
+  "order": 20,
+  "phase": "loop",
+  "status": "open",
+  "title": "Hold to ramp the numeric steppers",
+  "type": "task"
+}

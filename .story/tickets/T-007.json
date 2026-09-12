@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "Weight is stepper-only at plus or minus 5 lb, so reaching 225 lb from the 45 lb default is 36 taps. Distance and duration already accept typed entry through DraftInput, which holds raw keystrokes until they parse; extend it to weight.\n\nThe lastWeight pre-fill already covers any exercise with history, so the flat 45 default only survives for a genuinely new exercise, which is exactly the case where typing matters most.",
+  "id": "T-007",
+  "order": 10,
+  "phase": "loop",
+  "status": "open",
+  "title": "Type a weight instead of stepping to it",
+  "type": "task"
+}

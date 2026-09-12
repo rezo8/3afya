@@ -1,0 +1,15 @@
+{
+  "blockedBy": [
+    "T-013"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "The UI half of the multi-program work: list programs, activate one, create another, from ProgramScreen.\n\nActivation must invalidate the [\"today\"] and [\"programs\"] query keys together, or the Start screen keeps rendering the previous rotation while the server has already moved. The day-letter rule still applies: letters come from the index in program.days, never from programDay.position.",
+  "displayId": "T-014",
+  "id": "T-014",
+  "order": 30,
+  "phase": "depth",
+  "status": "open",
+  "title": "Switch programs from the builder",
+  "type": "task"
+}

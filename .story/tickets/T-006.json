@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "fromProgram is derived live by joining program_exercise, so removing an exercise from a day rewrites what history claims was planned that day. Snapshot it onto set_log at insert, along with the exercise kind that decides how the row's other columns are read.\n\nRULES 1: every historical row snapshots the facts that mattered at write time. This is also the precondition RULES 4 names before exercise.kind could ever become editable, so it gates any future rename-plus-retype work.",
+  "id": "T-006",
+  "order": 60,
+  "phase": "trust",
+  "status": "open",
+  "title": "Snapshot program context onto set_log at write time",
+  "type": "task"
+}

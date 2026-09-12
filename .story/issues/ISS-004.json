@@ -1,0 +1,20 @@
+{
+  "components": [
+    "apps/api/src/index.ts",
+    "cloudbuild.yaml",
+    "CLAUDE.md"
+  ],
+  "createdBy": "project-recommendations-audit",
+  "dedupeKey": "project-recommendations:cors-origins-decision",
+  "discoveredDate": "2026-09-12",
+  "id": "ISS-004",
+  "impact": "Two project documents disagree, so this needs a decision rather than a fix. cloudbuild.yaml sets CORS_ORIGINS=* and index.ts reflects whatever Origin the request carries; CLAUDE.md records this as deliberate, because the real serving URL is a bare Cloud Run hostname and an earlier attempt at an exact origin broke login with Better Auth's \"Invalid origin\" error. PROJECT_RECOMMENDATIONS treats it as a scheduled fix. Whichever wins, one of the two documents should stop saying the other thing. Note the constraint before deciding: any tightening has to survive the fact that no custom domain is mapped.",
+  "location": [],
+  "phase": null,
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "CORS_ORIGINS is wide open: the audit says tighten it, CLAUDE.md says it is intentional"
+}

@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "targetRepsMax exists on program_exercise and drives nothing. Double progression is the rule it was modelled for: when the top of the rep range is hit across all target sets, the weight goes up and the reps reset to the bottom of the range.\n\nSuggest, do not apply. A deterministic rule over data already held, with no model anywhere near it. Warm-up sets must be excluded from the judgement, which the records module already knows how to do.",
+  "id": "T-022",
+  "order": 30,
+  "phase": "insight",
+  "status": "open",
+  "title": "Suggest the next weight from double progression",
+  "type": "task"
+}

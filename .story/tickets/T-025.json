@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "The streak counts calendar-day adjacency, so a planned rest day breaks it. It punishes following the program, which is the opposite of what a streak is for.\n\nScore it against the program's actual cadence instead. The History screen already has an honest-presentation rule for this area: when the streak is 0 but something was trained, it shows \"Nd ago / Last trained\" rather than \"0d / Current streak\". Whatever replaces the calculation has to keep that honesty.",
+  "id": "T-025",
+  "order": 60,
+  "phase": "insight",
+  "status": "open",
+  "title": "Fix the streak to track rotation cadence",
+  "type": "task"
+}

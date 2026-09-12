@@ -1,0 +1,26 @@
+{
+  "features": {
+    "handovers": true,
+    "issues": true,
+    "reviews": true,
+    "roadmap": true,
+    "tickets": true
+  },
+  "language": "typescript",
+  "project": "3afya",
+  "schemaVersion": 2,
+  "type": "npm",
+  "version": 2,
+  "recipeOverrides": {
+    "stages": {
+      "TEST": {
+        "enabled": true,
+        "command": "pnpm --filter @afya/api exec vitest run"
+      },
+      "BUILD": {
+        "enabled": true,
+        "command": "pnpm build"
+      }
+    }
+  }
+}

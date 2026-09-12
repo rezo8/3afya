@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-09-11",
+  "createdDate": "2026-09-12",
+  "description": "Retrospective. Colour is addressed by role, never by hue: eleven tokens, and nothing outside the palette block names a colour. Shades derive with color-mix rather than hardcoded rgba. Palettes are [data-theme] blocks rather than :root-only, so a Settings swatch can be the palette rather than a duplicate of it. Selection lives in localStorage per device, applied before first render so the chosen palette paints instead of the default.",
+  "displayId": "T-038",
+  "id": "T-038",
+  "order": 50,
+  "phase": "core-loop",
+  "status": "complete",
+  "title": "Role-based colour tokens and a palette picker",
+  "type": "feature"
+}

@@ -1,0 +1,15 @@
+{
+  "blockedBy": [
+    "T-012"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "rotationState takes the single most-recently-updated active program, so creating a second program silently shadows the first rather than failing or asking. Nothing in the schema prevents two rows with isActive true.\n\nAdd create and activate endpoints, and enforce one active program per user with a partial unique index so the invariant lives in Postgres rather than in the query that happens to read it. Schema and API only; the builder UI is a separate ticket.",
+  "displayId": "T-013",
+  "id": "T-013",
+  "order": 20,
+  "phase": "depth",
+  "status": "open",
+  "title": "Support more than one program (schema and API)",
+  "type": "task"
+}

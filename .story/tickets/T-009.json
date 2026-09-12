@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "The reps steppers on a weighted exercise use the .step.small size (34px) while every other primary control in the session card is 44px. They are hit mid-set, one-handed, so they are the wrong place to economise on target size.\n\nCheck the surrounding layout arithmetic when raising them: the session card is sized against a 390px budget and the weighted branch puts a weight stepper, a big number and the reps column on one row.",
+  "id": "T-009",
+  "order": 30,
+  "phase": "loop",
+  "status": "open",
+  "title": "Raise the reps stepper to 44px",
+  "type": "task"
+}

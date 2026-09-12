@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-09-11",
+  "createdDate": "2026-09-12",
+  "description": "Retrospective, shipped on branch feat/freeform-sessions. A session need not belong to a program day: a freeform session has a null dayId and holds whatever was done, and is invisible to the rotation so a midweek bike ride neither resumes a day nor advances next-up. Adds a fourth exercise kind, distance, storing the unit as entered and converting to metres only to compare. Durations are typed as clocks and display rolls into hours. Logged sets became correctable from history through the same editor the live session uses.",
+  "displayId": "T-039",
+  "id": "T-039",
+  "order": 60,
+  "phase": "core-loop",
+  "status": "complete",
+  "title": "Log workouts that are not part of a program",
+  "type": "feature"
+}

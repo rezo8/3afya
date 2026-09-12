@@ -1,0 +1,20 @@
+{
+  "components": [
+    "apps/web/src/screens/session/SessionScreen.tsx"
+  ],
+  "createdBy": "ux-active-workout-audit",
+  "dedupeKey": "ux-active-workout-audit:F5",
+  "discoveredDate": "2026-09-12",
+  "id": "ISS-001",
+  "impact": "Logging the first set of a session creates the session, waits for the id, then posts the set. On Cloud Run with min-instances 0, the first request also pays a cold start, so the very first tap of a workout is the slowest interaction in the app. No mutation anywhere uses optimistic updates, so every logged set waits for a full round-trip before the UI moves.",
+  "location": [
+    "apps/web/src/screens/session/SessionScreen.tsx"
+  ],
+  "phase": null,
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "No optimistic updates: the first set of a session costs two sequential round-trips"
+}

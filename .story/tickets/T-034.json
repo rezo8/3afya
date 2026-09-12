@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-09-11",
+  "createdDate": "2026-09-12",
+  "description": "Retrospective. A program is named days in a rotation order, not weekday-pinned. Exercises are a shared library reused across days; a session holds logged sets. No session-exercise join table: an exercise belongs to a session iff it has at least one logged set, which keeps sessions immutable records and programs reusable templates. Day names are snapshot onto the session so renaming or deleting a day cannot rewrite history.",
+  "displayId": "T-034",
+  "id": "T-034",
+  "order": 10,
+  "phase": "core-loop",
+  "status": "complete",
+  "title": "Model programs, days, and logged sets",
+  "type": "feature"
+}

@@ -1,0 +1,22 @@
+{
+  "components": [
+    "apps/web/src/screens/session/SessionScreen.tsx",
+    "apps/web/src/styles/theme.css"
+  ],
+  "createdBy": "ux-active-workout-audit",
+  "dedupeKey": "ux-active-workout-audit:F9",
+  "discoveredDate": "2026-09-12",
+  "id": "ISS-002",
+  "impact": "The pips double as a way to log a set, but each is roughly 8px tall. Mid-set, one-handed, that is a target that is either missed or hit by accident. It is also the unguarded logging path that can double-log (T-002), so its size and its guard are two halves of the same problem.",
+  "location": [],
+  "phase": null,
+  "relatedTickets": [
+    "T-002",
+    "T-009"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "Set-complete pip is an 8px-tall tap target"
+}

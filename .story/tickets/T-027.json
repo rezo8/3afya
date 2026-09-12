@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "ownedDay is written twice, once in the programs route and once in the sessions route, both joining program_day to program to check user ownership. It is an authorization check, which makes a divergence between the two copies a security bug rather than an inconsistency.\n\nTwo concrete call sites exist, which is exactly the threshold RULES 8 sets for deduplicating: not before, and not \"just in case\".",
+  "id": "T-027",
+  "order": 20,
+  "phase": "upkeep",
+  "status": "open",
+  "title": "De-duplicate ownedDay into a shared module",
+  "type": "chore"
+}

@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "workout_session.note is read by the sessions route and the recap screen, and written by nothing. A column that is readable but never writable looks finished when it is not, which RULES 5 calls worse than not having the field.\n\nAdd a \"finish workout\" action at the end of a session that writes the note. It also gives the session an explicit end, which pairs with T-010's derived duration and gives the recap screen something to be the destination of.",
+  "id": "T-011",
+  "order": 50,
+  "phase": "loop",
+  "status": "open",
+  "title": "Finish a workout with a note",
+  "type": "task"
+}

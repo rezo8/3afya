@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": "2026-09-11",
+  "createdDate": "2026-09-12",
+  "description": "Retrospective. apps/api (Hono) and apps/web (React 19 + Vite), with packages/shared holding the API contract and packages/tsconfig and packages/eslint-config holding the strict TypeScript base and flat ESLint config. Node 22, ESM throughout, Docker Compose for local Postgres on port 5435.",
+  "displayId": "T-031",
+  "id": "T-031",
+  "order": 10,
+  "phase": "foundation",
+  "status": "complete",
+  "title": "Scaffold the pnpm and Turborepo monorepo",
+  "type": "chore"
+}

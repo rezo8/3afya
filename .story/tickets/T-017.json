@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-12",
+  "description": "There is no PATCH on /api/exercises, so a typo in an exercise name is permanent the moment any set references it. Add a rename that changes the name only.\n\nExplicitly not kind: RULES 4 forbids editing the discriminant that decides how set_log columns are read until the snapshot column exists. Must respect the (userId, name) unique index, and leave intact the archived-name resurrection path in POST /api/exercises, which depends on that same index.",
+  "id": "T-017",
+  "order": 60,
+  "phase": "depth",
+  "status": "open",
+  "title": "Rename an exercise without losing history",
+  "type": "task"
+}
