@@ -4,18 +4,17 @@ import { Link, useParams } from "@tanstack/react-router";
 import type {
   CreateExerciseBody,
   DistanceUnit,
-  Equipment,
   Exercise,
   ExerciseAlternative,
   LoggedSetResult,
   LogSetBody,
-  MuscleGroup,
   PrKind,
   TodayExercise,
   TodayResponse,
   UpdateSetBody,
 } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { TaxonomyTags } from "@/components/TaxonomyTags";
 import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
@@ -39,17 +38,6 @@ const parseNonNegative = (text: string): number | null => {
   const value = Number(text);
   return text.trim() !== "" && Number.isFinite(value) && value >= 0 ? value : null;
 };
-
-const muscleLabel = (group: MuscleGroup) => group.replace("_", " ");
-
-function TaxonomyTags({ muscleGroup, equipment }: { muscleGroup: MuscleGroup | null; equipment: Equipment | null }) {
-  return (
-    <>
-      {muscleGroup && <span className="ex-tag">{muscleLabel(muscleGroup)}</span>}
-      {equipment && <span className="ex-tag">{equipment}</span>}
-    </>
-  );
-}
 
 /** The entry card's headline control: − big value +, whatever the kind measures. */
 function BigStep({

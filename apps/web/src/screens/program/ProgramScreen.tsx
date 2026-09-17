@@ -1,10 +1,26 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Exercise, ExerciseKind, Program, ProgramDay, TodayResponse, UpdateDayBody, UpdateDayExerciseBody, UpdateProgramBody } from "@afya/shared";
+import type {
+  AddDayExerciseBody,
+  CatalogExercise,
+  CreateExerciseBody,
+  Exercise,
+  ExerciseAlternative,
+  Program,
+  ProgramDay,
+  TodayResponse,
+  UpdateDayBody,
+  UpdateDayExerciseBody,
+  UpdateProgramBody,
+} from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { TaxonomyTags } from "@/components/TaxonomyTags";
 import { api } from "@/lib/api/client";
+import { errorMessage } from "@/lib/api/errors";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 import { fmtDur } from "@/lib/format";
+import { ExercisePicker } from "./ExercisePicker";
+import type { ExercisePick } from "@/lib/exercise-pick";
 
 
 /**
@@ -22,27 +38,46 @@ const deleteDayStakes = (sessionCount: number) =>
       ? "1 session keeps its name"
       : `${sessionCount} sessions keep their name`;
 
-const KIND_OPTIONS: { value: ExerciseKind; label: string }[] = [
-  { value: "weighted", label: "Weight × reps" },
-  { value: "reps", label: "Reps" },
-  { value: "time", label: "Time" },
-];
+/** The library row a pick refers to, creating it first when the pick was to create one. */
+async function resolveExerciseId(pick: ExercisePick): Promise<string> {
+  if (pick.source === "library") return pick.exerciseId;
+  // A catalog pick sends no kind: the server reads kind, muscle group and equipment
+  // off the catalog entry, which is exactly what makes a picked name a tagged one.
+  const body: CreateExerciseBody = pick.source === "catalog" ? { name: pick.name } : { name: pick.name, kind: pick.kind };
+  const created = await api.post<Exercise>("/api/exercises", body);
+  return created.id;
+}
+
+const pickFromAlternative = (alt: ExerciseAlternative): ExercisePick =>
+  alt.id === null ? { source: "catalog", name: alt.name } : { source: "library", exerciseId: alt.id };
 
 export function ProgramScreen() {
   const qc = useQueryClient();
   const programsQ = useQuery({ queryKey: ["programs"], queryFn: () => api.get<Program[]>("/api/programs") });
   const libraryQ = useQuery({ queryKey: ["exercises"], queryFn: () => api.get<Exercise[]>("/api/exercises") });
   const todayQ = useQuery({ queryKey: ["today"], queryFn: () => api.get<TodayResponse>("/api/sessions/today") });
+  const catalogQ = useQuery({
+    queryKey: ["exercise-catalog"],
+    queryFn: () => api.get<CatalogExercise[]>("/api/exercises/catalog"),
+    staleTime: Infinity,
+  });
 
   const program = programsQ.data?.[0] ?? null;
   const [selDayId, setSelDayId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [progName, setProgName] = useState("");
-  const [addEx, setAddEx] = useState("");
-  const [newExKind, setNewExKind] = useState<ExerciseKind>("weighted");
   const [armedDeleteDayId, setArmedDeleteDayId] = useState<string | null>(null);
   const [armedRemoveExId, setArmedRemoveExId] = useState<string | null>(null);
+  /** The program-exercise slot whose swap panel is open, with the exercise it currently holds. */
+  const [swapFor, setSwapFor] = useState<{ dayExerciseId: string; exerciseId: string } | null>(null);
   const errors = useMutationError();
+
+  const swapExerciseId = swapFor?.exerciseId ?? null;
+  const alternativesQ = useQuery({
+    queryKey: ["alternatives", swapExerciseId],
+    queryFn: () => api.get<ExerciseAlternative[]>(`/api/exercises/${swapExerciseId}/alternatives`),
+    enabled: swapExerciseId !== null,
+  });
 
   useEffect(() => {
     if (program && (!selDayId || !program.days.some((d) => d.id === selDayId))) {
@@ -103,18 +138,22 @@ export function ProgramScreen() {
     onSuccess: () => invalidate(),
   });
   const addExercise = useTrackedMutation(errors, {
-    mutationFn: async ({ dayId, name, kind }: { dayId: string; name: string; kind: ExerciseKind }) => {
-      const trimmed = name.trim();
-      let ex = libraryQ.data?.find((e) => e.name.toLowerCase() === trimmed.toLowerCase());
-      if (!ex) ex = await api.post<Exercise>("/api/exercises", { name: trimmed, kind });
-      return api.post(`/api/programs/days/${dayId}/exercises`, { exerciseId: ex.id });
+    mutationFn: async ({ dayId, pick }: { dayId: string; pick: ExercisePick }) => {
+      const exerciseId = await resolveExerciseId(pick);
+      return api.post(`/api/programs/days/${dayId}/exercises`, { exerciseId } satisfies AddDayExerciseBody);
     },
     onSuccess: () => invalidate(),
   });
-  const addExerciseById = useTrackedMutation(errors, {
-    mutationFn: ({ dayId, exerciseId }: { dayId: string; exerciseId: string }) =>
-      api.post(`/api/programs/days/${dayId}/exercises`, { exerciseId }),
-    onSuccess: () => invalidate(),
+  /** Replace what a slot trains in place — same position, section, superset and targets. */
+  const swapExercise = useTrackedMutation(errors, {
+    mutationFn: async ({ dayExerciseId, pick }: { dayExerciseId: string; pick: ExercisePick }) => {
+      const exerciseId = await resolveExerciseId(pick);
+      return api.patch(`/api/programs/day-exercises/${dayExerciseId}`, { exerciseId } satisfies UpdateDayExerciseBody);
+    },
+    onSuccess: () => {
+      setSwapFor(null);
+      invalidate();
+    },
   });
   const updateDay = useTrackedMutation(errors, {
     mutationFn: ({ dayId, patch }: { dayId: string; patch: UpdateDayBody }) => api.patch(`/api/programs/days/${dayId}`, patch),
@@ -186,7 +225,6 @@ export function ProgramScreen() {
   }
 
   const inDay = new Set(selDay?.exercises.map((e) => e.exerciseId));
-  const suggestions = (libraryQ.data ?? []).filter((e) => !inDay.has(e.id)).slice(0, 8);
 
   return (
     <>
@@ -236,6 +274,7 @@ export function ProgramScreen() {
               setSelDayId(d.id);
               setArmedDeleteDayId(null);
               setArmedRemoveExId(null);
+              setSwapFor(null);
             }}
           >
             <span className="badge">{String.fromCharCode(65 + i)}</span>
@@ -339,15 +378,28 @@ export function ProgramScreen() {
                           {ex.name}
                           {ex.kind !== "weighted" && <span className="kind-tag">{ex.kind === "time" ? "time" : "reps"}</span>}
                         </span>
-                        {armedRemoveExId === ex.id ? (
-                          <button className="pex-del armed" onClick={() => deleteEx.mutate(ex.id)}>
-                            Remove?
+                        <span className="pex-actions">
+                          <button
+                            className={`pex-swap${swapFor?.dayExerciseId === ex.id ? " on" : ""}`}
+                            aria-expanded={swapFor?.dayExerciseId === ex.id}
+                            onClick={() =>
+                              setSwapFor(
+                                swapFor?.dayExerciseId === ex.id ? null : { dayExerciseId: ex.id, exerciseId: ex.exerciseId },
+                              )
+                            }
+                          >
+                            Swap ⇄
                           </button>
-                        ) : (
-                          <button className="pex-del" aria-label={`Remove ${ex.name}`} onClick={() => setArmedRemoveExId(ex.id)}>
-                            ×
-                          </button>
-                        )}
+                          {armedRemoveExId === ex.id ? (
+                            <button className="pex-del armed" onClick={() => deleteEx.mutate(ex.id)}>
+                              Remove?
+                            </button>
+                          ) : (
+                            <button className="pex-del" aria-label={`Remove ${ex.name}`} onClick={() => setArmedRemoveExId(ex.id)}>
+                              ×
+                            </button>
+                          )}
+                        </span>
                       </div>
                       <div className="pex-ctl">
                         <div className="ctl">
@@ -436,6 +488,44 @@ export function ProgramScreen() {
                           }}
                         />
                       </div>
+                      {swapFor?.dayExerciseId === ex.id && (
+                        <div className="swap-panel">
+                          <p className="eyebrow">Swap for — keeps this slot’s position, targets and tags</p>
+                          {alternativesQ.isLoading ? (
+                            <p className="swap-note">Finding alternatives…</p>
+                          ) : alternativesQ.isError ? (
+                            <ErrorBanner message={errorMessage(alternativesQ.error)} onRetry={() => alternativesQ.refetch()} />
+                          ) : (alternativesQ.data ?? []).length === 0 ? (
+                            <p className="swap-note">No same-muscle alternatives — search below</p>
+                          ) : (
+                            <ul className="expick-list">
+                              {(alternativesQ.data ?? []).map((alt) => (
+                                <li key={alt.id ?? alt.name}>
+                                  <button
+                                    type="button"
+                                    disabled={swapExercise.isPending}
+                                    onClick={() => swapExercise.mutate({ dayExerciseId: ex.id, pick: pickFromAlternative(alt) })}
+                                  >
+                                    <span className="expick-name">{alt.name}</span>
+                                    <span className="expick-tags">
+                                      <TaxonomyTags muscleGroup={alt.primaryMuscleGroup} equipment={alt.equipment} />
+                                      {!alt.inLibrary && <span className="expick-badge is-new">new</span>}
+                                    </span>
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          <ExercisePicker
+                            library={libraryQ.data ?? []}
+                            catalog={catalogQ.data ?? []}
+                            alreadyInDay={inDay}
+                            placeholder="Search for something else…"
+                            busy={swapExercise.isPending}
+                            onPick={(pick) => swapExercise.mutate({ dayExerciseId: ex.id, pick })}
+                          />
+                        </div>
+                      )}
                     </div>
                   </li>,
                 ];
@@ -447,47 +537,16 @@ export function ProgramScreen() {
             <p className="eyebrow" style={{ marginBottom: 8 }}>
               Add exercise
             </p>
-            <div className="lift-select" style={{ margin: "0 0 8px" }}>
-              {KIND_OPTIONS.map((k) => (
-                <button key={k.value} className={`ls${newExKind === k.value ? " on" : ""}`} onClick={() => setNewExKind(k.value)}>
-                  {k.label}
-                </button>
-              ))}
-            </div>
-            <div className="addex">
-              <input
-                placeholder="Name a new exercise…"
-                value={addEx}
-                onChange={(e) => setAddEx(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && addEx.trim()) {
-                    addExercise.mutate({ dayId: selDay.id, name: addEx, kind: newExKind });
-                    setAddEx("");
-                  }
-                }}
-              />
-              <button
-                onClick={() => {
-                  if (addEx.trim()) {
-                    addExercise.mutate({ dayId: selDay.id, name: addEx, kind: newExKind });
-                    setAddEx("");
-                  }
-                }}
-              >
-                Add
-              </button>
-            </div>
+            <ExercisePicker
+              key={selDay.id}
+              library={libraryQ.data ?? []}
+              catalog={catalogQ.data ?? []}
+              alreadyInDay={inDay}
+              placeholder="Search your library and the catalog…"
+              busy={addExercise.isPending}
+              onPick={(pick) => addExercise.mutate({ dayId: selDay.id, pick })}
+            />
           </div>
-
-          {suggestions.length > 0 && (
-            <div className="ex-suggest">
-              {suggestions.map((e) => (
-                <button key={e.id} onClick={() => addExerciseById.mutate({ dayId: selDay.id, exerciseId: e.id })}>
-                  + {e.name}
-                </button>
-              ))}
-            </div>
-          )}
 
           <div className="de-block">
             <p className="eyebrow">Cool-down</p>

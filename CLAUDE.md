@@ -62,6 +62,12 @@ records what is specific to 3afya.
 - **Tags stamped on create only**: Adding a catalog entry later tags exercises created from then on but does not retroactively tag existing rows. New catalog entries need their own backfill migration.
 - **Migration/catalog sync**: `0010_backfill_exercise_tags.sql` was printed from the constant, not typed. The VALUES list and constant must never disagree.
 
+### Exercise Picking (program builder)
+- **Creating is an explicit choice, never a fallback**: `ExercisePicker` searches the library and the catalog as one list; "Create <name>" is a separate last row shown only when nothing answers to that name. The old exact-match-else-POST path is what produced untagged duplicate library rows (ISS-008).
+- **Matching is substring + token, never fuzzy**: `matchesQuery` requires every query token to appear in the name. An abbreviation the name doesn't contain ("db") does not match — same rule as the catalog's exact lookup, for the same reason.
+- **A catalog pick sends no `kind`**: the server resolves kind, muscle group and equipment from the catalog entry. Sending a kind would defeat the tagging that makes the pick worth making.
+- **Swapping is in place**: `PATCH /api/programs/day-exercises/:id` with `exerciseId` keeps position, section, superset group, targets and rest. Adding and swapping onto a `time` exercise share `DEFAULT_HOLD_SEC`.
+
 ### Exercise Alternatives
 - **Equipment-first ranking**: `rankAlternatives` puts different equipment before same equipment within each half (library then catalog). This is the whole point — you look for a substitute because the machine is taken.
 - **Untagged source = empty result**: An exercise with no `primaryMuscleGroup` returns `[]` rather than guessing.

@@ -248,6 +248,10 @@ app.post("/:id/days/reorder", async (c) => {
 
 // --- exercises within a day ------------------------------------------------
 
+/** The hold a timed exercise starts on when nothing else says otherwise. */
+const DEFAULT_HOLD_SEC = 30;
+
+
 app.post("/days/:dayId/exercises", async (c) => {
   const userId = c.get("userId");
   const day = await ownedDay(userId, c.req.param("dayId"));
@@ -264,7 +268,7 @@ app.post("/days/:dayId/exercises", async (c) => {
   if (!ex) return c.json({ error: "bad_request", message: "Unknown exercise." }, 400);
 
   const existing = await db.select().from(programExercise).where(eq(programExercise.dayId, day.id));
-  const targetDurationSec = body.targetDurationSec ?? (ex.kind === "time" ? 30 : null);
+  const targetDurationSec = body.targetDurationSec ?? (ex.kind === "time" ? DEFAULT_HOLD_SEC : null);
   const [row] = await db
     .insert(programExercise)
     .values({
@@ -302,11 +306,26 @@ app.post("/days/:dayId/exercises", async (c) => {
 });
 
 app.patch("/day-exercises/:id", async (c) => {
-  const pe = await ownedDayExercise(c.get("userId"), c.req.param("id"));
+  const userId = c.get("userId");
+  const pe = await ownedDayExercise(userId, c.req.param("id"));
   if (!pe) return c.json({ error: "not_found" }, 404);
   const body = await c.req.json<UpdateDayExerciseBody>().catch(() => null);
   if (!body) return c.json({ error: "bad_request" }, 400);
   const patch: Partial<typeof programExercise.$inferInsert> = {};
+
+  // Swapping the exercise leaves the slot itself alone: same position, section,
+  // superset group and targets, so nothing has to be re-entered afterwards.
+  if (body.exerciseId !== undefined) {
+    const [swapTo] = await db
+      .select()
+      .from(exercise)
+      .where(and(eq(exercise.id, body.exerciseId), eq(exercise.userId, userId), isNull(exercise.archivedAt)))
+      .limit(1);
+    if (!swapTo) return c.json({ error: "bad_request", message: "Unknown exercise." }, 400);
+    patch.exerciseId = swapTo.id;
+    // A slot that never measured time has no hold for a timed exercise to start from.
+    if (swapTo.kind === "time" && pe.targetDurationSec === null) patch.targetDurationSec = DEFAULT_HOLD_SEC;
+  }
   if (typeof body.targetSets === "number") patch.targetSets = Math.max(1, Math.round(body.targetSets));
   if (typeof body.targetReps === "number") patch.targetReps = Math.max(1, Math.round(body.targetReps));
   if (body.targetRepsMax !== undefined)

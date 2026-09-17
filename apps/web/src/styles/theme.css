@@ -1377,6 +1377,34 @@ body {
   padding: 1px 5px;
   vertical-align: middle;
 }
+.pex-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.pex-swap {
+  appearance: none;
+  background: none;
+  border: 1px solid var(--line-hi);
+  border-radius: 999px;
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  cursor: pointer;
+  flex: none;
+}
+.pex-swap:hover {
+  border-color: var(--accent-mute);
+  color: var(--text);
+}
+.pex-swap.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .pex-del {
   appearance: none;
   border: none;
@@ -2644,6 +2672,111 @@ svg.chart {
   margin: 0;
   font-size: 13px;
   color: var(--text-soft);
+}
+
+/* ---- EXERCISE PICKER ---- */
+.expick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.expick-in {
+  background: var(--bg);
+  border: 1px solid var(--line-hi);
+  color: var(--text);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  font-family: var(--sans);
+  font-size: 15px;
+  width: 100%;
+}
+.expick-in:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.expick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 232px;
+  overflow-y: auto;
+}
+.expick-list button {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 9px 11px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.expick-list button:hover {
+  border-color: var(--accent-mute);
+}
+.expick-list button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.expick-name {
+  min-width: 0;
+}
+.expick-tags {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.expick-badge {
+  margin-left: 6px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border: 1px solid var(--line-hi);
+  border-radius: 5px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.expick-badge.is-new {
+  color: var(--accent);
+  border-color: var(--accent-mute);
+}
+.expick-create {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.expick-create-btn {
+  appearance: none;
+  border: 1px dashed var(--accent-mute);
+  background: none;
+  color: var(--accent);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.expick-create-btn:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.expick-create-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ---- PERSONAL RECORDS ---- */

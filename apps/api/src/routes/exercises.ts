@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { and, asc, eq, isNull } from "drizzle-orm";
-import type { CreateExerciseBody, Exercise, ExerciseAlternative, ExerciseKind } from "@afya/shared";
+import type { CatalogExercise, CreateExerciseBody, Exercise, ExerciseAlternative, ExerciseKind } from "@afya/shared";
 import { db } from "../db";
-import { catalogForMuscleGroup, findCatalogExercise } from "../db/exercise-catalog";
+import { EXERCISE_CATALOG, catalogForMuscleGroup, findCatalogExercise } from "../db/exercise-catalog";
 import { exercise, setLog } from "../db/schema/tracker";
 import { rankAlternatives } from "../exercise-alternatives";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
@@ -38,6 +38,16 @@ app.get("/", async (c) => {
     .where(and(eq(exercise.userId, c.get("userId")), isNull(exercise.archivedAt)))
     .orderBy(asc(exercise.name));
   return c.json(rows.map(toExercise));
+});
+
+/**
+ * The curated catalog, alphabetical — every name the app knows the taxonomy of, whether
+ * or not this user owns it. It is the same list for everyone, so it carries no user data;
+ * a picker reads it alongside the library so an exercise can be chosen rather than spelled.
+ */
+app.get("/catalog", (c) => {
+  const sorted = [...EXERCISE_CATALOG].sort((a, b) => a.name.localeCompare(b.name));
+  return c.json<CatalogExercise[]>(sorted);
 });
 
 /** Create a library exercise (idempotent on name per user; revives an archived one on name collision). */

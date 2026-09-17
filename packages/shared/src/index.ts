@@ -73,6 +73,18 @@ export interface CreateExerciseBody {
 }
 
 /**
+ * A curated exercise the app knows the taxonomy of, whether or not the user owns it.
+ * Served by `GET /api/exercises/catalog` so a picker can offer names beyond the
+ * user's own library; picking one creates the library row, tagged from this entry.
+ */
+export interface CatalogExercise {
+  name: string;
+  kind: ExerciseKind;
+  primaryMuscleGroup: MuscleGroup;
+  equipment: Equipment;
+}
+
+/**
  * A stand-in for an exercise, sharing its primary muscle group. Either one of the
  * user's own library exercises (`inLibrary: true`, with an `id`) or a curated catalog
  * entry they don't have yet (`inLibrary: false`, `id: null` — adding it is the next step).
@@ -154,6 +166,8 @@ export interface AddDayExerciseBody {
   section?: string | null;
 }
 export interface UpdateDayExerciseBody {
+  /** Swap which exercise this slot trains, keeping its position, targets and tags. */
+  exerciseId?: string;
   targetSets?: number;
   targetReps?: number;
   targetRepsMax?: number | null;

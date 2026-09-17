@@ -1,4 +1,4 @@
-import type { Equipment, ExerciseKind, MuscleGroup } from "@afya/shared";
+import type { CatalogExercise, MuscleGroup } from "@afya/shared";
 
 /**
  * The curated exercise taxonomy: the one place a name is mapped to a muscle group
@@ -21,13 +21,6 @@ import type { Equipment, ExerciseKind, MuscleGroup } from "@afya/shared";
  * matters, the entry needs its own new backfill migration. Never edit either side to
  * disagree with the other about what a name means.
  */
-export interface CatalogExercise {
-  name: string;
-  kind: ExerciseKind;
-  primaryMuscleGroup: MuscleGroup;
-  equipment: Equipment;
-}
-
 export const EXERCISE_CATALOG: readonly CatalogExercise[] = [
   // --- chest ---------------------------------------------------------------
   { name: "Barbell Bench Press", kind: "weighted", primaryMuscleGroup: "chest", equipment: "barbell" },
