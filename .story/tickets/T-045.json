@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-17",
+  "description": "Every quick-add chip (FuelPanel.tsx:165-171) logs exactly one fixed portion. Two chicken breasts means tapping twice; half a shake is impossible.\n\nMacroFactor's logging is ~1.5x fewer actions than MyFitnessPal's largely because quantity is part of the add, not a second trip. Give each chip a long-press / expand that reveals x0.5 x1 x1.5 x2 and a free multiplier, then scale proteinG and calories on the client before POST. No schema change: the entry still stores absolute grams and kcal, and the label carries the portion (\"Chicken breast x2\").\n\nDepends on nothing. Touches apps/web/src/screens/start/FuelPanel.tsx only.",
+  "id": "T-045",
+  "order": 90,
+  "phase": "depth",
+  "status": "open",
+  "title": "Log a quick-add at a chosen portion instead of one fixed serving",
+  "type": "feature"
+}

@@ -1,0 +1,22 @@
+{
+  "components": [
+    "web",
+    "program-builder"
+  ],
+  "createdBy": "user-report",
+  "discoveredDate": "2026-09-17",
+  "displayId": "ISS-008",
+  "id": "ISS-008",
+  "impact": "Adding an exercise to a program day offers two affordances and neither is a picker.\n\nWHERE THE DEFECT IS\n- apps/web/src/screens/program/ProgramScreen.tsx:455-481 — the only text input is placeholder \"Name a new exercise…\". It does not filter anything; it is a create field.\n- apps/web/src/screens/program/ProgramScreen.tsx:105-113 — on submit, addExercise looks for an EXACT case-insensitive name match in the loaded library and, failing that, silently POSTs a brand-new exercise. A typo or a variant spelling (\"Incline DB Press\" vs \"Incline Dumbbell Press\") creates a duplicate library row that is also untagged (apps/api/src/routes/exercises.ts:70 only tags on an exact catalog-name match), so it gets no muscle group, no equipment, and no alternatives forever after.\n- apps/web/src/screens/program/ProgramScreen.tsx:188-189 — the only browse affordance is the `suggestions` array: the library minus what is already in the day, `.slice(0, 8)`. No query, no ranking, no relevance. Rendered at :482-487. Past 8 library exercises the remainder is unreachable by browsing.\n- apps/api/src/db/exercise-catalog.ts — 67 curated exercises with muscle group and equipment. The builder never reads them. They are reachable only by typing a name character-exact.\n\nREPLACE IS ABSENT ENTIRELY\nThere is no swap control on a program exercise. To change one you arm the × (ProgramScreen.tsx:342-350), tap twice within 4s, then type the replacement, which appends to the END of the day, then press ↑ repeatedly (moveEx, :180-186, one position per tap) to walk it back to its slot. Ordering, section and superset tags are lost in the process.\n\nTHE WORKING COUNTER-EXAMPLE IS IN THIS REPO\nSessionScreen already does this correctly mid-workout: apps/web/src/screens/session/SessionScreen.tsx:136-138 and :497-525 render a swap sheet from GET /api/exercises/:id/alternatives (apps/api/src/routes/exercises.ts:92-135), which returns the user's same-muscle library first, then catalog entries they do not own, ranked by rankAlternatives (apps/api/src/exercise-alternatives.ts). The builder — where the choice actually gets made and is durable — has none of it.\n\nVERIFIED vs SUSPECTED\nVerified by reading: the absence of a search input, the exact-match-else-create path, the slice(0,8), the missing replace, and the existing session-side swap endpoint and UI. Not verified at runtime: how large the reporter's own library currently is.\n\nPROPOSED FIX (frontend, no schema change)\n1. Replace the \"Add exercise\" block with a combobox. One input filters a live list as you type, over the union of (a) the user's library, already fetched at ProgramScreen.tsx:32, and (b) the 67 catalog entries, exposed via a new GET /api/exercises/catalog (or an includeCatalog flag on the existing list route). Substring + token match, not exact.\n2. Rank: library-and-not-in-this-day first, then in-this-day (shown disabled, \"already in this day\"), then catalog (tagged \"new\"). Show muscle group and equipment chips using the existing TaxonomyTags component, so the choice is informed.\n3. \"Create <typed text>\" becomes an explicit LAST row, never the implicit fallback. That is the whole duplicate-library defect: creating must be a decision, not the failure mode of not matching.\n4. Add a Swap control per program exercise, reusing GET /api/exercises/:id/alternatives exactly as SessionScreen does, with the combobox as the \"something else\" escape. Swapping replaces IN PLACE — same position, same section, same superset group, same targetSets/targetReps/restSec — via a new PATCH on the day-exercise row carrying exerciseId, so nothing has to be re-entered.\n5. Keep the kind selector (ProgramScreen.tsx:447-453) visible only on the create row; picking an existing exercise already knows its kind.",
+  "location": [],
+  "phase": "depth",
+  "relatedTickets": [
+    "T-018",
+    "T-043"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "high",
+  "status": "open",
+  "title": "Program builder has no exercise search: the library and catalog are unreachable except by typing an exact name"
+}

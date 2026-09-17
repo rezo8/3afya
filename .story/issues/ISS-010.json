@@ -1,0 +1,18 @@
+{
+  "components": [
+    "web",
+    "fuel"
+  ],
+  "createdBy": "review",
+  "discoveredDate": "2026-09-17",
+  "id": "ISS-010",
+  "impact": "apps/web/src/screens/start/FuelPanel.tsx:166-170 renders each quick-add chip as \"+ Chicken breast 30p\" — protein only. The calories are in the object being posted (COLD_START_CHIPS, FuelPanel.tsx:8-13; or the derived frequent list, apps/api/src/routes/fuel.ts:44-64) and land in the day's total the moment the chip is tapped.\n\nSo the fastest way to log food in the app is also the only way to change your calorie total without being shown the number. A user watching the calorie meter (FuelPanel.tsx:151-162) sees it jump with no attribution until they expand \"Logged today\".\n\nFix: show both macros on the chip (\"30p / 200\"), or at minimum the calories, since the calorie meter is the one with a hard ceiling. Same tap cost, no honesty gap.\n\nRelated: this is the \"every number honest\" principle from the trust phase. Verified by reading; not reproduced at runtime.",
+  "location": [],
+  "phase": "trust",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "Quick-add chips show protein but silently add calories"
+}

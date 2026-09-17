@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-17",
+  "description": "POST /api/fuel (apps/api/src/routes/fuel.ts:87-100) never accepts a timestamp; loggedAt defaults to now (schema/tracker.ts:168). Food logged the next morning lands on the wrong day, and there is no way to move it.\n\nAccept an optional loggedAt on POST and PATCH, validated to be within a sane window (not future, not more than ~30 days back), and resolve \"which day\" through the existing local-date helpers (apps/api/src/day.ts) rather than the server zone — ISS-005 is exactly this bug in its earlier form.\n\nUI: a day stepper at the top of the Fuel panel, \"< Yesterday | Today >\", which switches GET /api/fuel/today to a dated variant and stamps new entries with that day. Pairs with T-015 (back-date a session) — same idea, other domain.",
+  "id": "T-047",
+  "order": 100,
+  "phase": "depth",
+  "status": "open",
+  "title": "Back-date fuel: log and retime an entry on a day other than today",
+  "type": "feature"
+}

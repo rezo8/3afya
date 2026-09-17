@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-17",
+  "description": "The calorie target is a number the user typed once (PUT /api/fuel/target, fuel.ts:112-126; DEFAULT_TARGET 2600 at fuel.ts:20). It never learns. A static target is the single thing every modern tracker has moved away from.\n\nMacroFactor derives expenditure from the relationship between logged intake and the body-weight trend instead of from an age/height/activity formula: log ~2200 kcal for two weeks while trend weight holds flat, and TDEE is ~2200. Weight is smoothed with a rolling weighted average over 2-4 weeks first, because daily scale noise from hydration and glycogen is larger than the signal.\n\n3afya already has both inputs: fuelEntry (schema/tracker.ts:160-171) and bodyMetric (schema/tracker.ts:191+, weight). This ticket is the pure function that turns them into an estimate — smoothed weight trend, energy balance over the window, an expenditure number with an explicit confidence/insufficient-data state — plus GET /api/fuel/expenditure. It does NOT silently move the user's target: it shows \"your intake and weight say ~2,450 kcal; your target is 2,600\" and offers to adopt it. nutritionTarget is already append-only (schema/tracker.ts:173-188), so every adopted target stays on the record.\n\nKeep the estimator a pure module with its own tests beside it (the exercise-alternatives.ts / .test.ts pattern). Blocked on nothing, but only useful once weight is being logged with some regularity.",
+  "id": "T-048",
+  "order": 70,
+  "phase": "insight",
+  "status": "open",
+  "title": "Adaptive expenditure: derive the calorie target from weight trend and logged intake",
+  "type": "feature"
+}

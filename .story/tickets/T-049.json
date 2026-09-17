@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-17",
+  "description": "Fuel is scored as a daily pass/fail: totals reset at local midnight and the meters (FuelPanel.tsx:138-163) say \"hit\" or \"384 kcal left\". Physiology does not settle up daily. Every serious tracker reports the weekly average, because one high day inside a compliant week is noise, and seven mediocre days that each read \"close\" are not.\n\nAdd a 7-day rolling average line to the fuel history view (GET /api/fuel/history already returns per-day totals, fuel.ts:128-160) and show, under the daily meters, \"this week: 2,480 kcal/day avg, 172 g protein/day avg\" against the target that was in force. Days with zero entries are a real problem here: an unlogged day averages in as 0 and makes adherence look far better than it was. Count and show them (\"6 of 7 days logged\") and exclude unlogged days from the average rather than treating them as fasts.\n\nFeeds T-025 (streaks) — the honest streak is logged days, not target-hit days.",
+  "id": "T-049",
+  "order": 80,
+  "phase": "insight",
+  "status": "open",
+  "title": "Score fuel on a weekly average, not a daily pass/fail",
+  "type": "feature"
+}

@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-17",
+  "description": "A logged fuel entry can only be deleted and re-added (FuelPanel.tsx:224-232; apps/api/src/routes/fuel.ts:102-110 offers DELETE and no PATCH). Misjudging a portion — the single most common tracking error — costs a delete, a retype, and a lost timestamp.\n\nAdd PATCH /api/fuel/:id accepting label, proteinG, calories (same Math.max(0,...) clamping as POST, fuel.ts:87-100), scoped to the calling user. In the UI, tapping a row in \"Logged today\" opens it inline in the same NumberField form the custom-add already uses (FuelPanel.tsx:246-283).\n\nThis is the \"every write visible, every number honest\" contract from the trust phase applied to fuel: right now the only way to correct a number is to destroy the record of it.",
+  "id": "T-046",
+  "order": 80,
+  "phase": "trust",
+  "status": "open",
+  "title": "Edit a logged fuel entry instead of deleting and retyping it",
+  "type": "feature"
+}

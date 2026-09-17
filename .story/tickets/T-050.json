@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-17",
+  "description": "The frequent list (fuel.ts:44-64) groups on lower(trim(label)) and takes the newest entry's macros. It is good, and it is fragile in one way: \"chicken breast\" and \"Chicken Breast 200g\" are two different foods to it, and the macros drift with whatever was last typed.\n\nThe user's stated requirement is explicitly NOT exact meal logging — no food database, no barcodes, no 12-million-row catalog. So the right shape is a small personal food memory, not an integration: a saved item is a label plus macros per unit, where the unit is the user's own (\"1 scoop\", \"100 g\", \"1 breast\"). Logging it = pick item, pick quantity, done; the entry still writes absolute grams and kcal so history and targets are untouched.\n\nScope: a fuel_item table (userId, label, unit, proteinGPerUnit, caloriesPerUnit, archivedAt), CRUD under /api/fuel/items, \"save this as an item\" on any logged entry, and the quick-add row reading from items first and falling back to today's frequent-label derivation for anything not saved.\n\nDo this AFTER T-045 through T-047 (quantity, edit, back-date). Those fix logging that is currently impossible; this one makes logging that already works faster.",
+  "id": "T-050",
+  "order": 110,
+  "phase": "depth",
+  "status": "open",
+  "title": "Personal food memory: saved items with a unit and per-unit macros",
+  "type": "feature"
+}
