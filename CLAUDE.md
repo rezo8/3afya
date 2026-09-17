@@ -167,7 +167,9 @@ records what is specific to 3afya.
 - **Day letters**: Use index in `program.days` (`String.fromCharCode(65 + i)`), never `programDay.position` (not re-packed on delete).
 - **Armed confirm pattern**: Two-tap delete with `DELETE_ARM_MS` (4s) window. Used for delete day, remove exercise, remove empty session. Reuse this shape rather than modals.
 - **Program builder sizing**: Controls sized against 390px budget. `.ord`, `.ctl button`, `.pex-del` use `flex: none`. Re-do arithmetic before adding controls.
-- **Placeholder-shown**: `.pex-tag-in` empty state uses `:placeholder-shown` — the `placeholder` attribute is load-bearing.
+- **Section/superset editing is a panel, not inline inputs**: one 44px `.pex-grouping` control per exercise states what the row carries and opens `.pex-grouping-panel`; swap and grouping share `openPanel` so only one expands a row (ISS-007). Inline 11px inputs were a ~25px target labelled only by a placeholder.
+- **Uncontrolled fields are keyed on their stored value** (`${ex.id}:sec:${ex.section ?? ""}`): a stable key never re-syncs a `defaultValue` input, so a rejected edit sits in the field reading as saved.
+- **A label that wraps its own input must not also wrap a button** — tapping the button focuses the field. Keep Clear a sibling. A mono/uppercase label also inherits into the input; reset `text-transform`/`letter-spacing` there.
 - **History stat presentation**: When streak is 0 but something was trained, render `Nd ago / Last trained` instead of `0d / Current streak` to avoid confusion.
 - **BodyScreen staleness**: Shows `last logged Nd ago` rather than guarding the tap — re-logging unchanged weight is legitimate.
 - **Session recap never locks**: `/history/$sessionId` is post-workout recap; sets can still be logged/edited after. Use "Review session" wording. Editing there is opt-in per exercise ("Edit sets"), one exercise at a time — the screen reads as a recap first. Any set edit invalidates `session-detail`/`sessions`/`session`/`today`/`records`/`trends`.

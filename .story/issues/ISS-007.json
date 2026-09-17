@@ -6,6 +6,7 @@
   "createdBy": "user-report",
   "dedupeKey": "user-report:superset-field-unusable",
   "discoveredDate": "2026-09-12",
+  "displayId": "ISS-007",
   "id": "ISS-007",
   "impact": "Reported from real use: \"I can't edit the superset stuff in my program.\"\n\nWhat is verified. The server path is fine — PATCH /api/programs/day-exercises/:id with supersetGroup null (or \"\") clears the group and persists, confirmed against the running API on six real rows. updateEx invalidates on success. So whatever the user hit is in the builder UI, not the API.\n\nWhat the control actually is. `.pex-tag-in` is an 11px mono input with 5px vertical padding — roughly a 25px-tall target against the 44px the rest of the app uses, two of them sharing one flex row inside a layout already sized against a 390px budget. It is labelled only by its placeholder, has no clear affordance, and the CSS carries a comment admitting the earlier solid-border version \"read as inert tags with nothing inviting a tap\", so the dashed border was already one attempt at this problem.\n\nWhy it can look like the edit does not stick. The input is uncontrolled (`defaultValue`) with a `key` that is stable across refetches, so its displayed value never re-syncs from the server. Combined with ProgramScreen having 13 mutations and no `onError` at all (T-001), a failed PATCH leaves the field showing the new value with nothing reported — it reads as saved until a reload brings the old value back.\n\nWhich of these the user hit is not established, and the fixes differ: a target-size problem wants sizing, a silent-failure problem is T-001, a discoverability problem wants a label and an explicit clear button. Worth asking before building.\n\nWorth considering alongside the fix: supersets and sections are advanced features shown on every exercise row whether or not the user has ever used one. For someone who does not superset, both fields are permanent clutter on the highest-density screen in the app. A \"show advanced fields\" disclosure would remove the problem for that user rather than making the target bigger.",
   "location": [
@@ -17,9 +18,14 @@
     "T-001",
     "T-009"
   ],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "The issue named three candidate causes and said which one the user hit was not established. Checked each against HEAD before building:\n\n1. SILENT FAILURE — already closed. ProgramScreen's 13 mutations all go through `useTrackedMutation` now and the screen renders `errors.failure` with a retry (ProgramScreen.tsx:188, :250). T-001/T-044 fixed this after the issue was filed; nothing left to do here.\n2. TARGET SIZE — still held. `.pex-tag-in` was an 11px mono input with 5px vertical padding, two per flex row.\n3. STALE UNCONTROLLED VALUE — still held, and was a real defect independent of the other two: `key={`${ex.id}:ss`}` is stable across refetches, so a `defaultValue` input never re-synced from the server.\n\nWHAT SHIPPED\n- The two micro-inputs are replaced by one full-width 44px control per exercise (`.pex-grouping`) that states what the row carries — \"Main lifts · Superset A\", or \"+ Section / superset\" when neither is set — and expands an editor panel. That covers target size and discoverability at once: the affordance is now a named control rather than a placeholder, and rows with no grouping carry no editing chrome.\n- The panel holds two 44px, visibly labelled fields with real example placeholders (\"e.g. A — same letter pairs them\"), each with an explicit Clear button. Clearing was previously only reachable by selecting the text and deleting it.\n- Both fields are keyed on their stored value (`${ex.id}:sec:${ex.section ?? \"\"}`), so any refetch re-syncs the input. A rejected edit no longer sits in the field reading as saved.\n- Swap and grouping now share one `openPanel` state, so only one panel expands a row at a time.\n- `<label>` wraps its own input for the association; Clear is a sibling, because a button nested in a label also focuses the labelled field on tap. The label is mono/uppercase and both properties inherit, so the input resets `text-transform`/`letter-spacing` — otherwise it renders what you type in capitals.\n- Dead `.pex-meta`/`.pex-tag-in` CSS removed.\n\nNOT DONE, DELIBERATELY: the issue also floated hiding supersets behind a global \"show advanced fields\" preference. Per-row disclosure already removes the clutter for someone who never supersets, and a global toggle would hide a field that has a value — worse than the problem it solves.\n\nVerified: typecheck, lint, test (84), build all pass. Not verified at runtime in a browser; measurements are from the CSS, not from a rendered page.",
+  "resolutionEpoch": {
+    "establishedAt": "2026-09-17T12:51:19.313Z",
+    "issueId": "ISS-007",
+    "sessionId": "45a9007f-af62-4e64-8c4d-05d52f645550"
+  },
+  "resolvedDate": "2026-09-17",
   "severity": "high",
-  "status": "open",
+  "status": "resolved",
   "title": "Superset and section fields in the program builder are a ~25px target that can't report a failure"
 }

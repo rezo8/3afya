@@ -1610,37 +1610,105 @@ body {
   outline: none;
   border-color: var(--accent);
 }
-.pex-meta {
-  display: flex;
-  gap: 8px;
+/* Section and superset used to be two 11px inputs sharing one row — a ~25px target
+   labelled only by its placeholder, on the densest screen in the app (ISS-007). They
+   are now one full-size control that says what the row carries and opens the editor. */
+.pex-grouping {
+  appearance: none;
+  width: 100%;
+  min-height: 44px;
   margin-top: 6px;
-}
-/* Dashed while empty, solid once filled: these are free-text inputs, and a solid
-   chip border made them read as inert tags with nothing inviting a tap. Dashed
-   is the same "add something here" language as the `+ range` / `+ rest` buttons
-   on the same card. */
-.pex-tag-in {
-  flex: 1;
-  min-width: 0;
   background: var(--surface);
   border: 1px dashed var(--line-hi);
-  color: var(--text-soft);
   border-radius: var(--r-sm);
-  padding: 5px 8px;
-  font-family: var(--mono);
-  font-size: 11px;
+  color: var(--text-faint);
+  font-family: var(--sans);
+  font-size: 13px;
+  text-align: left;
+  padding: 0 12px;
+  cursor: pointer;
 }
-.pex-tag-in:not(:placeholder-shown) {
+.pex-grouping:hover {
+  border-color: var(--accent-mute);
+}
+.pex-grouping.set {
   border-style: solid;
   color: var(--text);
 }
-.pex-tag-in:focus {
-  outline: none;
+.pex-grouping.on {
   border-color: var(--accent);
   color: var(--text);
 }
-.pex-note::placeholder,
-.pex-tag-in::placeholder {
+.pex-grouping-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.pex-field {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+/* The label wraps its own input, so the association needs no id; Clear stays a
+   sibling — nested in the label, tapping it would focus the field as well. */
+.pex-field-lbl {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+/* The label is mono/uppercase and both of those inherit, so the field has to say
+   otherwise or it renders what you type in capitals. */
+.pex-field-lbl input {
+  text-transform: none;
+  letter-spacing: normal;
+  min-height: 44px;
+  background: var(--surface);
+  border: 1px solid var(--line-hi);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  padding: 0 12px;
+  font-family: var(--sans);
+  font-size: 15px;
+}
+.pex-field-lbl input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.pex-field-lbl input::placeholder {
+  color: var(--text-faint);
+}
+.pex-field-clear {
+  appearance: none;
+  flex: none;
+  min-height: 44px;
+  padding: 0 12px;
+  background: none;
+  border: 1px solid var(--line-hi);
+  border-radius: var(--r-sm);
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.pex-field-clear:hover {
+  border-color: var(--alert);
+  color: var(--alert);
+}
+.pex-note::placeholder {
   color: var(--text-faint);
 }
 .de-block {

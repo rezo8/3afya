@@ -48,6 +48,15 @@ async function resolveExerciseId(pick: ExercisePick): Promise<string> {
   return created.id;
 }
 
+/** Which panel a program-exercise row has expanded, if any. */
+type OpenPanel = { dayExerciseId: string; exerciseId: string; panel: "swap" | "tags" };
+
+/** What a row's grouping reads as on the button that edits it. */
+const groupingLabel = (section: string | null, supersetGroup: string | null): string => {
+  const parts = [section, supersetGroup && `Superset ${supersetGroup}`].filter((part): part is string => Boolean(part));
+  return parts.length ? parts.join(" · ") : "+ Section / superset";
+};
+
 const pickFromAlternative = (alt: ExerciseAlternative): ExercisePick =>
   alt.id === null ? { source: "catalog", name: alt.name } : { source: "library", exerciseId: alt.id };
 
@@ -68,11 +77,14 @@ export function ProgramScreen() {
   const [progName, setProgName] = useState("");
   const [armedDeleteDayId, setArmedDeleteDayId] = useState<string | null>(null);
   const [armedRemoveExId, setArmedRemoveExId] = useState<string | null>(null);
-  /** The program-exercise slot whose swap panel is open, with the exercise it currently holds. */
-  const [swapFor, setSwapFor] = useState<{ dayExerciseId: string; exerciseId: string } | null>(null);
+  /**
+   * The one open panel on an exercise row. Both panels expand the same card, so only
+   * one is open at a time — two at once buries the row they belong to.
+   */
+  const [openPanel, setOpenPanel] = useState<OpenPanel | null>(null);
   const errors = useMutationError();
 
-  const swapExerciseId = swapFor?.exerciseId ?? null;
+  const swapExerciseId = openPanel?.panel === "swap" ? openPanel.exerciseId : null;
   const alternativesQ = useQuery({
     queryKey: ["alternatives", swapExerciseId],
     queryFn: () => api.get<ExerciseAlternative[]>(`/api/exercises/${swapExerciseId}/alternatives`),
@@ -151,7 +163,7 @@ export function ProgramScreen() {
       return api.patch(`/api/programs/day-exercises/${dayExerciseId}`, { exerciseId } satisfies UpdateDayExerciseBody);
     },
     onSuccess: () => {
-      setSwapFor(null);
+      setOpenPanel(null);
       invalidate();
     },
   });
@@ -274,7 +286,7 @@ export function ProgramScreen() {
               setSelDayId(d.id);
               setArmedDeleteDayId(null);
               setArmedRemoveExId(null);
-              setSwapFor(null);
+              setOpenPanel(null);
             }}
           >
             <span className="badge">{String.fromCharCode(65 + i)}</span>
@@ -352,6 +364,8 @@ export function ProgramScreen() {
                 const inSS = !!g && (prev?.supersetGroup === g || next?.supersetGroup === g);
                 const ssStart = inSS && prev?.supersetGroup !== g;
                 const showSection = i === 0 || prev?.section !== ex.section;
+                const swapOpen = openPanel?.dayExerciseId === ex.id && openPanel.panel === "swap";
+                const tagsOpen = openPanel?.dayExerciseId === ex.id && openPanel.panel === "tags";
                 return [
                   showSection ? (
                     <li key={`sec-${ex.id}`} className="pex-section">
@@ -380,12 +394,10 @@ export function ProgramScreen() {
                         </span>
                         <span className="pex-actions">
                           <button
-                            className={`pex-swap${swapFor?.dayExerciseId === ex.id ? " on" : ""}`}
-                            aria-expanded={swapFor?.dayExerciseId === ex.id}
+                            className={`pex-swap${swapOpen ? " on" : ""}`}
+                            aria-expanded={swapOpen}
                             onClick={() =>
-                              setSwapFor(
-                                swapFor?.dayExerciseId === ex.id ? null : { dayExerciseId: ex.id, exerciseId: ex.exerciseId },
-                              )
+                              setOpenPanel(swapOpen ? null : { dayExerciseId: ex.id, exerciseId: ex.exerciseId, panel: "swap" })
                             }
                           >
                             Swap ⇄
@@ -466,29 +478,68 @@ export function ProgramScreen() {
                           if (v !== (ex.note ?? "")) updateEx.mutate({ id: ex.id, patch: { note: v || null } });
                         }}
                       />
-                      <div className="pex-meta">
-                        <input
-                          className="pex-tag-in"
-                          key={`${ex.id}:sec`}
-                          defaultValue={ex.section ?? ""}
-                          placeholder="Section"
-                          onBlur={(e) => {
-                            const v = e.target.value.trim();
-                            if (v !== (ex.section ?? "")) updateEx.mutate({ id: ex.id, patch: { section: v || null } });
-                          }}
-                        />
-                        <input
-                          className="pex-tag-in"
-                          key={`${ex.id}:ss`}
-                          defaultValue={ex.supersetGroup ?? ""}
-                          placeholder="Superset"
-                          onBlur={(e) => {
-                            const v = e.target.value.trim();
-                            if (v !== (ex.supersetGroup ?? "")) updateEx.mutate({ id: ex.id, patch: { supersetGroup: v || null } });
-                          }}
-                        />
-                      </div>
-                      {swapFor?.dayExerciseId === ex.id && (
+                      <button
+                        className={`pex-grouping${ex.section || ex.supersetGroup ? " set" : ""}${tagsOpen ? " on" : ""}`}
+                        aria-expanded={tagsOpen}
+                        onClick={() =>
+                          setOpenPanel(tagsOpen ? null : { dayExerciseId: ex.id, exerciseId: ex.exerciseId, panel: "tags" })
+                        }
+                      >
+                        {groupingLabel(ex.section, ex.supersetGroup)}
+                      </button>
+                      {tagsOpen && (
+                        <div className="pex-grouping-panel">
+                          <div className="pex-field">
+                            <label className="pex-field-lbl">
+                              Section
+                              <input
+                                // Keyed on the stored value so a refetch re-syncs the field. A stable key
+                                // left a rejected edit sitting in an uncontrolled input, reading as saved.
+                                key={`${ex.id}:sec:${ex.section ?? ""}`}
+                                defaultValue={ex.section ?? ""}
+                                placeholder="e.g. Main lifts"
+                                onBlur={(e) => {
+                                  const v = e.target.value.trim();
+                                  if (v !== (ex.section ?? "")) updateEx.mutate({ id: ex.id, patch: { section: v || null } });
+                                }}
+                              />
+                            </label>
+                            {ex.section && (
+                              <button
+                                className="pex-field-clear"
+                                aria-label={`Clear section for ${ex.name}`}
+                                onClick={() => updateEx.mutate({ id: ex.id, patch: { section: null } })}
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          <div className="pex-field">
+                            <label className="pex-field-lbl">
+                              Superset
+                              <input
+                                key={`${ex.id}:ss:${ex.supersetGroup ?? ""}`}
+                                defaultValue={ex.supersetGroup ?? ""}
+                                placeholder="e.g. A — same letter pairs them"
+                                onBlur={(e) => {
+                                  const v = e.target.value.trim();
+                                  if (v !== (ex.supersetGroup ?? "")) updateEx.mutate({ id: ex.id, patch: { supersetGroup: v || null } });
+                                }}
+                              />
+                            </label>
+                            {ex.supersetGroup && (
+                              <button
+                                className="pex-field-clear"
+                                aria-label={`Clear superset for ${ex.name}`}
+                                onClick={() => updateEx.mutate({ id: ex.id, patch: { supersetGroup: null } })}
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {swapOpen && (
                         <div className="swap-panel">
                           <p className="eyebrow">Swap for — keeps this slot’s position, targets and tags</p>
                           {alternativesQ.isLoading ? (
