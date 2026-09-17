@@ -49,3 +49,20 @@ export function isUsableTarget(draft: AmountDraft): boolean {
   const amount = readAmount(draft);
   return amount.state === "entered" && amount.value > 0;
 }
+
+/**
+ * What a food is worth, for display: `30p · 200kcal`.
+ *
+ * A zero is omitted rather than printed, because after a food was allowed to declare
+ * only one of its numbers, `0p · 5kcal` states a fact about black coffee that reads
+ * like a missing value. Both zero renders as nothing at all — the logging path won't
+ * produce it (`canLogAmounts`), and an empty summary is the honest reading if it ever
+ * does. Both numbers are rounded; a quick-add chip that hides one is how a tap could
+ * move the calorie total without ever showing the number (ISS-010).
+ */
+export function fuelMacroSummary(proteinG: number, calories: number): string {
+  const protein = Math.round(proteinG);
+  const kcal = Math.round(calories);
+  const parts = [protein > 0 && `${protein}p`, kcal > 0 && `${kcal}kcal`].filter((part): part is string => Boolean(part));
+  return parts.join(" · ");
+}

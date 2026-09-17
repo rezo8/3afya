@@ -5,14 +5,20 @@
   ],
   "createdBy": "review",
   "discoveredDate": "2026-09-17",
+  "displayId": "ISS-010",
   "id": "ISS-010",
-  "impact": "apps/web/src/screens/start/FuelPanel.tsx:166-170 renders each quick-add chip as \"+ Chicken breast 30p\" — protein only. The calories are in the object being posted (COLD_START_CHIPS, FuelPanel.tsx:8-13; or the derived frequent list, apps/api/src/routes/fuel.ts:44-64) and land in the day's total the moment the chip is tapped.\n\nSo the fastest way to log food in the app is also the only way to change your calorie total without being shown the number. A user watching the calorie meter (FuelPanel.tsx:151-162) sees it jump with no attribution until they expand \"Logged today\".\n\nFix: show both macros on the chip (\"30p / 200\"), or at minimum the calories, since the calorie meter is the one with a hard ceiling. Same tap cost, no honesty gap.\n\nRelated: this is the \"every number honest\" principle from the trust phase. Verified by reading; not reproduced at runtime.",
+  "impact": "apps/web/src/screens/start/FuelPanel.tsx:166-170 renders each quick-add chip as \"+ Chicken breast 30p\" — protein only. The calories are in the object being posted (COLD_START_CHIPS, FuelPanel.tsx:8-13; or the derived frequent list, apps/api/src/routes/fuel.ts:44-64) and land in the day's total the moment the chip is tapped.\n\nSo the fastest way to log food in the app is also the only way to change your calorie total without being shown the number. A user watching the calorie meter (FuelPanel.tsx:151-162) sees it jump with no attribution until they expand \"Logged today\".\n\nFix: show both macros on the chip (\"30p / 200\"), or at minimum the calories, since the calorie meter is the one with a hard ceiling. Same tap cost, no honesty gap.\n\nRelated: this is the \"every number honest\" principle from the trust phase. Verified by reading; not reproduced at runtime.\n\nOWNER DECISION (2026-09-17): the chips SHOULD keep adding calories — that behaviour is correct and must not change. This is a display defect only: show the calories on the chip alongside the protein. Do not remove calories from what a chip logs.",
   "location": [],
   "phase": "trust",
   "relatedTickets": [],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Display-only fix, per the owner decision on this issue: a chip still logs both numbers; it now shows both.\n\n- New `fuelMacroSummary(proteinG, calories)` in apps/web/src/lib/fuel.ts renders a food as \"30p · 200kcal\". A quick-add chip reads \"+ Chicken breast 30p · 200kcal\", so tapping it can no longer move the calorie meter without having stated the number first.\n- A zero is omitted rather than printed. After ISS-009 let a food declare only one of its numbers, \"0p · 5kcal\" states a true fact about black coffee that reads like a missing value. Both zero renders as the empty string; `canLogAmounts` won't produce that food, and saying nothing is the honest reading if it ever does.\n- The \"Logged today\" row now uses the same formatter instead of its own inline `{proteinG}p · {calories}kcal`. Both surfaces answer \"what is this food worth\" and must never disagree — that is one piece of knowledge, so it lives in one function.\n- Both numbers are rounded. The log row previously rounded protein and printed calories raw; a fractional calorie from the custom-entry field would have shown unrounded beside a rounded protein.\n\nCovered by 5 cases in apps/web/src/lib/fuel.test.ts (both, protein-only, calories-only, neither, rounding).\n\nVerified: typecheck, lint, test (89), build all pass. Not verified in a browser; chip width was reasoned from `.quickadd` being `flex-wrap` at 12px mono, not measured.",
+  "resolutionEpoch": {
+    "establishedAt": "2026-09-17T12:55:33.948Z",
+    "issueId": "ISS-010",
+    "sessionId": "ee4aec56-8867-4569-87a3-ea8d9cc74c63"
+  },
+  "resolvedDate": "2026-09-17",
   "severity": "medium",
-  "status": "open",
+  "status": "resolved",
   "title": "Quick-add chips show protein but silently add calories"
 }

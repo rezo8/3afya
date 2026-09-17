@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountValue, bumpAmount, canLogAmounts, isUsableTarget, readAmount } from "./fuel";
+import { amountValue, bumpAmount, canLogAmounts, fuelMacroSummary, isUsableTarget, readAmount } from "./fuel";
 
 describe("readAmount", () => {
   it("reads an empty field as blank rather than as zero", () => {
@@ -84,5 +84,27 @@ describe("isUsableTarget", () => {
   it("refuses a blank or unreadable target", () => {
     expect(isUsableTarget("")).toBe(false);
     expect(isUsableTarget("abc")).toBe(false);
+  });
+});
+
+describe("fuelMacroSummary", () => {
+  it("shows both numbers when a food has both", () => {
+    expect(fuelMacroSummary(30, 200)).toBe("30p · 200kcal");
+  });
+
+  it("omits protein a food does not have", () => {
+    expect(fuelMacroSummary(0, 5)).toBe("5kcal");
+  });
+
+  it("omits calories a food does not have", () => {
+    expect(fuelMacroSummary(30, 0)).toBe("30p");
+  });
+
+  it("says nothing when a food declares neither", () => {
+    expect(fuelMacroSummary(0, 0)).toBe("");
+  });
+
+  it("rounds both numbers", () => {
+    expect(fuelMacroSummary(30.4, 200.6)).toBe("30p · 201kcal");
   });
 });

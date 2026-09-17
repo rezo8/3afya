@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AddFuelEntryBody, FuelDay, FuelEntry, NutritionTarget } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
-import { amountValue, bumpAmount, canLogAmounts, isUsableTarget, readAmount, type AmountDraft } from "@/lib/fuel";
+import { amountValue, bumpAmount, canLogAmounts, fuelMacroSummary, isUsableTarget, readAmount, type AmountDraft } from "@/lib/fuel";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 
 const COLD_START_CHIPS: AddFuelEntryBody[] = [
@@ -159,7 +159,7 @@ export function FuelPanel() {
       <div className="quickadd">
         {quickAdds.map((food) => (
           <button key={food.label} className="chip" onClick={() => add.mutate(food)} disabled={add.isPending}>
-            + {food.label} {Math.round(food.proteinG)}p
+            + {food.label} {fuelMacroSummary(food.proteinG, food.calories)}
           </button>
         ))}
       </div>
@@ -213,7 +213,7 @@ export function FuelPanel() {
               <li key={entry.id} className="fuel-row">
                 <span className="fr-label">{entry.label}</span>
                 <span className="fr-meta">
-                  {timeOfDay(entry.loggedAt)} · {Math.round(entry.proteinG)}p · {entry.calories}kcal
+                  {timeOfDay(entry.loggedAt)} · {fuelMacroSummary(entry.proteinG, entry.calories)}
                 </span>
                 <button
                   className="fr-del"
