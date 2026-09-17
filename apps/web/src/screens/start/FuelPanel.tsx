@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AddFuelEntryBody, FuelDay, FuelEntry, NutritionTarget } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
+import { amountValue, bumpAmount, canLogAmounts, isUsableTarget, readAmount, type AmountDraft } from "@/lib/fuel";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 
 const COLD_START_CHIPS: AddFuelEntryBody[] = [
@@ -16,15 +17,7 @@ const PROTEIN_STEP = 5;
 const CALORIE_STEP = 50;
 const COLLAPSED_ENTRIES = 3;
 
-type NumberDraft = string;
-type TargetDraft = { proteinG: NumberDraft; calories: NumberDraft };
-
-const numberOf = (draft: NumberDraft) => {
-  const parsed = Number(draft.trim());
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-const bump = (draft: NumberDraft, by: number): NumberDraft => String(Math.max(0, numberOf(draft) + by));
-const isPositive = (draft: NumberDraft) => numberOf(draft) > 0;
+type TargetDraft = { proteinG: AmountDraft; calories: AmountDraft };
 
 const pct = (done: number, goal: number) => (goal > 0 ? Math.min(100, (done / goal) * 100) : 0);
 const timeOfDay = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
@@ -35,8 +28,8 @@ export function FuelPanel() {
   const errors = useMutationError();
   const [showCustom, setShowCustom] = useState(false);
   const [customLabel, setCustomLabel] = useState("");
-  const [customProtein, setCustomProtein] = useState<NumberDraft>("");
-  const [customCalories, setCustomCalories] = useState<NumberDraft>("");
+  const [customProtein, setCustomProtein] = useState<AmountDraft>("");
+  const [customCalories, setCustomCalories] = useState<AmountDraft>("");
   const [targetDraft, setTargetDraft] = useState<TargetDraft | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(false);
 
@@ -73,22 +66,23 @@ export function FuelPanel() {
   const visibleEntries = showAllEntries ? newestFirst : newestFirst.slice(0, COLLAPSED_ENTRIES);
   const hiddenEntries = newestFirst.length - COLLAPSED_ENTRIES;
 
-  const canAddCustom = customLabel.trim() !== "" && isPositive(customProtein) && isPositive(customCalories);
+  const canAddCustom =
+    customLabel.trim() !== "" && canLogAmounts(readAmount(customProtein), readAmount(customCalories));
   const submitCustom = (e: FormEvent) => {
     e.preventDefault();
     if (!canAddCustom || add.isPending) return;
-    add.mutate({ label: customLabel.trim(), proteinG: numberOf(customProtein), calories: numberOf(customCalories) });
+    add.mutate({ label: customLabel.trim(), proteinG: amountValue(customProtein), calories: amountValue(customCalories) });
     setCustomLabel("");
     setCustomProtein("");
     setCustomCalories("");
     setShowCustom(false);
   };
 
-  const canSaveTarget = !!targetDraft && isPositive(targetDraft.proteinG) && isPositive(targetDraft.calories);
+  const canSaveTarget = !!targetDraft && isUsableTarget(targetDraft.proteinG) && isUsableTarget(targetDraft.calories);
   const submitTarget = (e: FormEvent) => {
     e.preventDefault();
     if (!targetDraft || !canSaveTarget || saveTarget.isPending) return;
-    saveTarget.mutate({ proteinG: numberOf(targetDraft.proteinG), calories: numberOf(targetDraft.calories) });
+    saveTarget.mutate({ proteinG: amountValue(targetDraft.proteinG), calories: amountValue(targetDraft.calories) });
   };
   const toggleTargetEdit = () =>
     setTargetDraft((draft) =>
@@ -253,16 +247,16 @@ function NumberField({
 }: {
   label: string;
   unit: string;
-  value: NumberDraft;
+  value: AmountDraft;
   step: number;
   inputMode: "numeric" | "decimal";
-  onChange: (next: NumberDraft) => void;
+  onChange: (next: AmountDraft) => void;
 }) {
   return (
     <div className="fuel-field">
       <span className="fuel-field-label">{label}</span>
       <div className="fuel-field-ctl">
-        <button type="button" className="step small" aria-label={`Less ${label}`} onClick={() => onChange(bump(value, -step))}>
+        <button type="button" className="step small" aria-label={`Less ${label}`} onClick={() => onChange(bumpAmount(value, -step))}>
           −
         </button>
         <input
@@ -274,7 +268,7 @@ function NumberField({
           onChange={(e) => onChange(e.target.value)}
         />
         <span className="fuel-field-unit">{unit}</span>
-        <button type="button" className="step small" aria-label={`More ${label}`} onClick={() => onChange(bump(value, step))}>
+        <button type="button" className="step small" aria-label={`More ${label}`} onClick={() => onChange(bumpAmount(value, step))}>
           +
         </button>
       </div>
