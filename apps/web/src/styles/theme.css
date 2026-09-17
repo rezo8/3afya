@@ -656,6 +656,20 @@ body {
   gap: 8px;
   margin: 16px 0;
 }
+/* A set is in flight. Taps on the pip are guarded away while it is, so the row has to
+   say so — an unacknowledged tap is what makes someone tap again. */
+.pips.logging {
+  opacity: 0.55;
+  cursor: progress;
+}
+.pips.logging .pip.active {
+  animation: pip-logging 1s ease-in-out infinite;
+}
+@keyframes pip-logging {
+  50% {
+    opacity: 0.4;
+  }
+}
 .pip {
   flex: 1;
   height: 8px;

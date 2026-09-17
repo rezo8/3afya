@@ -14,6 +14,7 @@ import type {
   TodayResponse,
   UpdateSetBody,
 } from "@afya/shared";
+import { IDEMPOTENCY_KEY_MAX } from "@afya/shared";
 import { isToday } from "../day";
 import { db } from "../db";
 import { recordSetColumns } from "../db/record-set-columns";
@@ -339,6 +340,29 @@ app.post("/", async (c) => {
   return c.json({ id: row!.id, dayId: row!.dayId, performedAt: row!.performedAt.toISOString() }, 201);
 });
 
+/**
+ * The caller's key if they sent a usable one, else null — a malformed key means the
+ * request is treated as keyless, which is what every request did before this existed.
+ * Rejecting it would turn a bad optional field into a failure to record a set the user
+ * actually performed, and the set is the thing worth protecting.
+ */
+function parseIdempotencyKey(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > IDEMPOTENCY_KEY_MAX) return null;
+  return trimmed;
+}
+
+/** The set this key already logged in this session, if it is still there. */
+async function replayedSet(sessionId: string, idempotencyKey: string) {
+  const [row] = await db
+    .select()
+    .from(setLog)
+    .where(and(eq(setLog.sessionId, sessionId), eq(setLog.idempotencyKey, idempotencyKey)))
+    .limit(1);
+  return row ?? null;
+}
+
 /** Log one set into a session the user owns. */
 app.post("/:id/sets", async (c) => {
   const userId = c.get("userId");
@@ -360,8 +384,10 @@ app.post("/:id/sets", async (c) => {
     .limit(1);
   if (!ex) return c.json({ error: "bad_request", message: "Unknown exercise." }, 400);
 
+  const idempotencyKey = parseIdempotencyKey(body.idempotencyKey);
+
   // Send the fields relevant to the exercise's kind; the rest default to 0.
-  const [row] = await db
+  const [inserted] = await db
     .insert(setLog)
     .values({
       sessionId: session.id,
@@ -375,25 +401,37 @@ app.post("/:id/sets", async (c) => {
       // guessing at miles.
       distanceUnit: parseDistanceUnit(body.distanceUnit),
       isWarmup: body.isWarmup ?? false,
+      idempotencyKey,
     })
+    .onConflictDoNothing({ target: [setLog.sessionId, setLog.idempotencyKey] })
     .returning();
+
+  // Nothing came back: this key already logged a set in this session, so the request is
+  // the same set-completion arriving twice. Answer with the row it logged the first time.
+  const row = inserted ?? (idempotencyKey ? await replayedSet(session.id, idempotencyKey) : null);
+  if (!row) {
+    // Reachable when a concurrent DELETE removes the conflicting row between the insert
+    // and this read. 409 is not retryable, so this message is the whole response the
+    // user gets — say what happened to their set, not what happened to the database.
+    return c.json({ error: "conflict", message: "That set didn't save. Log it again." }, 409);
+  }
 
   const priorSets = await db
     .select(recordSetColumns)
     .from(setLog)
     .innerJoin(workoutSession, eq(setLog.sessionId, workoutSession.id))
-    .where(and(eq(workoutSession.userId, userId), eq(setLog.exerciseId, ex.id), ne(setLog.id, row!.id)));
+    .where(and(eq(workoutSession.userId, userId), eq(setLog.exerciseId, ex.id), ne(setLog.id, row.id)));
   const prs = detectPrs(ex.kind, priorSets, {
-    id: row!.id,
-    weight: row!.weight,
-    reps: row!.reps,
-    durationSec: row!.durationSec,
-    distance: row!.distance,
-    distanceUnit: row!.distanceUnit,
-    isWarmup: row!.isWarmup,
-    completedAt: row!.completedAt,
+    id: row.id,
+    weight: row.weight,
+    reps: row.reps,
+    durationSec: row.durationSec,
+    distance: row.distance,
+    distanceUnit: row.distanceUnit,
+    isWarmup: row.isWarmup,
+    completedAt: row.completedAt,
   });
-  return c.json({ set: toSet(row!), prs } satisfies LoggedSetResult, 201);
+  return c.json({ set: toSet(row), prs } satisfies LoggedSetResult, inserted ? 201 : 200);
 });
 
 /** Edit a logged set (e.g. fix a wrong weight) in a session the user owns. */

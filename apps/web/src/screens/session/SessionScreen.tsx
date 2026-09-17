@@ -23,6 +23,7 @@ import { SetEditor, stepDistance } from "@/components/SetEditor";
 import { PR_LABEL } from "@/lib/pr";
 import { fmtClock, fmtDist, fmtDur, parseDuration, stepDuration } from "@/lib/format";
 import { isExerciseDone } from "@/lib/session";
+import { keyForSlot, newIdempotencyKey, slotId } from "@/lib/set-slot";
 import { useRestTimer } from "./RestTimer";
 
 type Work = Record<string, { weight: number; reps: number; durationSec: number; distance: number; distanceUnit: DistanceUnit }>;
@@ -119,6 +120,16 @@ function SessionView({ target }: { target: SessionTarget }) {
    * duplicate row because `POST /api/sessions` happens to be find-or-create.
    */
   const createdSessionId = useRef<string | null>(null);
+  /**
+   * One idempotency key per set slot, so a double tap sends the same key and the server
+   * logs one row. Kept in a ref because it must be correct within a single frame, which
+   * `logSet.isPending` is not. See `lib/set-slot.ts` for why it is per slot, not per tap.
+   *
+   * Deliberately mounted-scoped: a delete on the recap screen also renumbers sets, and
+   * what covers that is this component unmounting. Hoisting the map to a module or a
+   * context would reintroduce the replay it guards against.
+   */
+  const setKeys = useRef(new Map<string, string>());
   const rest = useRestTimer();
   const libraryQ = useQuery({ queryKey: ["exercises"], queryFn: () => api.get<Exercise[]>("/api/exercises") });
   const alternativesQ = useQuery({
@@ -137,6 +148,7 @@ function SessionView({ target }: { target: SessionTarget }) {
     errors.clear();
     setNextIsWarmup(false);
     createdSessionId.current = null;
+    setKeys.current.clear();
   }, [targetKey, errors.clear]);
 
   useEffect(() => {
@@ -195,7 +207,13 @@ function SessionView({ target }: { target: SessionTarget }) {
   });
   const deleteSet = useTrackedMutation(errors, {
     mutationFn: (setId: string) => api.delete(`/api/sessions/${data!.session!.id}/sets/${setId}`),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      // Deleting renumbers the remaining sets, so every held key now names a slot that
+      // means something else. Keeping them would replay a surviving row in place of a
+      // set the user actually performed.
+      setKeys.current.clear();
+      invalidate();
+    },
   });
   const createEx = useTrackedMutation(errors, {
     mutationFn: (body: CreateExerciseBody) => api.post<Exercise>("/api/exercises", body),
@@ -322,9 +340,18 @@ function SessionView({ target }: { target: SessionTarget }) {
   }
 
   function completeSet() {
-    if (!active) return;
+    // Guarded here rather than at the call sites: the pip is a <span> and cannot be
+    // disabled, so the two would otherwise disagree. This stops the ordinary double tap;
+    // the idempotency key below stops the one that beats a render.
+    if (!active || logSet.isPending) return;
     const wk = work[active.exerciseId]!;
-    const body: LogSetBody = { exerciseId: active.exerciseId, setNumber: active.loggedSets.length + 1, isWarmup: nextIsWarmup };
+    const setNumber = active.loggedSets.length + 1;
+    const body: LogSetBody = {
+      exerciseId: active.exerciseId,
+      setNumber,
+      isWarmup: nextIsWarmup,
+      idempotencyKey: keyForSlot(setKeys.current, slotId(active.exerciseId, setNumber), newIdempotencyKey),
+    };
     if (active.kind === "weighted") {
       body.weight = wk.weight;
       body.reps = wk.reps;
@@ -636,7 +663,9 @@ function SessionView({ target }: { target: SessionTarget }) {
                       : "= same as last time"}
               </div>
 
-              <div className="pips">
+              {/* `logging` is what makes the guard legible: a tap swallowed by a request
+                  already in flight would otherwise look like a dead control. */}
+              <div className={`pips${logSet.isPending ? " logging" : ""}`}>
                 {Array.from({ length: pipCount }).map((_, i) => {
                   const cls = ["pip"];
                   if (active.fromProgram && i >= active.targetSets) cls.push("extra");

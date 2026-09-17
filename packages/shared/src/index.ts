@@ -266,7 +266,21 @@ export interface LogSetBody {
   distance?: number;
   distanceUnit?: DistanceUnit;
   isWarmup?: boolean;
+  /**
+   * Identifies one set-completion, so the same one arriving twice — a double tap, or a
+   * retried request whose first response never came back — logs one row. Optional: a
+   * client that sends none gets the old unguarded insert.
+   */
+  idempotencyKey?: string;
 }
+
+/**
+ * The longest `LogSetBody.idempotencyKey` the API will honour. A longer one is treated
+ * as keyless, which silently switches off the double-log guard — so the bound lives
+ * here, where the client generating keys and the server validating them read the same
+ * number, rather than once on each side.
+ */
+export const IDEMPOTENCY_KEY_MAX = 128;
 export interface UpdateSetBody {
   weight?: number;
   reps?: number;

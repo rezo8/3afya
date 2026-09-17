@@ -146,12 +146,19 @@ export const setLog = pgTable(
     // Records and trends convert to metres to compare across units.
     distanceUnit: text("distance_unit").$type<DistanceUnit>(),
     isWarmup: boolean("is_warmup").default(false).notNull(),
+    // One set-completion's identity, supplied by the client. Nullable on purpose: every
+    // row that predates this column, and every request that sends no key, still inserts.
+    idempotencyKey: text("idempotency_key"),
     completedAt: timestamp("completed_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index("set_log_session_idx").on(t.sessionId),
     // Drives the "last session" pre-fill and the per-exercise strength trends.
     index("set_log_exercise_completed_idx").on(t.exerciseId, t.completedAt),
+    // What actually stops a double-logged set: a second insert carrying a key this
+    // session already used is rejected by Postgres rather than by application code.
+    // Postgres treats NULLs as distinct by default, so keyless inserts are unaffected.
+    uniqueIndex("set_log_session_idem_idx").on(t.sessionId, t.idempotencyKey),
   ],
 );
 

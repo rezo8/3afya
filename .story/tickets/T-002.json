@@ -1,12 +1,13 @@
 {
   "blockedBy": [],
-  "completedDate": null,
+  "completedDate": "2026-09-17",
   "createdDate": "2026-09-12",
   "description": "The set-completion pip calls completeSet() unguarded while the primary button checks logSet.isPending, so a double tap on a slow connection logs the set twice. Add the same client guard to the pip.\n\nThen close the server half: a client-generated idempotency key on POST /api/sessions/:id/sets so a retried request cannot insert a second row. The retry path in T-001 makes this more likely, not less, because a user who can retry will.",
+  "displayId": "T-002",
   "id": "T-002",
   "order": 20,
   "phase": "trust",
-  "status": "open",
+  "status": "complete",
   "title": "Guard against double-logging a set",
   "type": "task"
 }
