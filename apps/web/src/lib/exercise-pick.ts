@@ -1,4 +1,4 @@
-import type { CatalogExercise, Equipment, Exercise, ExerciseKind, MuscleGroup } from "@afya/shared";
+import type { CatalogExercise, Equipment, Exercise, ExerciseAlternative, ExerciseKind, MuscleGroup } from "@afya/shared";
 
 /**
  * What the exercise picker hands back. Creating is its own answer rather than what
@@ -9,6 +9,10 @@ export type ExercisePick =
   | { source: "library"; exerciseId: string }
   | { source: "catalog"; name: string }
   | { source: "new"; name: string; kind: ExerciseKind };
+
+/** A suggested alternative, said in the picker's terms: a library row, or a catalog name to create. */
+export const pickFromAlternative = (alt: ExerciseAlternative): ExercisePick =>
+  alt.id === null ? { source: "catalog", name: alt.name } : { source: "library", exerciseId: alt.id };
 
 export interface PickerOption {
   key: string;

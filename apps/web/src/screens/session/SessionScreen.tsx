@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import type {
+  CatalogExercise,
   CreateExerciseBody,
   DistanceUnit,
   Exercise,
@@ -23,6 +24,8 @@ import { SetEditor, stepDistance } from "@/components/SetEditor";
 import { PR_LABEL } from "@/lib/pr";
 import { fmtClock, fmtDist, fmtDur, parseDuration, stepDuration } from "@/lib/format";
 import { isExerciseDone } from "@/lib/session";
+import { pickFromAlternative, type ExercisePick } from "@/lib/exercise-pick";
+import { ExercisePicker } from "@/components/ExercisePicker";
 import { keyForSlot, newIdempotencyKey, slotId } from "@/lib/set-slot";
 import { useRestTimer } from "./RestTimer";
 
@@ -32,6 +35,12 @@ type Work = Record<string, { weight: number; reps: number; durationSec: number; 
 type SessionTarget = { kind: "day"; dayId: string } | { kind: "freeform" };
 
 const DISTANCE_UNITS: DistanceUnit[] = ["mi", "km", "m"];
+
+/**
+ * The swap picker excludes nothing: an exercise already in the session is still a
+ * legitimate substitute, and picking it moves the session's focus onto it.
+ */
+const NO_EXCLUSIONS: ReadonlySet<string> = new Set();
 
 
 /** A plain decimal, or null while the text isn't one yet ("7." mid-keystroke). */
@@ -132,6 +141,10 @@ function SessionView({ target }: { target: SessionTarget }) {
   const setKeys = useRef(new Map<string, string>());
   const rest = useRestTimer();
   const libraryQ = useQuery({ queryKey: ["exercises"], queryFn: () => api.get<Exercise[]>("/api/exercises") });
+  const catalogQ = useQuery({
+    queryKey: ["exercise-catalog"],
+    queryFn: () => api.get<CatalogExercise[]>("/api/exercises/catalog"),
+  });
   const alternativesQ = useQuery({
     queryKey: ["alternatives", swapFor],
     queryFn: () => api.get<ExerciseAlternative[]>(`/api/exercises/${swapFor}/alternatives`),
@@ -291,8 +304,10 @@ function SessionView({ target }: { target: SessionTarget }) {
     setShowAdd(true);
     setSwapFor(null);
   };
-  /** The muscle group lives on the library `Exercise`, never on the session's `TodayExercise`. */
-  const canSwap = active !== null && libraryById.get(active.exerciseId)?.primaryMuscleGroup != null;
+  // Every exercise can be swapped: the picker below the suggestions reaches the whole
+  // library and catalog, so an untagged exercise with no same-muscle alternatives still
+  // has somewhere to go.
+  const canSwap = active !== null;
   const swapOpen = active !== null && swapFor === active.exerciseId;
   const alternatives = alternativesQ.data ?? [];
   const toggleSwap = (exerciseId: string) => {
@@ -303,22 +318,24 @@ function SessionView({ target }: { target: SessionTarget }) {
    * A substitute is performed-side only: it joins this session as an ad-hoc exercise and
    * the program day keeps the exercise it planned.
    */
-  const swapTo = async (alt: ExerciseAlternative) => {
-    if (alt.id === null) {
-      try {
-        // No `kind` on purpose — the server takes it (and the muscle tags) from the catalog.
-        addExercise(await createEx.mutateAsync({ name: alt.name }));
-      } catch {
-        // onError above already surfaced the banner; nothing else to do here.
+  const swapTo = async (pick: ExercisePick) => {
+    if (pick.source === "library") {
+      if (inSession.has(pick.exerciseId)) {
+        focusExercise(pick.exerciseId);
+        return;
       }
+      const fromLibrary = libraryById.get(pick.exerciseId);
+      if (fromLibrary) addExercise(fromLibrary);
       return;
     }
-    if (inSession.has(alt.id)) {
-      focusExercise(alt.id);
-      return;
+    // A catalog pick sends no kind: the server reads kind, muscle group and equipment
+    // off the catalog entry, which is what makes a picked name a tagged one.
+    const body: CreateExerciseBody = pick.source === "catalog" ? { name: pick.name } : { name: pick.name, kind: pick.kind };
+    try {
+      addExercise(await createEx.mutateAsync(body));
+    } catch {
+      // onError above already surfaced the banner; nothing else to do here.
     }
-    const fromLibrary = libraryById.get(alt.id);
-    if (fromLibrary) addExercise(fromLibrary);
   };
 
   const setWorkFor = (id: string, patch: Partial<Work[string]>) => setWork((wk) => ({ ...wk, [id]: { ...wk[id]!, ...patch } }));
@@ -522,12 +539,12 @@ function SessionView({ target }: { target: SessionTarget }) {
               ) : alternativesQ.isError ? (
                 <ErrorBanner message={errorMessage(alternativesQ.error)} onRetry={() => alternativesQ.refetch()} />
               ) : alternatives.length === 0 ? (
-                <p className="swap-note">No alternatives for this one</p>
+                <p className="swap-note">No same-muscle alternatives — search below</p>
               ) : (
                 <ul className="swap-list">
                   {alternatives.map((alt) => (
                     <li key={alt.id ?? alt.name}>
-                      <button onClick={() => swapTo(alt)} disabled={createEx.isPending}>
+                      <button onClick={() => swapTo(pickFromAlternative(alt))} disabled={createEx.isPending}>
                         <span className="swap-name">{alt.name}</span>
                         <span className="swap-tags">
                           <TaxonomyTags muscleGroup={alt.primaryMuscleGroup} equipment={alt.equipment} />
@@ -538,6 +555,14 @@ function SessionView({ target }: { target: SessionTarget }) {
                   ))}
                 </ul>
               )}
+              <ExercisePicker
+                library={libraryQ.data ?? []}
+                catalog={catalogQ.data ?? []}
+                alreadyInDay={NO_EXCLUSIONS}
+                placeholder="Search for something else…"
+                busy={createEx.isPending}
+                onPick={swapTo}
+              />
             </div>
           )}
 

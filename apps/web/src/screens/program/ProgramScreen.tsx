@@ -19,8 +19,8 @@ import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 import { fmtDur } from "@/lib/format";
-import { ExercisePicker } from "./ExercisePicker";
-import type { ExercisePick } from "@/lib/exercise-pick";
+import { ExercisePicker } from "@/components/ExercisePicker";
+import { pickFromAlternative, type ExercisePick } from "@/lib/exercise-pick";
 
 
 /**
@@ -56,9 +56,6 @@ const groupingLabel = (section: string | null, supersetGroup: string | null): st
   const parts = [section, supersetGroup && `Superset ${supersetGroup}`].filter((part): part is string => Boolean(part));
   return parts.length ? parts.join(" · ") : "+ Section / superset";
 };
-
-const pickFromAlternative = (alt: ExerciseAlternative): ExercisePick =>
-  alt.id === null ? { source: "catalog", name: alt.name } : { source: "library", exerciseId: alt.id };
 
 export function ProgramScreen() {
   const qc = useQueryClient();
