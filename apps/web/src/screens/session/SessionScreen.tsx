@@ -10,6 +10,7 @@ import type {
   LoggedSetResult,
   LogSetBody,
   PrKind,
+  SubstituteBody,
   TodayExercise,
   TodayResponse,
   UpdateSetBody,
@@ -36,10 +37,7 @@ type SessionTarget = { kind: "day"; dayId: string } | { kind: "freeform" };
 
 const DISTANCE_UNITS: DistanceUnit[] = ["mi", "km", "m"];
 
-/**
- * The swap picker excludes nothing: an exercise already in the session is still a
- * legitimate substitute, and picking it moves the session's focus onto it.
- */
+/** A freeform session plans nothing, so its swap picker rules nothing out. */
 const NO_EXCLUSIONS: ReadonlySet<string> = new Set();
 
 
@@ -189,20 +187,29 @@ function SessionView({ target }: { target: SessionTarget }) {
     });
   }, [data]);
 
+  /** Declared above the mutations that call it: an onSuccess must not close over a later binding. */
+  const focusExercise = (id: string) => {
+    setOverride(id);
+    setNextIsWarmup(false);
+    setSwapFor(null);
+  };
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["session", targetKey] });
     qc.invalidateQueries({ queryKey: ["today"] });
   };
+  /** This session's id, starting it if the first thing the user does is log or swap. */
+  const ensureSessionId = async (): Promise<string> => {
+    const existing = data?.session?.id ?? createdSessionId.current;
+    if (existing) return existing;
+    const start = target.kind === "day" ? { dayId: target.dayId } : { freeform: true };
+    const created = await api.post<{ id: string }>("/api/sessions", start);
+    createdSessionId.current = created.id;
+    return created.id;
+  };
   const logSet = useTrackedMutation(errors, {
-    mutationFn: async ({ body }: { body: LogSetBody; name: string }) => {
-      let sid = data?.session?.id ?? createdSessionId.current;
-      if (!sid) {
-        const start = target.kind === "day" ? { dayId: target.dayId } : { freeform: true };
-        sid = (await api.post<{ id: string }>("/api/sessions", start)).id;
-        createdSessionId.current = sid;
-      }
-      return api.post<LoggedSetResult>(`/api/sessions/${sid}/sets`, body);
-    },
+    mutationFn: async ({ body }: { body: LogSetBody; name: string }) =>
+      api.post<LoggedSetResult>(`/api/sessions/${await ensureSessionId()}/sets`, body),
     onSuccess: (result, vars) => {
       setNextIsWarmup(false);
       createdSessionId.current = null;
@@ -232,6 +239,14 @@ function SessionView({ target }: { target: SessionTarget }) {
     mutationFn: (body: CreateExerciseBody) => api.post<Exercise>("/api/exercises", body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["exercises"] }),
   });
+  const substitute = useTrackedMutation(errors, {
+    mutationFn: async (body: SubstituteBody) => api.post(`/api/sessions/${await ensureSessionId()}/substitutions`, body),
+    onSuccess: (_result, body) => {
+      createdSessionId.current = null;
+      focusExercise(body.exerciseId);
+      invalidate();
+    },
+  });
 
   if (isLoading) return <p className="center-note">Loading…</p>;
 
@@ -247,6 +262,8 @@ function SessionView({ target }: { target: SessionTarget }) {
       name: ex.name,
       kind: ex.kind,
       fromProgram: false,
+      programExerciseId: null,
+      substitutedFor: null,
       targetSets: 0,
       targetReps: 0,
       targetRepsMax: null,
@@ -273,11 +290,6 @@ function SessionView({ target }: { target: SessionTarget }) {
       : (exercises.find((e) => !isExerciseDone(e))?.exerciseId ?? null);
   const active = exercises.find((e) => e.exerciseId === activeId) ?? null;
 
-  const focusExercise = (id: string) => {
-    setOverride(id);
-    setNextIsWarmup(false);
-    setSwapFor(null);
-  };
   const addExercise = (ex: Exercise) => {
     setExtras((xs) => (xs.some((x) => x.id === ex.id) ? xs : [...xs, ex]));
     setWork((wk) =>
@@ -315,28 +327,35 @@ function SessionView({ target }: { target: SessionTarget }) {
     setShowAdd(false);
   };
   /**
-   * A substitute is performed-side only: it joins this session as an ad-hoc exercise and
-   * the program day keeps the exercise it planned.
+   * Swapping a program exercise substitutes it for this session only: the substitute
+   * takes the slot's targets, so the session is still finishable, and the program day
+   * keeps the exercise it planned. Picking the slot's own exercise again undoes it.
+   *
+   * An ad-hoc exercise fills no slot, so there its substitute simply joins the session.
    */
   const swapTo = async (pick: ExercisePick) => {
+    const slotId = active?.programExerciseId ?? null;
     if (pick.source === "library") {
-      if (inSession.has(pick.exerciseId)) {
-        focusExercise(pick.exerciseId);
-        return;
-      }
-      const fromLibrary = libraryById.get(pick.exerciseId);
-      if (fromLibrary) addExercise(fromLibrary);
+      const chosen = libraryById.get(pick.exerciseId);
+      if (!chosen) return;
+      if (slotId) substitute.mutate({ programExerciseId: slotId, exerciseId: chosen.id });
+      else if (inSession.has(chosen.id)) focusExercise(chosen.id);
+      else addExercise(chosen);
       return;
     }
     // A catalog pick sends no kind: the server reads kind, muscle group and equipment
     // off the catalog entry, which is what makes a picked name a tagged one.
     const body: CreateExerciseBody = pick.source === "catalog" ? { name: pick.name } : { name: pick.name, kind: pick.kind };
     try {
-      addExercise(await createEx.mutateAsync(body));
+      const created = await createEx.mutateAsync(body);
+      if (slotId) substitute.mutate({ programExerciseId: slotId, exerciseId: created.id });
+      else addExercise(created);
     } catch {
       // onError above already surfaced the banner; nothing else to do here.
     }
   };
+  /** A day plans each exercise once, so a second slot performing one already there is refused. */
+  const swapExclusions = day ? inSession : NO_EXCLUSIONS;
 
   const setWorkFor = (id: string, patch: Partial<Work[string]>) => setWork((wk) => ({ ...wk, [id]: { ...wk[id]!, ...patch } }));
 
@@ -499,6 +518,7 @@ function SessionView({ target }: { target: SessionTarget }) {
               : `Added · set ${active.loggedSets.length + 1}`}
           </p>
           <h2 className="lift">{active.name}</h2>
+          {active.substitutedFor && <p className="set-sub">Instead of {active.substitutedFor}</p>}
           {active.fromProgram ? (
             <p className="set-target">
               {active.targetSets} ×{" "}
@@ -544,7 +564,10 @@ function SessionView({ target }: { target: SessionTarget }) {
                 <ul className="swap-list">
                   {alternatives.map((alt) => (
                     <li key={alt.id ?? alt.name}>
-                      <button onClick={() => swapTo(pickFromAlternative(alt))} disabled={createEx.isPending}>
+                      <button
+                        onClick={() => swapTo(pickFromAlternative(alt))}
+                        disabled={createEx.isPending || substitute.isPending}
+                      >
                         <span className="swap-name">{alt.name}</span>
                         <span className="swap-tags">
                           <TaxonomyTags muscleGroup={alt.primaryMuscleGroup} equipment={alt.equipment} />
@@ -558,9 +581,9 @@ function SessionView({ target }: { target: SessionTarget }) {
               <ExercisePicker
                 library={libraryQ.data ?? []}
                 catalog={catalogQ.data ?? []}
-                alreadyInDay={NO_EXCLUSIONS}
+                alreadyInDay={swapExclusions}
                 placeholder="Search for something else…"
-                busy={createEx.isPending}
+                busy={createEx.isPending || substitute.isPending}
                 onPick={swapTo}
               />
             </div>

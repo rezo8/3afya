@@ -162,6 +162,32 @@ export const setLog = pgTable(
   ],
 );
 
+/**
+ * One program slot this session performed as something else. The program day keeps
+ * the exercise it planned — the substitution belongs to the session, so swapping in
+ * a machine that was free today does not rewrite the program for every week after.
+ *
+ * Deleting the row is how a swap is undone, which is why swapping back to the slot's
+ * own exercise deletes rather than stores a no-op.
+ */
+export const sessionSubstitution = pgTable(
+  "session_substitution",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => workoutSession.id, { onDelete: "cascade" }),
+    programExerciseId: uuid("program_exercise_id")
+      .notNull()
+      .references(() => programExercise.id, { onDelete: "cascade" }),
+    exerciseId: uuid("exercise_id")
+      .notNull()
+      .references(() => exercise.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("session_substitution_slot_idx").on(t.sessionId, t.programExerciseId)],
+);
+
 // --- Fuel (protein / calorie targets) --------------------------------------
 
 export const fuelEntry = pgTable(
@@ -228,6 +254,12 @@ export const programExerciseRelations = relations(programExercise, ({ one }) => 
 export const workoutSessionRelations = relations(workoutSession, ({ one, many }) => ({
   day: one(programDay, { fields: [workoutSession.dayId], references: [programDay.id] }),
   sets: many(setLog),
+}));
+
+export const sessionSubstitutionRelations = relations(sessionSubstitution, ({ one }) => ({
+  session: one(workoutSession, { fields: [sessionSubstitution.sessionId], references: [workoutSession.id] }),
+  slot: one(programExercise, { fields: [sessionSubstitution.programExerciseId], references: [programExercise.id] }),
+  exercise: one(exercise, { fields: [sessionSubstitution.exerciseId], references: [exercise.id] }),
 }));
 
 export const setLogRelations = relations(setLog, ({ one }) => ({

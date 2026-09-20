@@ -1,0 +1,24 @@
+{
+  "components": [
+    "web",
+    "session"
+  ],
+  "createdBy": "autonomous-session (ISS-012)",
+  "dedupeKey": "iss-012:freeform-adhoc-never-finishable",
+  "discoveredDate": "2026-09-20",
+  "displayId": "ISS-014",
+  "id": "ISS-014",
+  "impact": "ISS-012 fixed the half it was filed for — a swap inside a program day is now a session substitution that carries the slot's targets, so a swapped program day is finishable again. It deliberately left the other half, which ISS-012's own report named: an exercise that fills no program slot still cannot read as done, and nothing on the screen says the workout is over.\n\nWHERE THE DEFECT IS\n- apps/web/src/lib/session.ts:3 — `isExerciseDone = e.fromProgram && e.loggedSets.length >= e.targetSets`. The first conjunct is false for every ad-hoc exercise, so it is never done whatever is logged.\n- apps/web/src/screens/session/SessionScreen.tsx:425 — `pipCount = Math.max(active.targetSets, active.loggedSets.length + 1)`, so an ad-hoc exercise always shows exactly one more empty pip. In a freeform session that is every exercise in it.\n- apps/api/src/routes/sessions.ts:211 — `adhocExercises` sets `targetSets: loggedSets.length`, i.e. there is no target to reach, only a count of what happened.\n\nWHERE THE SYMPTOM IS TRIGGERED FROM\n`FreeformSessionScreen` (apps/web/src/screens/session/SessionScreen.tsx:87-89) and the \"＋ Add an exercise\" panel on a program day.\n\nWHAT IS DELIBERATE\nCLAUDE.md records that `isExerciseDone` is false for ad-hoc exercises on purpose: it keeps a freeform session focused on what was just added rather than declaring itself finished after one set. That rule is defensible; what it does not provide is any way for the user to say a ride is over. So this is a design change, not a bug fix, and it needs a decision.\n\nDIRECTIONS (from ISS-012's report, minus the part already done)\n1. An editable set count on an ad-hoc exercise — the user's own suggestion (\"allows me to edit set count\"). Needs a per-session target for an exercise that no program slot plans.\n2. A \"Finish workout\" action on the session screen. The only terminal control today is the \"Review session\" link (SessionScreen.tsx:920-924). Worth having regardless of 1.\nThese are not exclusive.\n\nVERIFIED vs SUSPECTED\nVerified by reading at HEAD after the ISS-012 fix; line numbers checked at time of writing. Not reproduced at runtime.",
+  "location": [
+    "apps/web/src/lib/session.ts:3",
+    "apps/web/src/screens/session/SessionScreen.tsx:425",
+    "apps/api/src/routes/sessions.ts:211"
+  ],
+  "phase": null,
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "A freeform session can never read as finished: an ad-hoc exercise has no set target and there is no finish action"
+}

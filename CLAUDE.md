@@ -68,6 +68,26 @@ records what is specific to 3afya.
 - **A catalog pick sends no `kind`**: the server resolves kind, muscle group and equipment from the catalog entry. Sending a kind would defeat the tagging that makes the pick worth making.
 - **Swapping is in place**: `PATCH /api/programs/day-exercises/:id` with `exerciseId` keeps position, section, superset group, targets and rest. Adding and swapping onto a `time` exercise share `DEFAULT_HOLD_SEC`.
 
+### Mid-workout Swaps (session substitutions)
+- **A swap inside a program day is a `session_substitution` row**, not an ad-hoc add:
+  `(sessionId, programExerciseId, exerciseId)`, unique per slot. `buildDayExercises`
+  renders the slot as the substitute carrying the slot's own targets, section, superset
+  group and rest, with `fromProgram: true` and `substitutedFor` naming what it replaced.
+  The program day is untouched — next week still plans what it planned.
+- **This is what makes a swapped session finishable.** Before ISS-012 a substitute joined
+  as an ad-hoc exercise, and `isExerciseDone` requires `fromProgram`, so it could never be
+  done and `pipCount` asked for one more set forever. Anything that gives a program slot an
+  ad-hoc stand-in reintroduces that.
+- **Substituting the slot's own exercise deletes the row** — that is the undo, and the only
+  one. There is no separate DELETE endpoint.
+- **Sets logged against the planned exercise before the swap become ad-hoc**, because the
+  slot's `exerciseId` is no longer in `programIds`. That is deliberate: they were performed.
+- **A day performs each exercise once**: `POST /api/sessions/:id/substitutions` refuses a
+  substitute another slot already holds. Two slots sharing an exercise would share one pool
+  of logged sets and each would read as the other's progress.
+- **The swap picker's `alreadyInDay` is the session's exercises for a day session** and
+  empty for freeform, which is what keeps that refusal off the screen in the first place.
+
 ### Exercise Alternatives
 - **Equipment-first ranking**: `rankAlternatives` puts different equipment before same equipment within each half (library then catalog). This is the whole point — you look for a substitute because the machine is taken.
 - **Untagged source = empty result**: An exercise with no `primaryMuscleGroup` returns `[]` rather than guessing.
@@ -127,7 +147,8 @@ records what is specific to 3afya.
   wrapper, or the two modes diverge.
 - **`isExerciseDone` is false for ad-hoc exercises** (it requires `fromProgram`), which is
   what keeps a freeform session focused on what you just added instead of declaring itself
-  finished after one set.
+  finished after one set. A mid-workout swap is *not* ad-hoc — see **Mid-workout Swaps** —
+  precisely because a program slot must stay finishable.
 - **Typed numbers go through `DraftInput`**: it holds the raw keystrokes so half-finished
   text ("7.", "12:") doesn't collapse to a number mid-entry, and commits only what parses.
   Give it a `key` on the thing being edited — remounting is how a stale draft is abandoned.
@@ -179,7 +200,10 @@ records what is specific to 3afya.
 - **Session recap never locks**: `/history/$sessionId` is post-workout recap; sets can still be logged/edited after. Use "Review session" wording. Editing there is opt-in per exercise ("Edit sets"), one exercise at a time — the screen reads as a recap first. Any set edit invalidates `session-detail`/`sessions`/`session`/`today`/`records`/`trends`.
 - **Zero-set sessions**: Visible in History with muted "started · nothing logged", but excluded from stats. Empty state has armed confirm to remove.
 - **Warm-up toggle state**: Per-set UI state (`nextIsWarmup`), not derived. Reset on `logSet` success, dayId reset, and exercise switch via `focusExercise` wrapper.
-- **Exercise swap details**: Catalog-only alternatives created with `createEx.mutateAsync({ name })` and no `kind` so server resolves from catalog. Panel state held as `swapFor` (exercise id), cleared on focus change. Taxonomy tags use shared `TaxonomyTags` component.
+- **Exercise swap details**: the swap panel lists `GET /api/exercises/:id/alternatives` and then `ExercisePicker` below it, so search and create are reachable mid-workout the same way they are in the builder (ISS-011). `swapTo` takes an `ExercisePick`, so both halves land in one handler. Catalog picks send no `kind` so the server resolves it from the catalog. Panel state is `swapFor` (exercise id), cleared on focus change.
+- **`ExercisePicker` lives in `components/`**, shared by the program builder and the session screen; `pickFromAlternative` lives in `lib/exercise-pick.ts` so one mapping from `ExerciseAlternative` to `ExercisePick` serves both.
+- **Every exercise can be swapped**: `canSwap` no longer requires `primaryMuscleGroup`. The picker below the suggestions is what gives an untagged exercise somewhere to go.
+- **A mutation `onSuccess` must not close over a binding declared below the early returns**: `focusExercise` sits above the mutations for that reason.
 - **TrendsScreen order**: Progress → Fuel adherence → Records (collapsed). Don't restore Records to top or un-collapse.
 - **Trends exercise ordering**: `GET /api/trends/exercises` ordered by recency (`max(set_log.completed_at) desc`). Picker depends on this order — `data[0]` is default.
 - **Un-logged fuel days are `null`**: `FuelHistoryDay.entryCount === 0` distinguishes "didn't log" from "ate 0 g". `BarChart` accepts `(number | null)[]` where `null` draws dashed placeholder.

@@ -10,6 +10,7 @@ import type {
   SessionExercise,
   SetLog,
   StartSessionBody,
+  SubstituteBody,
   TodayExercise,
   TodayResponse,
   UpdateSetBody,
@@ -18,7 +19,15 @@ import { IDEMPOTENCY_KEY_MAX } from "@afya/shared";
 import { isToday } from "../day";
 import { db } from "../db";
 import { recordSetColumns } from "../db/record-set-columns";
-import { exercise, program, programDay, programExercise, setLog, workoutSession } from "../db/schema/tracker";
+import {
+  exercise,
+  program,
+  programDay,
+  programExercise,
+  sessionSubstitution,
+  setLog,
+  workoutSession,
+} from "../db/schema/tracker";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
 import { parseDistanceUnit } from "../distance";
 import { computeRecords, detectPrs } from "../records";
@@ -197,6 +206,8 @@ async function adhocExercises(
         name: m?.name ?? "Exercise",
         kind: m?.kind ?? ("weighted" as ExerciseKind),
         fromProgram: false,
+        programExerciseId: null,
+        substitutedFor: null,
         targetSets: loggedSets.length,
         targetReps: 0,
         targetRepsMax: null,
@@ -212,6 +223,22 @@ async function adhocExercises(
   );
 }
 
+/** This session's swaps, keyed by the program slot each one replaces. */
+async function substitutesForSession(
+  userId: string,
+  session: typeof workoutSession.$inferSelect | null,
+): Promise<Map<string, typeof exercise.$inferSelect>> {
+  const map = new Map<string, typeof exercise.$inferSelect>();
+  if (!session) return map;
+  const rows = await db
+    .select({ slotId: sessionSubstitution.programExerciseId, ex: exercise })
+    .from(sessionSubstitution)
+    .innerJoin(exercise, eq(sessionSubstitution.exerciseId, exercise.id))
+    .where(and(eq(sessionSubstitution.sessionId, session.id), eq(exercise.userId, userId)));
+  for (const r of rows) map.set(r.slotId, r.ex);
+  return map;
+}
+
 async function buildDayExercises(userId: string, dayId: string, session: typeof workoutSession.$inferSelect | null) {
   const dayExercises = await db
     .select({ pe: programExercise, ex: exercise })
@@ -224,16 +251,25 @@ async function buildDayExercises(userId: string, dayId: string, session: typeof 
     ? await db.select().from(setLog).where(eq(setLog.sessionId, session.id)).orderBy(asc(setLog.setNumber))
     : [];
 
-  const programIds = new Set(dayExercises.map(({ ex }) => ex.id));
+  const substitutes = await substitutesForSession(userId, session);
+
+  // A substituted slot is performed as the substitute, so the planned exercise's own id
+  // is no longer "planned": sets logged against it before the swap surface as ad-hoc,
+  // which is honest — they were performed.
+  const programIds = new Set(dayExercises.map(({ pe, ex }) => substitutes.get(pe.id)?.id ?? ex.id));
 
   const planned = await Promise.all(
-    dayExercises.map(async ({ pe, ex }) => {
+    dayExercises.map(async ({ pe, ex: planned }) => {
+      const substitute = substitutes.get(pe.id);
+      const ex = substitute ?? planned;
       const last = await lastSetFor(userId, ex.id, session?.id);
       return {
         exerciseId: ex.id,
         name: ex.name,
         kind: ex.kind,
         fromProgram: true,
+        programExerciseId: pe.id,
+        substitutedFor: substitute ? planned.name : null,
         targetSets: pe.targetSets,
         targetReps: pe.targetReps,
         targetRepsMax: pe.targetRepsMax,
@@ -338,6 +374,74 @@ app.post("/", async (c) => {
     .values({ userId, dayId: day?.id ?? null, dayName: day?.name ?? null })
     .returning();
   return c.json({ id: row!.id, dayId: row!.dayId, performedAt: row!.performedAt.toISOString() }, 201);
+});
+
+/**
+ * Swap one program slot for another exercise, for this session only.
+ *
+ * The substitute inherits the slot's targets, so a session stays finishable after a
+ * swap; the program day is untouched, so next week still plans what it planned. Naming
+ * the slot's own exercise removes the substitution, which is how a swap is undone.
+ */
+app.post("/:id/substitutions", async (c) => {
+  const userId = c.get("userId");
+  const [session] = await db
+    .select()
+    .from(workoutSession)
+    .where(and(eq(workoutSession.id, c.req.param("id")), eq(workoutSession.userId, userId)))
+    .limit(1);
+  if (!session) return c.json({ error: "not_found" }, 404);
+  if (!session.dayId) {
+    return c.json({ error: "bad_request", message: "A freeform session plans nothing to substitute." } satisfies ApiErrorBody, 400);
+  }
+
+  const body = await c.req.json<SubstituteBody>().catch(() => null);
+  if (!body?.programExerciseId || !body.exerciseId) {
+    return c.json({ error: "bad_request", message: "programExerciseId and exerciseId are required." } satisfies ApiErrorBody, 400);
+  }
+
+  const [slot] = await db
+    .select()
+    .from(programExercise)
+    .where(and(eq(programExercise.id, body.programExerciseId), eq(programExercise.dayId, session.dayId)))
+    .limit(1);
+  if (!slot) return c.json({ error: "bad_request", message: "That exercise isn't in this day." } satisfies ApiErrorBody, 400);
+
+  if (slot.exerciseId === body.exerciseId) {
+    await db
+      .delete(sessionSubstitution)
+      .where(
+        and(eq(sessionSubstitution.sessionId, session.id), eq(sessionSubstitution.programExerciseId, slot.id)),
+      );
+    return c.json({ substituted: false });
+  }
+
+  const [substitute] = await db
+    .select()
+    .from(exercise)
+    .where(and(eq(exercise.id, body.exerciseId), eq(exercise.userId, userId), isNull(exercise.archivedAt)))
+    .limit(1);
+  if (!substitute) return c.json({ error: "bad_request", message: "Unknown exercise." } satisfies ApiErrorBody, 400);
+
+  // Two slots performing the same exercise would share one pool of logged sets, so each
+  // would read as the other's progress. Refuse rather than show a number that isn't true.
+  const slots = await db.select().from(programExercise).where(eq(programExercise.dayId, session.dayId));
+  const substitutes = await substitutesForSession(userId, session);
+  const alreadyInDay = slots.some(
+    (other) => other.id !== slot.id && (substitutes.get(other.id)?.id ?? other.exerciseId) === substitute.id,
+  );
+  if (alreadyInDay) {
+    return c.json({ error: "bad_request", message: `${substitute.name} is already in this day.` } satisfies ApiErrorBody, 400);
+  }
+
+  await db
+    .insert(sessionSubstitution)
+    .values({ sessionId: session.id, programExerciseId: slot.id, exerciseId: substitute.id })
+    .onConflictDoUpdate({
+      target: [sessionSubstitution.sessionId, sessionSubstitution.programExerciseId],
+      set: { exerciseId: substitute.id },
+    });
+  return c.json({ substituted: true });
 });
 
 /**

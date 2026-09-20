@@ -296,6 +296,10 @@ export interface TodayExercise {
   name: string;
   kind: ExerciseKind;
   fromProgram: boolean;
+  /** The program slot this exercise fills, and the handle a swap substitutes against. Null for ad-hoc. */
+  programExerciseId: string | null;
+  /** The planned exercise this one was swapped in for, by name. Null unless it is a substitute. */
+  substitutedFor: string | null;
   targetSets: number;
   targetReps: number;
   targetRepsMax: number | null;
@@ -318,6 +322,12 @@ export interface TodayExercise {
  * The session screen payload: a program day + per-exercise history + any live session.
  * `day` is null for a freeform session, where every exercise is ad-hoc.
  */
+/** Swap a program slot for another exercise, for this session only. Same exercise = undo. */
+export interface SubstituteBody {
+  programExerciseId: string;
+  exerciseId: string;
+}
+
 export interface TodayResponse {
   day: { id: string; name: string; position: number; warmup: string | null; cooldown: string | null } | null;
   session: { id: string; performedAt: string } | null;
