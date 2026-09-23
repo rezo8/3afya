@@ -1,12 +1,13 @@
 {
   "blockedBy": [],
-  "completedDate": null,
+  "completedDate": "2026-09-23",
   "createdDate": "2026-09-12",
   "description": "The .ls-del control destroys a logged set from a roughly 24px target with no confirmation: the smallest and most destructive target in the app. It now exists in two places, SessionScreen and SessionDetailScreen, and both must be covered or history keeps the unguarded one.\n\nApply the armed-confirm pattern already used for delete-day and remove-session (DELETE_ARM_MS, two taps within the window), and raise the target to the 44px used elsewhere.",
+  "displayId": "T-003",
   "id": "T-003",
   "order": 30,
   "phase": "trust",
-  "status": "open",
+  "status": "complete",
   "title": "Confirm before deleting a logged set",
   "type": "task"
 }

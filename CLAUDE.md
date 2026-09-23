@@ -190,7 +190,15 @@ records what is specific to 3afya.
 - **Client-side rotation advance**: `StartScreen` owns moving "NEXT UP" past a finished day because the API keeps returning today's day. If rotation ever advances server-side, delete the client rule.
 - **Fuel target invalidation**: Target editing must invalidate both `["fuel","today"]` and `["fuel","history"]` — TrendsScreen scores against `FuelHistory.target`.
 - **Day letters**: Use index in `program.days` (`String.fromCharCode(65 + i)`), never `programDay.position` (not re-packed on delete).
-- **Armed confirm pattern**: Two-tap delete with `DELETE_ARM_MS` (4s) window. Used for delete day, remove exercise, remove empty session. Reuse this shape rather than modals.
+- **Armed confirm pattern**: two taps within `DELETE_ARM_MS` (4s), via `useArmedConfirm` in
+  `lib/use-armed-confirm.ts` — one armed target at a time, self-disarming. Used for delete day,
+  remove exercise, remove empty session, remove set. Reuse the hook rather than a modal or a
+  hand-rolled timer; call `disarm()` from the mutation's `onSuccess`.
+- **Removing a logged set is `RemoveSetButton`** (`components/`), shared by the session screen and
+  history exactly as `SetEditor` is. Both faces are disabled while the delete is pending: the arm
+  window can expire mid-request, and a live × on the row being removed would let a second tap
+  delete a set that is already gone (404, then a Retry for nothing). Its 44px box overhangs the
+  row padding with negative margins so the row stays as short as the 24px steppers.
 - **Program builder sizing**: Controls sized against 390px budget. `.ord`, `.ctl button`, `.pex-del` use `flex: none`. Re-do arithmetic before adding controls.
 - **Section/superset editing is a panel, not inline inputs**: one 44px `.pex-grouping` control per exercise states what the row carries and opens `.pex-grouping-panel`; swap and grouping share `openPanel` so only one expands a row (ISS-007). Inline 11px inputs were a ~25px target labelled only by a placeholder.
 - **Uncontrolled fields are keyed on their stored value** (`${ex.id}:sec:${ex.section ?? ""}`): a stable key never re-syncs a `defaultValue` input, so a rejected edit sits in the field reading as saved.

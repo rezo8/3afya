@@ -1,15 +1,14 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import type { SessionDetail, SessionExercise, SetLog, UpdateSetBody } from "@afya/shared";
 import { SetEditor } from "@/components/SetEditor";
+import { RemoveSetButton } from "@/components/RemoveSetButton";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
+import { useArmedConfirm } from "@/lib/use-armed-confirm";
 import { fmtDist, fmtDur } from "@/lib/format";
-
-/** Matches ProgramScreen's "Delete day" arming window — same guard, same feel. */
-const DELETE_ARM_MS = 4000;
 
 const est1rm = (s: SetLog) => s.weight * (1 + s.reps / 30);
 
@@ -81,15 +80,10 @@ export function SessionDetailScreen() {
     enabled: !!sessionId,
   });
   const errors = useMutationError();
-  const [armedRemove, setArmedRemove] = useState(false);
+  const removeSessionConfirm = useArmedConfirm<string>();
+  const removeSetConfirm = useArmedConfirm<string>();
   /** Editing is opt-in, one exercise at a time: this screen is a recap first. */
   const [editing, setEditing] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!armedRemove) return;
-    const t = setTimeout(() => setArmedRemove(false), DELETE_ARM_MS);
-    return () => clearTimeout(t);
-  }, [armedRemove]);
 
   /** A set logged into any session is corrected the same way, so every view of it refreshes. */
   const invalidateSets = () => {
@@ -107,13 +101,16 @@ export function SessionDetailScreen() {
   });
   const deleteSet = useTrackedMutation(errors, {
     mutationFn: (setId: string) => api.delete(`/api/sessions/${sessionId}/sets/${setId}`),
-    onSuccess: invalidateSets,
+    onSuccess: () => {
+      removeSetConfirm.disarm();
+      invalidateSets();
+    },
   });
 
   const removeSession = useTrackedMutation(errors, {
     mutationFn: (id: string) => api.delete(`/api/sessions/${id}`),
     onSuccess: () => {
-      setArmedRemove(false);
+      removeSessionConfirm.disarm();
       qc.invalidateQueries({ queryKey: ["sessions"] });
       qc.invalidateQueries({ queryKey: ["session"] });
       qc.invalidateQueries({ queryKey: ["today"] });
@@ -187,12 +184,12 @@ export function SessionDetailScreen() {
       {data.exercises.length === 0 ? (
         <section className="sd-empty">
           <p className="center-note">No sets were logged in this session.</p>
-          {armedRemove ? (
+          {removeSessionConfirm.armed === data.id ? (
             <button className="sd-remove armed" disabled={removeSession.isPending} onClick={() => removeSession.mutate(data.id)}>
               Tap again to remove this empty session · this can’t be undone
             </button>
           ) : (
-            <button className="sd-remove" onClick={() => setArmedRemove(true)}>
+            <button className="sd-remove" onClick={() => removeSessionConfirm.arm(data.id)}>
               Remove this session
             </button>
           )}
@@ -230,9 +227,12 @@ export function SessionDetailScreen() {
                         {editing === e.exerciseId ? (
                           <>
                             <SetEditor kind={e.kind} set={s} onPatch={(patch) => editSet.mutate({ setId: s.id, patch })} />
-                            <button className="ls-del" aria-label="Remove set" onClick={() => deleteSet.mutate(s.id)}>
-                              ×
-                            </button>
+                            <RemoveSetButton
+                              armed={removeSetConfirm.armed === s.id}
+                              disabled={deleteSet.isPending}
+                              onArm={() => removeSetConfirm.arm(s.id)}
+                              onConfirm={() => deleteSet.mutate(s.id)}
+                            />
                           </>
                         ) : (
                           <>

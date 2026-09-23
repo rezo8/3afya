@@ -1,0 +1,28 @@
+{
+  "components": [
+    "web",
+    "api",
+    "testing"
+  ],
+  "createdBy": "lens-review lens-mue21r6e (test-quality), triaged by T-003 session",
+  "dedupeKey": "lens-mue21r6e:missing-test-use-armed-confirm",
+  "discoveredDate": "2026-09-23",
+  "id": "ISS-015",
+  "impact": "The web package's vitest suite covers pure modules only (apps/web/src/lib/*.test.ts); there is no DOM testing library in apps/web/package.json and no component or hook test anywhere under apps/web/src. The API suite (apps/api, 35 tests) is likewise pure-module: nothing reaches Postgres or an HTTP handler.\n\nWHAT THIS LEAVES UNGUARDED (verified at HEAD, 2026-09-23)\n- apps/web/src/lib/use-armed-confirm.ts:21 — the two-tap confirm hook now behind delete-day, remove-exercise, remove-session and remove-set. Its arm / replace / expire / disarm transitions were verified in Chromium by an ad-hoc Playwright script kept in a session scratchpad, not in the repo (T-003). Code review flagged the missing test as a major finding; the project rule \"test the math, not the plumbing\" (RULES.md rule 11) is why no unit test was written — the hook is useState plus setTimeout, and a test of it without a renderer tests nothing.\n- apps/web/src/components/RemoveSetButton.tsx:8 — the shared destructive control, same situation.\n- apps/api/drizzle/0015_*.sql `set_log_session_idem_idx` — the unique index that stops a double-tapped set logging twice (T-002). Correctness rests on Postgres; the vitest suite cannot see it. Verified by hand once (handover 2026-09-19-01), re-checked by nothing.\n\nWHAT WAS VERIFIED vs SUSPECTED\nVerified: the absence of any DOM test dependency and any component/hook test file (find + package.json read). Verified: the Playwright checks for T-002 and T-003 both had to be rebuilt from scratch in a scratchpad because the previous install had been cleaned. Suspected: that more database-level invariants are coming (session_substitution uniqueness, ISS-012) and will each be hand-verified once and then drift.\n\nDECISION NEEDED\nWhether browser verification (Playwright against the dev server) and/or an API integration harness (vitest against a throwaway Postgres) becomes a repeatable part of this repo — and if so, which one first. Two handovers (2026-09-19-01, 2026-09-19-02) already named this as \"worth a ticket\"; this issue is that ticket's precursor.",
+  "location": [
+    "apps/web/src/lib/use-armed-confirm.ts:21",
+    "apps/web/src/components/RemoveSetButton.tsx:8",
+    "apps/web/package.json",
+    "apps/api/src/routes/sessions.ts"
+  ],
+  "phase": null,
+  "relatedTickets": [
+    "T-003",
+    "T-002"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "No rendering or integration test harness: UI state and database invariants are verified only by hand"
+}

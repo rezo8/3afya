@@ -20,6 +20,8 @@ import { TaxonomyTags } from "@/components/TaxonomyTags";
 import { api } from "@/lib/api/client";
 import { errorMessage } from "@/lib/api/errors";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
+import { useArmedConfirm } from "@/lib/use-armed-confirm";
+import { RemoveSetButton } from "@/components/RemoveSetButton";
 import { DraftInput } from "@/components/DraftInput";
 import { SetEditor, stepDistance } from "@/components/SetEditor";
 import { PR_LABEL } from "@/lib/pr";
@@ -120,6 +122,7 @@ function SessionView({ target }: { target: SessionTarget }) {
   const [prSets, setPrSets] = useState<Set<string>>(new Set());
   const errors = useMutationError();
   const [nextIsWarmup, setNextIsWarmup] = useState(false);
+  const removeSetConfirm = useArmedConfirm<string>();
   /**
    * The session `logSet` lazily created, held until an invalidated query reports it.
    * A failed set-POST doesn't invalidate, so without this a retry re-reads the same
@@ -232,6 +235,7 @@ function SessionView({ target }: { target: SessionTarget }) {
       // means something else. Keeping them would replay a surviving row in place of a
       // set the user actually performed.
       setKeys.current.clear();
+      removeSetConfirm.disarm();
       invalidate();
     },
   });
@@ -756,9 +760,12 @@ function SessionView({ target }: { target: SessionTarget }) {
                         🏆
                       </span>
                     )}
-                    <button className="ls-del" aria-label="Remove set" onClick={() => deleteSet.mutate(s.id)}>
-                      ×
-                    </button>
+                    <RemoveSetButton
+                      armed={removeSetConfirm.armed === s.id}
+                      disabled={deleteSet.isPending}
+                      onArm={() => removeSetConfirm.arm(s.id)}
+                      onConfirm={() => deleteSet.mutate(s.id)}
+                    />
                   </li>
                 ))}
               </ul>

@@ -1855,6 +1855,9 @@ body {
   background: var(--accent-mute);
   color: var(--text);
 }
+/* The smallest and most destructive control in the app gets the 44px target used
+   elsewhere. Negative margins let the hit area overhang the row's padding, so the row
+   stays as short as the 24px steppers beside it. */
 .ls-del {
   appearance: none;
   border: none;
@@ -1863,10 +1866,29 @@ body {
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  margin: -4px -8px -4px 0;
+  display: grid;
+  place-items: center;
+  flex: none;
 }
 .ls-del:hover {
   color: var(--alert);
+}
+/* Armed by a first tap — the hint replaces the glyph, so the box grows with the copy. */
+.ls-del.armed {
+  width: auto;
+  padding: 0 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--alert);
+}
+.ls-del:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .back-link {
   display: inline-block;

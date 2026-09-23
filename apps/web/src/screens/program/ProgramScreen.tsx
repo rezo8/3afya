@@ -21,15 +21,7 @@ import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-e
 import { fmtDur } from "@/lib/format";
 import { ExercisePicker } from "@/components/ExercisePicker";
 import { pickFromAlternative, type ExercisePick } from "@/lib/exercise-pick";
-
-
-/**
- * How long an armed confirm — "Delete day", "remove exercise" — stays armed after
- * the first tap. Long enough to read the stakes it reveals and tap again; a
- * shorter window expires mid-sentence and reads as a broken control rather than
- * a guard.
- */
-const DELETE_ARM_MS = 4000;
+import { useArmedConfirm } from "@/lib/use-armed-confirm";
 
 const deleteDayStakes = (sessionCount: number) =>
   sessionCount === 0
@@ -72,8 +64,8 @@ export function ProgramScreen() {
   const [selDayId, setSelDayId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [progName, setProgName] = useState("");
-  const [armedDeleteDayId, setArmedDeleteDayId] = useState<string | null>(null);
-  const [armedRemoveExId, setArmedRemoveExId] = useState<string | null>(null);
+  const deleteDayConfirm = useArmedConfirm<string>();
+  const removeExConfirm = useArmedConfirm<string>();
   /**
    * The one open panel on an exercise row. Both panels expand the same card, so only
    * one is open at a time — two at once buries the row they belong to.
@@ -97,18 +89,6 @@ export function ProgramScreen() {
   useEffect(() => {
     if (program) setProgName(program.name);
   }, [program?.id, program?.name]);
-
-  useEffect(() => {
-    if (!armedDeleteDayId) return;
-    const t = setTimeout(() => setArmedDeleteDayId(null), DELETE_ARM_MS);
-    return () => clearTimeout(t);
-  }, [armedDeleteDayId]);
-
-  useEffect(() => {
-    if (!armedRemoveExId) return;
-    const t = setTimeout(() => setArmedRemoveExId(null), DELETE_ARM_MS);
-    return () => clearTimeout(t);
-  }, [armedRemoveExId]);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["programs"] });
@@ -138,7 +118,7 @@ export function ProgramScreen() {
   const deleteDay = useTrackedMutation(errors, {
     mutationFn: (dayId: string) => api.delete(`/api/programs/days/${dayId}`),
     onSuccess: () => {
-      setArmedDeleteDayId(null);
+      deleteDayConfirm.disarm();
       invalidate();
     },
   });
@@ -175,7 +155,7 @@ export function ProgramScreen() {
   const deleteEx = useTrackedMutation(errors, {
     mutationFn: (id: string) => api.delete(`/api/programs/day-exercises/${id}`),
     onSuccess: () => {
-      setArmedRemoveExId(null);
+      removeExConfirm.disarm();
       invalidate();
     },
   });
@@ -281,8 +261,8 @@ export function ProgramScreen() {
             className={`day-chip${d.id === selDay?.id ? " sel" : ""}`}
             onClick={() => {
               setSelDayId(d.id);
-              setArmedDeleteDayId(null);
-              setArmedRemoveExId(null);
+              deleteDayConfirm.disarm();
+              removeExConfirm.disarm();
               setOpenPanel(null);
             }}
           >
@@ -307,12 +287,12 @@ export function ProgramScreen() {
                 if (v && v !== selDay.name) renameDay.mutate({ dayId: selDay.id, name: v });
               }}
             />
-            {armedDeleteDayId === selDay.id ? (
+            {deleteDayConfirm.armed === selDay.id ? (
               <button className="de-del armed" onClick={() => deleteDay.mutate(selDay.id)}>
                 Tap again to delete “{selDay.name}” · {deleteDayStakes(selDay.sessionCount)}
               </button>
             ) : (
-              <button className="de-del" onClick={() => setArmedDeleteDayId(selDay.id)}>
+              <button className="de-del" onClick={() => deleteDayConfirm.arm(selDay.id)}>
                 Delete day
               </button>
             )}
@@ -399,12 +379,12 @@ export function ProgramScreen() {
                           >
                             Swap ⇄
                           </button>
-                          {armedRemoveExId === ex.id ? (
+                          {removeExConfirm.armed === ex.id ? (
                             <button className="pex-del armed" onClick={() => deleteEx.mutate(ex.id)}>
                               Remove?
                             </button>
                           ) : (
-                            <button className="pex-del" aria-label={`Remove ${ex.name}`} onClick={() => setArmedRemoveExId(ex.id)}>
+                            <button className="pex-del" aria-label={`Remove ${ex.name}`} onClick={() => removeExConfirm.arm(ex.id)}>
                               ×
                             </button>
                           )}
