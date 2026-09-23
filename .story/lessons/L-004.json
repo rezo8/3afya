@@ -1,0 +1,19 @@
+{
+  "content": "A defence-in-depth fix can pass review while leaving the reported bug covered by only its weaker half. Before implementing, state which half stops the specific scenario in the ticket, and check that the other half reaches it too. If the strong half is keyed on something that differs between the two events it is meant to collapse, it never fires for them — and the fix ships looking complete.",
+  "context": "T-002 in 3afya: a client guard plus a server idempotency key against double-logged sets. The first plan generated the key per completeSet() invocation, so a double tap sent two DIFFERENT keys, the unique index never fired, and the reported bug rested entirely on a React-state guard that a same-frame tap defeats. Plan review caught it; the key was re-derived per set SLOT (exerciseId + setNumber). The browser test later proved the point exactly: two clicks in one tick produced two POSTs — the guard did not stop the second — and one row, because both carried the same key. Round 2 then caught that the key map's lifecycle broke in both directions (clearing on log success reopened the bug for a full RTT; never clearing made a delete replay an old row, since deleting renumbers the remaining sets).",
+  "createdDate": "2026-09-20",
+  "id": "L-004",
+  "lastValidated": "2026-09-20",
+  "reinforcements": 0,
+  "source": "review",
+  "status": "active",
+  "supersedes": null,
+  "tags": [
+    "planning",
+    "review",
+    "idempotency",
+    "concurrency"
+  ],
+  "title": "When a fix has two halves, prove they overlap on the case the ticket actually names",
+  "updatedDate": "2026-09-20"
+}

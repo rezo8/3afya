@@ -1,0 +1,19 @@
+{
+  "content": "In a browser-driving script, assert on element counts before reading them. A step that silently does nothing — a sign-in guarded by `if (await page.getByPlaceholder(/email/i).count())` when the fields carry labels instead — leaves every later query returning 0, `[]`, or \"not found\", which reads as a clean run rather than a failure. Make the script exit non-zero when a precondition it depends on is absent (`if (url.includes(\"/sign-in\")) process.exit(1)`).",
+  "context": "Verifying ISS-007/ISS-008/ISS-010 in the 3afya web app. The first Playwright run reported \"PICKER INPUT: 0\", \"GROUPING BUTTONS: 0\", \"CHIPS: []\" and no console errors — which looked like the features were missing. They were not: the sign-in block had been skipped because the inputs are labelled rather than placeholdered, so every assertion ran against the sign-in page. Adding an explicit post-login URL check turned the same script into a real verification, and all four screens then passed.",
+  "createdDate": "2026-09-20",
+  "id": "L-003",
+  "lastValidated": "2026-09-20",
+  "reinforcements": 0,
+  "source": "correction",
+  "status": "active",
+  "supersedes": null,
+  "tags": [
+    "testing",
+    "playwright",
+    "verification",
+    "false-negative"
+  ],
+  "title": "A UI check that cannot fail is not a check — assert the page is what you think it is",
+  "updatedDate": "2026-09-20"
+}

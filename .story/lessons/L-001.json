@@ -2,9 +2,10 @@
   "content": "Never file a bug — issue, ticket, comment, or message — without file:line references for both where the defect is and where it is triggered from, and state plainly what was verified versus what is suspected. Any count or rule number in a report is a claim: verify it against the code when writing, and re-verify before acting on a report written earlier.",
   "context": "2026-09-12, while researching T-001. Two failures in the same session.\n\nSTALE COUNTS: T-001 was filed saying \"ProgramScreen holds 13 mutations with no onError, BodyScreen has 2\". Verified against the code: ProgramScreen has 12 (ProgramScreen.tsx:72-135), and BodyScreen has 1 declaration (BodyScreen.tsx:42) rendered 3x from METRICS (:20-24, :107-109) — so \"2\" matched neither the declaration count nor the runtime instance count, apparently left over from when METRICS had two entries. The ticket also cited \"RULES 7\" when the governing rule is RULES.md #8. It further claimed SessionDetailScreen \"shows a banner but offers no retry\", when in fact it shows a banner whose retry is present but broken (:184-186 calls invalidateSets(), which refetches queries and never re-issues the failed write).\n\nWRONG FRAMING ACCEPTED AS CAUSE: a user reported \"swapping does NOT swap, it adds on the bottom\" and worried it meant the program was wrongly coupled to today's workout. Reading the code first showed the opposite: SessionScreen.tsx:317-320 documents the decoupling as deliberate (\"a substitute is performed-side only... the program day keeps the exercise it planned\") and swapTo (:321-337) never touches the program. The real defect was narrower — no record that the substitute REPLACED anything, so the original stays un-done and the substitute renders at the bottom. Filing the feared architectural bug would have aimed the fix at the wrong layer. Became T-043.\n\nNow encoded as the \"Reporting Bugs\" section in the global ~/.claude/CLAUDE.md.",
   "createdDate": "2026-09-12",
+  "displayId": "L-001",
   "id": "L-001",
-  "lastValidated": "2026-09-12",
-  "reinforcements": 0,
+  "lastValidated": "2026-09-19",
+  "reinforcements": 1,
   "source": "correction",
   "status": "active",
   "supersedes": null,
@@ -15,5 +16,5 @@
     "process"
   ],
   "title": "A bug report carries its code references, and its counts are claims to verify",
-  "updatedDate": "2026-09-12"
+  "updatedDate": "2026-09-19"
 }

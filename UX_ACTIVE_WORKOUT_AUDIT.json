@@ -1,0 +1,389 @@
+{
+  "audit": {
+    "title": "3afya — Active Workout Experience UX Audit",
+    "date": "2026-07-26",
+    "app": "3afya (عافية) — personal workout & health tracker",
+    "reviewer_role": "Senior Product Designer / Frontend Engineer, specialized in evaluating the active-workout interaction loop (tired, sweaty, one-handed, noisy gym, poor connectivity)",
+    "purpose": "Core question: how much friction does the application introduce between a user deciding to perform a set and successfully recording that set?",
+    "no_code_changes_made": true,
+    "methodology": "Static code inspection only. No UI was run/screenshotted. All findings are grounded in specific files/line ranges, including tracing runtime behavior into dependency source (better-auth client, @better-fetch/fetch, @tanstack/router-core) rather than assuming framework behavior.",
+    "files_inspected": [
+      "apps/web/src/screens/session/SessionScreen.tsx",
+      "apps/web/src/screens/session/RestTimer.tsx",
+      "apps/web/src/screens/start/StartScreen.tsx",
+      "apps/web/src/screens/start/FuelPanel.tsx",
+      "apps/web/src/screens/body/BodyScreen.tsx",
+      "apps/web/src/screens/program/ProgramScreen.tsx",
+      "apps/web/src/screens/history/SessionDetailScreen.tsx",
+      "apps/web/src/router.tsx",
+      "apps/web/src/app/AppLayout.tsx",
+      "apps/web/src/app/TabBar.tsx",
+      "apps/web/src/lib/api/client.ts",
+      "apps/web/src/lib/api/errors.ts",
+      "apps/web/src/lib/auth/auth-client.ts",
+      "apps/web/src/lib/query/query-client.ts",
+      "apps/web/src/styles/theme.css",
+      "apps/web/index.html",
+      "apps/web/package.json",
+      "apps/api/src/routes/sessions.ts",
+      "apps/api/src/auth.ts",
+      "node_modules/.pnpm/@better-fetch+fetch@1.1.21/.../dist/index.js",
+      "apps/web/node_modules/better-auth/dist/client/config.mjs",
+      "node_modules/.pnpm/@tanstack+router-core@1.171.14/.../dist/esm/load-matches.js"
+    ],
+    "deployment_context_used": "Umbrella CLAUDE.md documents 3afya deploys to Cloud Run with min-instances 0 / max 3 (scale-to-zero) — used to reason about cold-start latency risk for mutation findings.",
+    "cross_reference_note": "TODO.md's 'Later — polish & ownership' section already lists 'Installable PWA (offline logging, home-screen icon, background rest-timer alerts)', which directly relates to F12 (no offline queueing/connectivity indicator). No other TODO.md item overlaps these findings — TODO.md is a feature backlog, not an interaction-friction audit, so most findings here are net-new signal.",
+    "sibling_audits_present": [
+      "DOMAIN_MODEL_AUDIT.json — domain/data-model focused.",
+      "BACKEND_ENGINEERING_AUDIT.json — engineering-debt focused.",
+      "PRODUCT_LEAD_AUDIT.json — product-completeness focused; overlaps on the rest-timer-loses-state and silent-mutation-failure findings (their F3/F6 = this audit's F3... note PRODUCT_LEAD_AUDIT.json's F3 is the rest timer, this audit's F3 is silent mutation failures — verify by content, not id, when cross-referencing).",
+      "PRODUCT_STRATEGY_AUDIT.json — strategic/differentiation focused."
+    ],
+    "consumer_instructions": "Findings are independent and individually actionable — each has file/line evidence, a root cause (problem), and a suggested_implementation sufficient to scope a fix without re-deriving it from scratch. severity + priority together indicate urgency (Critical/Now items block the core loop; Medium/Soon items degrade it; Low/Later items are polish). F1, F3, F5, F6, and F10 all touch apps/web/src/screens/session/SessionScreen.tsx and can plausibly be addressed together in one focused pass since they share context in the same file. F4 touches router.tsx + auth-client.ts and is independent of the SessionScreen work. F2 is a standalone interaction-design change. Do not treat the 'strengths' list as immutable constraints beyond their stated intent (e.g. F2's fix should preserve the no-keyboard-by-default stepper behavior, not replace it outright). Re-verify all file:line evidence against the current state of the code before acting, since it may have moved since this audit's date."
+  },
+
+  "findings": [
+    {
+      "id": "F1",
+      "title": "Out-of-order exercise logging snaps focus back to the wrong exercise after every set",
+      "category": "State Management / Navigation / Interaction",
+      "severity": "Critical",
+      "priority": "Now",
+      "todo_ref": null,
+      "current_state": "Active exercise selection: `const activeId = override && exercises.some(e => e.exerciseId === override) ? override : (exercises.find(e => !isDone(e))?.exerciseId ?? null);` where `isDone = (e) => e.fromProgram && e.loggedSets.length >= e.targetSets`. Inside `completeSet()`: `logSet.mutate(...); setOverride(active.fromProgram ? null : active.exerciseId);` — for any program exercise, `override` is reset to null after EVERY logged set, not just when that exercise is finished.",
+      "evidence": [
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "134-140", "note": "activeId derivation" },
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "159-174", "note": "completeSet, unconditional override reset for fromProgram exercises" },
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "440", "note": "row onClick={() => setOverride(e.exerciseId)} — how a user manually selects an out-of-order exercise" }
+      ],
+      "problem": "If a user does exercises out of the program's listed order (equipment occupied, supersetting, warming up on something else — all common in a real gym), tapping that exercise's row correctly sets override. But logging ONE set of it clears override, and activeId recomputes to 'first program exercise that isn't done yet' — almost always a DIFFERENT exercise than the one just worked. The screen jumps away from the exercise the user is physically at.",
+      "why_it_matters": "This repeats after every single set of every out-of-order exercise, not once. The user must re-locate and re-tap the correct row before logging each subsequent set of that exercise — exactly the repeated, avoidable friction the audit is measuring, occurring while tired and moving between stations.",
+      "recommendation": "Only clear the override when the overridden exercise itself is actually done, not on every completed set of any program exercise.",
+      "suggested_implementation": "Change the reset condition in completeSet() to check the specific exercise's own completion: clear override only if `active.loggedSets.length + 1 >= active.targetSets` (i.e., this set finishes it), otherwise keep override pinned to `active.exerciseId`.",
+      "dependencies": [],
+      "interaction_cost": "+1 unnecessary tap (re-select correct row) per set for any exercise logged out of program order, plus a disorientation cost from unrequested content changes."
+    },
+    {
+      "id": "F2",
+      "title": "No numeric entry for weight — stepper-only, ±5 lb, no acceleration, flat 45 lb default for unseen exercises",
+      "category": "Interaction / Input Ergonomics",
+      "severity": "Critical",
+      "priority": "Now",
+      "todo_ref": null,
+      "current_state": "Weight changes only via onClick buttons stepping ±5 lb: `onClick={() => setWorkFor(active.exerciseId, { weight: Math.max(0, w.weight - 5) })}` / `+5`. No text input, no long-press/hold-to-accelerate, no keypad anywhere in the file. Seed value for any exercise with no history: `weight: ex.lastWeight ?? 45`.",
+      "evidence": [
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "46-61", "note": "seed logic, flat 45 lb / 8 reps / 30s fallback" },
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "278-291", "note": "weight stepper, onClick only, no onPointerDown/interval ramp" }
+      ],
+      "problem": "Real gym weights range from single-digit dumbbells to 400+ lb machines/barbells. A single ±5 discrete tap with no direct-entry fallback means reaching a real working weight from a 45 lb default can require dozens of taps — worst exactly on first-ever use of any given exercise, when there's no history to seed from (e.g., 360 lb leg press = 63 taps).",
+      "why_it_matters": "Largest single tap-count inflator in the entire core loop. Directly contradicts minimizing friction between deciding to lift and recording it — most of the friction here happens before the set is even attempted.",
+      "recommendation": "Keep the stepper for small in-workout adjustments, but add tap-and-hold acceleration (ramping step size the longer +/- is held) and/or make the big number itself tappable to open a numeric keypad for direct entry.",
+      "suggested_implementation": "Add onPointerDown/onPointerUp handlers with a setInterval ramp (5 -> 10 -> 25 lb/step) on the existing .step buttons; alternatively swap .wval to a controlled <input inputMode=\"decimal\"> on tap, reverting to display mode on blur/Enter.",
+      "dependencies": [],
+      "interaction_cost": "Up to 60+ taps to reach a correct weight for any exercise without prior history."
+    },
+    {
+      "id": "F3",
+      "title": "Mutation failures are completely silent app-wide — no onError anywhere",
+      "category": "Error States / State Management",
+      "severity": "Critical",
+      "priority": "Now",
+      "todo_ref": null,
+      "current_state": "Every mutation (logSet, editSet, deleteSet, createEx, plus FuelPanel's add/remove and BodyScreen's log) defines only onSuccess, never onError. `grep -rn \"onError|isError\" apps/web/src/screens` returns zero matches app-wide. query-client.ts sets query retry:1 but leaves mutation retry at React Query's default of 0.",
+      "evidence": [
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "67-93", "note": "all four mutations, onSuccess only" },
+        { "file": "apps/web/src/screens/start/FuelPanel.tsx", "lines": "16-17", "note": "same pattern" },
+        { "file": "apps/web/src/screens/body/BodyScreen.tsx", "lines": "41", "note": "same pattern" },
+        { "file": "apps/web/src/lib/query/query-client.ts", "lines": "3-13", "note": "mutation retry left at default 0" }
+      ],
+      "problem": "When the 'Complete set' POST fails (dropped wifi, Cloud Run cold-start timeout, transient 500), the button just reverts from disabled 'Logging…' to its normal 'Complete set N' state — visually identical to having never been tapped, or to idle-ready. No toast, no inline error, no retry affordance. The set silently is not recorded.",
+      "why_it_matters": "Worst possible failure mode for exactly the conditions this app must handle (gym with poor connectivity, scale-to-zero backend cold starts). The UI gives no way to distinguish 'not logged yet' from 'tried and silently failed' — a user could lose sets without ever knowing until reviewing history later, if at all.",
+      "recommendation": "Add onError to every mutation, surfacing a visible, actionable failure state — at minimum keep the attempted set's inputs visible with an inline 'Couldn't save — tap to retry' affordance instead of silently reverting to the pristine state.",
+      "suggested_implementation": "Shared error-banner/toast component driven by mutation.isError; manual retry re-invokes mutate with the mutation's own stored `variables`.",
+      "dependencies": [],
+      "interaction_cost": "Not tap-count — data-loss risk. Currently 0 user-visible signals on failure."
+    },
+    {
+      "id": "F4",
+      "title": "Every in-app navigation re-runs a live network auth check with no error handling or offline fallback",
+      "category": "Error States / Mobile / Performance",
+      "severity": "High",
+      "priority": "Now",
+      "todo_ref": null,
+      "current_state": "`async function requireUser() { const { data } = await authClient.getSession(); if (!data) throw redirect({ to: '/sign-in' }); }` is the `beforeLoad` for the pathless `appRoute` that wraps every authenticated screen. Verified in @tanstack/router-core@1.171.14's load-matches.js that beforeLoad is NOT gated by staleTime (only `loader` reruns respect it) — `shouldSkipLoader` only short-circuits SSR-dehydrated matches — so requireUser() re-executes on every single navigation (Start->Session, Session->History, etc). Traced authClient.getSession() into better-auth's client (dist/client/config.mjs:24-40, no catchAllError set) and into @better-fetch/fetch (dist/index.js:569, `let response = await fetch(...)` with no surrounding try/catch, and catchAllError is opt-in/unset). createRouter(...) in router.tsx:73 sets no defaultErrorComponent.",
+      "evidence": [
+        { "file": "apps/web/src/router.tsx", "lines": "27-58", "note": "requireUser, appRoute beforeLoad" },
+        { "file": "apps/web/src/router.tsx", "lines": "73", "note": "createRouter, no defaultErrorComponent" },
+        { "file": "node_modules/.pnpm/@tanstack+router-core@1.171.14/.../dist/esm/load-matches.js", "lines": "78-84, 287-304", "note": "shouldSkipLoader only skips SSR-dehydrated matches, not fresh client navigations" },
+        { "file": "apps/web/node_modules/better-auth/dist/client/config.mjs", "lines": "24-40", "note": "createFetch config, no catchAllError" },
+        { "file": "node_modules/.pnpm/@better-fetch+fetch@1.1.21/.../dist/index.js", "lines": "452-475, 569", "note": "uncaught fetch call; catchAllError opt-in and unset here" }
+      ],
+      "problem": "A momentary connectivity drop during ANY navigation (walking to a different part of the gym, elevator, dead spot) causes authClient.getSession()'s underlying fetch to throw a raw TypeError, which propagates uncaught out of requireUser's beforeLoad. With no route/router-level errorComponent configured, the user hits the router's generic/unstyled default error UI rather than a graceful retry.",
+      "why_it_matters": "Turns a transient signal blip into a broken navigation instead of a recoverable one, and it can happen on the most important navigations of a session (leaving/re-entering the Session screen).",
+      "recommendation": "Make requireUser tolerate network failures gracefully — only redirect to /sign-in when the server actually responded and said 'no session,' never when the request itself failed. Add a themed defaultErrorComponent to the router as a backstop.",
+      "suggested_implementation": "Wrap `await authClient.getSession()` in try/catch inside requireUser; on catch, allow navigation to proceed optimistically (don't bounce to sign-in) or show a lightweight 'reconnecting' state. Add `createRouter({ ..., defaultErrorComponent: ... })` matching the app's theme with a retry action.",
+      "dependencies": [],
+      "interaction_cost": "Unbounded when triggered — a broken screen requiring app reload, not a bounded number of extra taps."
+    },
+    {
+      "id": "F5",
+      "title": "No optimistic updates anywhere; first set of a session costs two sequential round-trips",
+      "category": "State Management / Performance",
+      "severity": "High",
+      "priority": "Now",
+      "todo_ref": null,
+      "current_state": "logSet's mutationFn: `let sid = data?.session?.id; if (!sid) sid = (await api.post('/api/sessions', { dayId })).id; return api.post(`/api/sessions/${sid}/sets`, body);` — two sequential awaited calls for the first set of any session. Confirmed zero uses of onMutate/setQueryData anywhere in the web app (grep across src/screens and src/lib returns nothing) — every mutation waits for a full server round-trip + invalidateQueries before the UI reflects any change.",
+      "evidence": [
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "67-93", "note": "compound session-create + set-log call" },
+        { "file": "apps/web/src", "lines": "n/a", "note": "grep -rn \"onMutate|cancelQueries|setQueryData\" apps/web/src -> zero matches app-wide" }
+      ],
+      "problem": "The very first set of a workout requires two sequential API calls before 'Logging…' resolves. On the app's actual deployment (Cloud Run, min-instances 0 per umbrella CLAUDE.md), the container may be cold, so this compound first tap can take several seconds with only a disabled button and static text as feedback — no progress indicator, no timeout, no cancel.",
+      "why_it_matters": "The first set of a session is the highest-stakes tap in the loop (the moment the user commits to 'I'm doing this now'). A multi-second stall with no optimistic feedback reads as broken, and combines with F3 (no error surfacing) to leave a slow/failed first request with no visible recovery path.",
+      "recommendation": "Optimistically append the logged set to local session state immediately on tap; reconcile with the server response when it arrives, rolling back only on genuine failure (now visible per F3).",
+      "suggested_implementation": "onMutate: cancel in-flight queries for ['session', dayId], synthesize a local SetLog into the cached TodayResponse.exercises[...].loggedSets, stash previous cache as rollback context. onError: restore previous cache + surface error. onSettled: invalidate to reconcile server-assigned id/timestamps.",
+      "dependencies": ["F3"],
+      "interaction_cost": "Perceived latency on the single most important tap in the loop — potentially multiple seconds on a cold start, currently zero optimistic feedback."
+    },
+    {
+      "id": "F6",
+      "title": "Deleting a logged set has no confirmation and the smallest touch targets in the app",
+      "category": "Interaction / Accessibility / Undo-Recovery",
+      "severity": "High",
+      "priority": "Now",
+      "todo_ref": null,
+      "current_state": "`<button className=\"ls-del\" aria-label=\"Remove set\" onClick={() => deleteSet.mutate(s.id)}>×</button>` fires immediately on click, no confirmation step. CSS: `.ls-edit button { width: 24px; height: 24px; }`, sitting in a `flex; gap: 5px` row directly adjacent to the edit +/- steppers used to fix a value — vs. `.step { width: 44px; height: 44px; }` used everywhere else in the app.",
+      "evidence": [
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "365-416", "note": "logged-set row, delete button, no confirm" },
+        { "file": "apps/web/src/styles/theme.css", "lines": "1250-1280", "note": ".ls-edit button and .ls-del at 24px, vs .step at 44px elsewhere" }
+      ],
+      "problem": "A destructive, irreversible action sits at nearly half the touch-target size used elsewhere, immediately next to the steppers a user is actively tapping to fix a typo. A sweaty or tired thumb has a real chance of hitting delete instead of the adjacent stepper.",
+      "why_it_matters": "This is precisely the 'undo/recovery from mistakes' scenario the audit brief calls out, except inverted: the correction UI itself is the highest-risk-of-mistake control in the app, with no safety net.",
+      "recommendation": "Enlarge the delete target and/or require a second confirming tap (e.g., first tap turns it into a 'confirm remove?' state for ~2s), consistent with the app's existing no-modal, low-friction style (cf. the PR banner's auto-dismiss pattern).",
+      "suggested_implementation": "Two-stage tap state on .ls-del: first press swaps icon/label to a timed confirm state (~2s) before it becomes live; size to >=44px; add spacing from the edit-stepper cluster.",
+      "dependencies": [],
+      "interaction_cost": "Zero extra taps currently required to cause an accidental, unrecoverable data loss; recovery requires manually re-entering the set from memory."
+    },
+    {
+      "id": "F7",
+      "title": "Reps stepper for weighted exercises uses smaller, sub-standard touch targets",
+      "category": "Accessibility / Interaction",
+      "severity": "Medium",
+      "priority": "Soon",
+      "todo_ref": null,
+      "current_state": "For kind === 'weighted' exercises, the reps +/- controls use `.step.small` (34x34px) while every sibling stepper (weight on the same screen, reps-only exercises, time exercises) uses the standard `.step` (44x44px).",
+      "evidence": [
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "296-302", "note": "reps stepper for weighted exercises, className=\"step small\"" },
+        { "file": "apps/web/src/styles/theme.css", "lines": "448-452", "note": ".step.small 34px vs .step 44px" }
+      ],
+      "problem": "The one sub-44px control in the active-set UI, with no apparent functional reason to be smaller than its neighbor (the weight stepper right next to it).",
+      "why_it_matters": "This lands in the highest-frequency interaction (reps are adjusted on nearly every set), so mis-taps here are the most common a user will experience.",
+      "recommendation": "Use the standard 44px .step size for the reps stepper on weighted exercises too; reflow layout rather than shrinking the touch target if space is the constraint.",
+      "suggested_implementation": "Drop the 'small' modifier class from the two reps buttons in the weighted-kind branch; adjust .numbers/.weight/.reps flex sizing as needed.",
+      "dependencies": [],
+      "interaction_cost": "Elevated mis-tap rate on the most frequent per-set interaction; no added taps, added error rate."
+    },
+    {
+      "id": "F8",
+      "title": "\"Vs last time\" and initial seeding compare against the single most-recent set, not the matching set-number",
+      "category": "UX / Domain Modeling",
+      "severity": "Medium",
+      "priority": "Soon",
+      "todo_ref": null,
+      "current_state": "`lastSetFor(userId, exerciseId, excludeSessionId)` orders by `desc(setLog.completedAt)` with `.limit(1)` — returns one scalar set per exercise regardless of set position. buildDayExercises attaches this once per exercise as lastWeight/lastReps/lastDurationSec; SessionScreen.tsx uses this same scalar to seed EVERY set's starting values and to compute the delta shown for whichever set is currently active.",
+      "evidence": [
+        { "file": "apps/api/src/routes/sessions.ts", "lines": "113-124", "note": "lastSetFor — single most-recent set, no set-number awareness" },
+        { "file": "apps/api/src/routes/sessions.ts", "lines": "162, 178, 190, 204-206", "note": "attached once per exercise" },
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "46-61, 179-192", "note": "seeds every set from the same scalar; delta shown regardless of active set number" }
+      ],
+      "problem": "For programs where weight/reps vary by set position (pyramids, lighter-first, drop sets), the delta shown on set 1 today may actually be comparing against last session's set 3 (whatever was logged most recently), not against last session's set 1 — not a true apples-to-apples comparison.",
+      "why_it_matters": "This is exactly the signal the audit brief flags as critical ('trying to remember previous performance') — usually right for flat-set training styles, but can quietly mislead for the training styles where the comparison matters most.",
+      "recommendation": "Track last performance per set-number where available, falling back to the current single-scalar behavior when there's no positional match.",
+      "suggested_implementation": "Extend lastSetFor to optionally accept a setNumber and prefer a set logged at the same position in the most recent prior session; keep current behavior as the fallback for first-time/no-match cases.",
+      "dependencies": [],
+      "interaction_cost": "No tap cost — a correctness/trust cost in the number the user relies on to decide their next weight."
+    },
+    {
+      "id": "F9",
+      "title": "Set-complete \"pip\" is an 8px-tall tap target",
+      "category": "Interaction / Accessibility",
+      "severity": "Low",
+      "priority": "Later",
+      "todo_ref": null,
+      "current_state": "Each set-progress pip is independently clickable to log that set: `onClick={() => i === active.loggedSets.length && completeSet()}`. CSS: `.pip { flex: 1; height: 8px; cursor: pointer; }`.",
+      "evidence": [
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "343-351", "note": "pip onClick" },
+        { "file": "apps/web/src/styles/theme.css", "lines": "476-491", "note": ".pip height: 8px" }
+      ],
+      "problem": "An 8px-tall strip is well under any reasonable touch-target minimum. It's a secondary/redundant affordance (the large 'Complete set' button below it is the well-sized primary target), but still interactive and prone to mis-taps or being ignored as too fiddly.",
+      "why_it_matters": "Low severity since the primary button covers the same action reliably, but it's a redundant control currently inviting frustration for no upside.",
+      "recommendation": "Either enlarge the hit area (invisible hit-slop padding around each pip) or drop onClick entirely and make pips pure status indicators.",
+      "suggested_implementation": "Wrap each pip in a taller (~32-44px) tappable container with the visible 8px bar centered inside, or remove the handler.",
+      "dependencies": [],
+      "interaction_cost": "Marginal — mis-taps on a redundant control, not the primary path."
+    },
+    {
+      "id": "F10",
+      "title": "Double-log risk: pip tap isn't guarded by isPending; no server idempotency key",
+      "category": "State Management / Correctness",
+      "severity": "Medium",
+      "priority": "Soon",
+      "todo_ref": null,
+      "current_state": "The primary button is guarded: `disabled={logSet.isPending}` (line 352). The pip's onClick has no such guard (line 344-351). Server-side, `POST /:id/sets` (apps/api/src/routes/sessions.ts:270-316) has no idempotency-key/dedupe check and will insert two identical sets if called twice.",
+      "evidence": [
+        { "file": "apps/web/src/screens/session/SessionScreen.tsx", "lines": "344-354", "note": "pip (344-351) unguarded vs button (352-354) guarded by logSet.isPending" },
+        { "file": "apps/api/src/routes/sessions.ts", "lines": "270-316", "note": "POST /:id/sets, no dedupe/idempotency key" }
+      ],
+      "problem": "A user tapping both the active pip and the 'Complete set' button in quick succession (plausible under time pressure/fatigue, since both are valid affordances for the same action) can fire completeSet() twice before React re-renders with isPending: true, producing two logged sets for one physical set performed.",
+      "why_it_matters": "Directly inflates the user's own workout record incorrectly, and combined with F3 (silent failures), there's no way to notice or reconcile it in the moment.",
+      "recommendation": "Guard the pip's onClick with the same logSet.isPending check as the button; independently, add a client-generated idempotency key the server can use to dedupe a genuine double-submit (also protects against retries added as part of fixing F3/F5).",
+      "suggested_implementation": "`onClick={() => !logSet.isPending && i === active.loggedSets.length && completeSet()}`. Server: accept a client-supplied clientRequestId on LogSetBody, unique-constrain or no-op on repeat within a short window.",
+      "dependencies": [],
+      "interaction_cost": "No added taps to fix; currently zero taps required to accidentally create a duplicate record."
+    },
+    {
+      "id": "F11",
+      "title": "Fixed rest-timer bar can overlap lower page content while scrolled",
+      "category": "Mobile / Screen Density",
+      "severity": "Low",
+      "priority": "Later",
+      "todo_ref": null,
+      "current_state": "`.app` reserves bottom padding only for the tab bar: `padding: 20px 18px calc(82px + 18px);`. The rest bar is separately fixed: `.rest-bar { position: fixed; bottom: 84px; }` with no corresponding reserved space added to the scrollable content while a rest is active.",
+      "evidence": [
+        { "file": "apps/web/src/styles/theme.css", "lines": "76-86", "note": ".app padding, tab-bar-only reservation" },
+        { "file": "apps/web/src/styles/theme.css", "lines": "1291-1304", "note": ".rest-bar, position: fixed, bottom: 84px" }
+      ],
+      "problem": "While resting (a large fraction of total session time), scrolling down to the exercise list or 'Add an exercise' panel puts that content underneath the floating rest bar rather than the page reserving space for it.",
+      "why_it_matters": "Minor, but it means the two moments users are most likely to scroll one-handed (mid-rest, checking the next lift or adding an accessory exercise) are exactly when a fixed overlay is most likely to obscure a tap target.",
+      "recommendation": "When a rest is active, add the rest bar's height to the scroll container's bottom padding dynamically, or render it in document flow instead of purely overlaying via position: fixed.",
+      "suggested_implementation": "Toggle a modifier class on .app when rest.state != null, e.g. `.app.resting { padding-bottom: calc(82px + 18px + 70px) }`.",
+      "dependencies": [],
+      "interaction_cost": "Occasional mis-taps/extra scroll-and-retry while the rest bar is showing."
+    },
+    {
+      "id": "F12",
+      "title": "No offline queueing or connectivity indicator — a true dead zone stops logging entirely, silently",
+      "category": "Mobile / Offline",
+      "severity": "Medium",
+      "priority": "Soon",
+      "todo_ref": "TODO.md 'Later — polish & ownership': 'Installable PWA (offline logging, home-screen icon, background rest-timer alerts)'",
+      "current_state": "No service worker, no offline persistence layer, no navigator.onLine handling, and no PWA tooling in the project (apps/web/package.json has no vite-plugin-pwa/workbox dependency; no manifest link in index.html; no sw.js anywhere). Every read/write goes straight through a plain fetch wrapper with no local queue.",
+      "evidence": [
+        { "file": "apps/web/package.json", "lines": "n/a", "note": "dependency list — no PWA/offline tooling" },
+        { "file": "apps/web/index.html", "lines": "n/a", "note": "no manifest link" },
+        { "file": "apps/web/src/lib/api/client.ts", "lines": "1-41", "note": "plain fetch, no queue/cache layer" }
+      ],
+      "problem": "In a true no-signal environment (basement gym, dead zone), nothing works at all — not degraded, just unusable — and combined with F3 (silent mutation failures), the user gets no explanation of why nothing they tap seems to do anything.",
+      "why_it_matters": "The audit brief explicitly frames 'gym with poor connectivity' as a baseline assumption, not an edge case.",
+      "recommendation": "Don't take this on before fixing F3 (visible failure states) — that alone converts 'silently broken' into 'clearly broken, tap to retry,' which captures most of the practical benefit cheaply. A genuine offline queue (persist pending set-logs, replay on reconnect) is a reasonable follow-up investment once error visibility exists.",
+      "suggested_implementation": "Phase 1 (cheap): navigator.onLine-driven banner ('You're offline — sets will fail to save') plus F3's error surfacing. Phase 2 (larger): queue failed POST /sets bodies in IndexedDB/localStorage and replay in order on reconnect.",
+      "dependencies": ["F3"],
+      "interaction_cost": "Total loss of functionality with no explanation, for the duration of the outage."
+    }
+  ],
+
+  "top_10_ranked": [
+    { "rank": 1, "finding_id": "F1", "one_line": "Out-of-order exercise logging snaps focus back to the wrong exercise after every set" },
+    { "rank": 2, "finding_id": "F2", "one_line": "No numeric entry for weight; ±5 lb stepper-only with a flat 45 lb default for new exercises" },
+    { "rank": 3, "finding_id": "F3", "one_line": "Mutation failures are completely silent app-wide" },
+    { "rank": 4, "finding_id": "F4", "one_line": "Every navigation re-runs a network auth check with no error handling / offline fallback" },
+    { "rank": 5, "finding_id": "F5", "one_line": "No optimistic updates; first set of a session costs two sequential round-trips on a scale-to-zero backend" },
+    { "rank": 6, "finding_id": "F6", "one_line": "Deleting a logged set has no confirmation and 24px touch targets" },
+    { "rank": 7, "finding_id": "F7", "one_line": "Reps stepper for weighted exercises uses 34px targets vs 44px everywhere else" },
+    { "rank": 8, "finding_id": "F8", "one_line": "\"Vs last time\" compares against the single most-recent set, not the matching set number" },
+    { "rank": 9, "finding_id": "F10", "one_line": "Double-log risk: pip tap isn't guarded by isPending; no server idempotency key" },
+    { "rank": 10, "finding_id": "F12", "one_line": "No offline queueing or connectivity indicator" }
+  ],
+
+  "strengths": [
+    {
+      "title": "Rest timer uses an absolute endsAt timestamp, not a decrementing counter",
+      "description": "Date.now() + seconds*1000, stays correct across backgrounding, screen lock, and tab switches — a detail many workout apps get wrong.",
+      "files": ["apps/web/src/screens/session/RestTimer.tsx:23-33"]
+    },
+    {
+      "title": "All numeric set entry is stepper-based, no text <input> in the active-set UI",
+      "description": "Deliberately avoids popping the OS keyboard mid-set — right idea, even though weight's wide range exposes the approach's limits (see F2).",
+      "files": ["apps/web/src/screens/session/SessionScreen.tsx"]
+    },
+    {
+      "title": "Automatic advance to the next incomplete exercise once a program exercise's target sets are met (in-order case)",
+      "description": "No extra tap needed to 'move on' when following the program in order. Note: this is the same mechanism that causes F1's bug in the out-of-order case — beneficial in the linear case, harmful in the non-linear one.",
+      "files": ["apps/web/src/screens/session/SessionScreen.tsx"]
+    },
+    {
+      "title": "Big, legible weight display",
+      "description": "clamp(58px, 20vw, 82px), high-contrast, tabular-nums — genuinely easy to read at a glance, one-handed, from a slight distance.",
+      "files": ["apps/web/src/styles/theme.css"]
+    },
+    {
+      "title": "PR detection with a non-blocking celebratory banner",
+      "description": "Auto-dismisses after 4.5s, vibration + sound cue — motivational without demanding a dismiss-tap.",
+      "files": ["apps/web/src/screens/session/SessionScreen.tsx", "apps/web/src/styles/theme.css"]
+    },
+    {
+      "title": "\"Vitality\" design system's restraint",
+      "description": "One accent color, dark ground, prefers-reduced-motion respected — reads clearly under gym lighting/glare without competing visual noise.",
+      "files": ["apps/web/src/styles/theme.css"]
+    },
+    {
+      "title": "Ad-hoc exercise support integrates without mutating the program template",
+      "description": "Correct architectural call per the domain model (sessions are immutable snapshots, programs are reusable templates) — though see F1 for a UI-level interaction bug on top of this good architecture.",
+      "files": ["CLAUDE.md", "apps/api/src/routes/sessions.ts"]
+    },
+    {
+      "title": "Server-truthful auth gate avoids a flash of wrong content on load",
+      "description": "The downside (a live network call per navigation) is fixable (F4) without giving up this benefit.",
+      "files": ["apps/web/src/router.tsx"]
+    },
+    {
+      "title": "Session/history review screen surfaces per-exercise volume, best set, and PR tags cleanly",
+      "description": "A solid 'review the result' step in the core loop.",
+      "files": ["apps/web/src/screens/history/SessionDetailScreen.tsx"]
+    }
+  ],
+
+  "core_workout_loop": [
+    { "step": 1, "name": "Start workout", "description": "StartScreen ('/') lists program days; tapping navigates to /session/$dayId, triggering requireUser's network auth check (F4) before the screen loads." },
+    { "step": 2, "name": "Find exercise", "description": "Day's exercises pre-loaded as one ordered list (TodayResponse.exercises); no search needed, but the 'active' one is computed, not freely chosen, unless overridden (F1's mechanism)." },
+    { "step": 3, "name": "See what was done previously", "description": "A single lastWeight/lastReps/lastDurationSec per exercise seeds fields and drives the 'vs last time' delta (F8's caveat)." },
+    { "step": 4, "name": "Enter the set", "description": "Stepper taps only: ±5 lb / ±1 rep / ±5s (F2 for weight specifically)." },
+    { "step": 5, "name": "Complete the set", "description": "Tap 'Complete set' (or the thin pip, F9) -> logSet.mutate -> full round trip, no optimistic update (F5), silent on failure (F3)." },
+    { "step": 6, "name": "Start rest", "description": "rest.start(active.restSec ?? 90) fires automatically on every logged set; timestamp-based, backgrounding-safe (a strength)." },
+    { "step": 7, "name": "Return to the next set", "description": "Active card re-renders from fresh server data post-invalidate; if the exercise was done out of program order, focus may have jumped elsewhere (F1)." },
+    { "step": 8, "name": "Complete the exercise", "description": "Once loggedSets.length >= targetSets, exercise is marked done; if in order, the next incomplete one becomes active automatically." },
+    { "step": 9, "name": "Finish the workout", "description": "No explicit 'finish' action exists; once all program exercises are done, an 'All sets logged' state links back to Start. Low friction, but no session summary (duration, total volume) shown at this moment." },
+    { "step": 10, "name": "Review the result", "description": "SessionDetailScreen via History: sets, volume, PR tags, best-set-per-exercise. Solid, though no session duration is tracked (schema has no endedAt)." }
+  ],
+
+  "friction_audit": [
+    { "issue": "Recompute-and-relocate the active exercise after every set logged out of program order", "frequency": "Every set, for any non-linear session", "related_finding": "F1" },
+    { "issue": "Tap accumulation to reach a real weight from the flat 45 lb seed on any never-logged exercise", "frequency": "Once per new exercise, but up to dozens of taps each time", "related_finding": "F2" },
+    { "issue": "No feedback loop on failure — failed tap looks identical to successful tap", "frequency": "Any network hiccup or cold start", "related_finding": "F3" },
+    { "issue": "Two sequential network calls hidden behind the first 'Complete set' tap of a session", "frequency": "Once per session, worst-cased by cold start", "related_finding": "F5" },
+    { "issue": "High-risk adjacent controls for correcting a mistake (edit vs delete, 24px targets, no confirm)", "frequency": "Any time a logged set needs correction", "related_finding": "F6" },
+    { "issue": "Redundant thin tap target (pip) that risks being missed or double-firing alongside the main button", "frequency": "Every set (optional alternate control)", "related_finding": "F9, F10" }
+  ],
+
+  "mobile_and_offline_risks": [
+    { "risk": "Full-stop failure under weak/no connectivity, with no explanation", "detail": "No offline queue, no navigator.onLine handling, no visible error state on failed requests. Largest gap against the brief's explicit 'gym with poor connectivity' scenario.", "related_findings": ["F3", "F12"] },
+    { "risk": "Auth re-check on every navigation, unguarded against network failure", "detail": "No custom router error UI; a connectivity blip during navigation (not even during logging) can break the app outright.", "related_findings": ["F4"] },
+    { "risk": "Cold-start latency on the actual deployment target", "detail": "Umbrella CLAUDE.md documents Cloud Run min 0 / max 3 for this app — first request after any idle period can be multi-second; UI has no optimistic state to absorb it.", "related_findings": ["F5"] },
+    { "risk": "No idempotency protection if retries are added later without a dedupe key", "detail": "Should be fixed in the same pass as the error-handling/retry work, not after.", "related_findings": ["F10"] }
+  ],
+
+  "recommended_ux_principles": [
+    "Every state-changing tap must have a visible outcome within the tap's own affordance — success, pending, or failure — never a silent no-op.",
+    "The exercise the user is physically doing should never change without the user asking it to. Automatic focus changes are only acceptable as a forward convenience (advancing to the next thing), never as an unrequested reversion.",
+    "Destructive actions get proportionally larger friction, not proportionally smaller touch targets. Deleting a logged set should be harder to trigger by accident than logging one, not easier.",
+    "Assume every network call can be slow or can fail, because in this deployment it genuinely will be sometimes (scale-to-zero backend, gym wifi). Optimistic-first, reconcile-on-response should be the default mutation pattern, not the exception.",
+    "Numeric entry ergonomics should scale with the plausible range of the value, not use one interaction pattern for everything. Bounded/narrow ranges (reps, rest seconds) are fine as pure steppers; wide/unbounded ranges (weight) need a faster path to an arbitrary value."
+  ],
+
+  "recommended_next_5_actions": [
+    { "rank": 1, "finding_id": "F1", "action": "Fix the out-of-order exercise focus bug", "why": "Small, contained logic change with outsized real-world impact." },
+    { "rank": 2, "finding_id": "F3", "action": "Add visible mutation error states across the app", "why": "De-risks several other findings at once (silent cold-start stalls, unnoticed double-submits)." },
+    { "rank": 3, "finding_id": "F2", "action": "Add weight-entry acceleration or a numeric-entry fallback", "why": "Biggest single tap-count reduction available." },
+    { "rank": 4, "finding_id": "F4", "action": "Make requireUser network-failure-tolerant and add a themed defaultErrorComponent", "why": "Closes the worst offline-navigation failure mode." },
+    { "rank": 5, "finding_id": "F5", "action": "Introduce optimistic updates for logSet", "why": "Targets perceived latency on the highest-stakes tap in the loop; pairs naturally with action 2's error/rollback path." }
+  ]
+}
