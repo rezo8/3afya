@@ -24,6 +24,13 @@
       "summary": "Every write visible, every number honest"
     },
     {
+      "description": "Nutrition moves off the bottom of Start onto its own Fuel tab. Scope, decided 2026-09-26: track protein, calories, carbs and fat, with carbs and fat optional on every entry so a blank stays a blank; foods come from a personal food memory (the user's own items and units, never a food database or barcodes, per PROJECT_RECOMMENDATIONS.md); logging any day; a weekly view that leaves unlogged days out of the average; and an expenditure estimate that never moves the target on its own. Mockup: https://claude.ai/artifact/CD3dbZS6upyEbpCcv25c2g",
+      "id": "fuel",
+      "label": "PHASE 3b",
+      "name": "Fuel page",
+      "summary": "A full nutrition page: four macros, saved foods, portions, any day, weekly view"
+    },
+    {
       "description": "The active-workout surface, judged by tap count, touch-target size, and recovery from a mistake rather than the happy path. This is the highest-frequency screen in the app and the one most often used one-handed with a barbell waiting.",
       "id": "loop",
       "label": "PHASE 3",

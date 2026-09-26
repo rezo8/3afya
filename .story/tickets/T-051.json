@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-26",
+  "description": "Nutrition lives as FuelPanel at the bottom of Start (apps/web/src/screens/start/StartScreen.tsx:148). At 390px only the two meters are visible above the fold, the eight quick-add chips stack one per row below it, and Start ends up showing two different \"＋ Log something else\" buttons: the freeform workout entry (StartScreen.tsx:11-12) and the custom-food form (FuelPanel.tsx:213, 232). The second one does something else entirely.\n\nSCOPE\n- New route /fuel (apps/web/src/router.tsx, beside startRoute at :103) and a sixth tab in TABS (apps/web/src/app/TabBar.tsx:3-9): Start, Program, Fuel, Trends, History, Body. Check the tab bar still fits at 390px with six mono labels.\n- The Fuel page's Today view takes over what FuelPanel renders today (meters, quick-adds, logged list, custom add, target edit). Move it, don't duplicate it: FuelPanel's queries and mutations go with it.\n- Start keeps a compact card: protein and calorie meters, up to three quick-add chips, \"+ Log food\", and \"Open Fuel ›\" (mockup: StartCard). Both surfaces read the same [\"fuel\",\"today\"] query, so logging on either updates both.\n- Rename the freeform entry on Start to \"+ Log a workout off-program\", so \"Log something else\" stops meaning two things on one screen.\n\nNOT IN SCOPE\nCarbs/fat, the day stepper, grouping and the Week view. Each has its own ticket in this phase.\n\nMockup: https://claude.ai/artifact/CD3dbZS6upyEbpCcv25c2g (boards Main, StartCard).",
+  "displayId": "T-051",
+  "id": "T-051",
+  "order": 10,
+  "phase": "fuel",
+  "status": "open",
+  "title": "Give Fuel its own tab and page, and shrink Start's fuel panel to a summary card",
+  "type": "feature"
+}
