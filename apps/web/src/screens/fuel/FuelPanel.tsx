@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import type { NutritionTarget } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
@@ -97,9 +96,6 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
       <CarbsAndFat day={data} />
 
       <QuickAdd foods={quickAddsFor(data)} date={date} errors={errors} />
-      <Link to="/fuel/foods" className="fuel-foods-link">
-        Your foods ›
-      </Link>
 
       <button className="fuel-custom-open" onClick={() => setLogging(true)}>
         ＋ Log food

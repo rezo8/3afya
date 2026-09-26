@@ -15,6 +15,7 @@ import { db } from "../db";
 import { fuelEntry, fuelItem, nutritionTarget } from "../db/schema/tracker";
 import { isFuelDate, readLoggedAt } from "../fuel-window";
 import { optionalGrams, quickAddsFor } from "../fuel-queries";
+import { targetInForce } from "../fuel-targets";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
 
 const app = new Hono<AuthedEnv>();
@@ -206,6 +207,18 @@ app.get("/history", async (c) => {
     .where(and(eq(fuelEntry.userId, userId), gte(fuelEntry.loggedAt, start)))
     .orderBy(asc(fuelEntry.loggedAt));
 
+  const current = await targetFor(userId);
+  const targets = await db
+    .select({
+      proteinG: nutritionTarget.proteinG,
+      calories: nutritionTarget.calories,
+      carbsG: nutritionTarget.carbsG,
+      fatG: nutritionTarget.fatG,
+      createdAt: nutritionTarget.createdAt,
+    })
+    .from(nutritionTarget)
+    .where(eq(nutritionTarget.userId, userId));
+
   const byDate = new Map<string, { proteinG: number; calories: number; entryCount: number }>();
   for (let i = days - 1; i >= 0; i--) {
     byDate.set(localDate(startOfDaysAgo(i, zone), zone), { proteinG: 0, calories: 0, entryCount: 0 });
@@ -220,8 +233,13 @@ app.get("/history", async (c) => {
     }
   }
   return c.json({
-    target: await targetFor(userId),
-    days: [...byDate.entries()].map(([date, day]) => ({ date, ...day })),
+    target: current,
+    days: [...byDate.entries()].map(([date, day]) => ({
+      date,
+      ...day,
+      // Before the first target was ever set, the default was what the day was measured against.
+      target: targetInForce(targets, startOfLocalDate(nextLocalDate(date), zone), DEFAULT_TARGET),
+    })),
   } satisfies FuelHistory);
 });
 

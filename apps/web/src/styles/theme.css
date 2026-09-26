@@ -1330,6 +1330,88 @@ body {
 .sheet-cta {
   height: 52px;
 }
+.fuel-tabs {
+  margin-top: -4px;
+}
+.week-strip {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 56px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.week-strip-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+.week-strip-avg {
+  font-size: 14px;
+}
+.week-strip-go {
+  float: right;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+}
+.fuel-week {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* Stacked rather than side by side: at 390px the two readouts don't fit on one line
+   without wrapping their units away from their numbers. */
+.fuel-week-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.fuel-week-side .fuel-week-mid {
+  display: inline;
+}
+.fuel-week-big span,
+.fuel-week-side .mnote {
+  white-space: nowrap;
+}
+.fuel-week-big,
+.fuel-week-mid {
+  margin: 4px 0 0;
+  font-family: var(--display);
+  line-height: 1;
+}
+.fuel-week-big {
+  font-size: 44px;
+}
+.fuel-week-big span {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-soft);
+}
+.fuel-week-mid {
+  font-size: 28px;
+  color: var(--accent);
+}
+.fuel-week-note {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--text-soft);
+}
+.fuel-week-note b {
+  color: var(--text);
+}
 .fuel-foods-link {
   display: inline-flex;
   align-items: center;

@@ -433,10 +433,13 @@ export interface FuelHistoryDay {
   calories: number;
   /** Entries logged that day — 0 means nothing was logged, not "logged 0 g". */
   entryCount: number;
+  /** The target in force that day, which is what the day is scored against — not today's. */
+  target: NutritionTarget;
 }
 
-/** Daily totals over the last N days — powers the adherence chart. */
+/** Daily totals over the last N days — powers the adherence chart and the Fuel week. */
 export interface FuelHistory {
+  /** The target now. */
   target: NutritionTarget;
   days: FuelHistoryDay[];
 }

@@ -263,6 +263,13 @@ records what is specific to 3afya.
   matches. "Just numbers" can save the food as it logs it. The saved food is kept in a ref, so a Retry
   after the entry failed doesn't POST the food twice (409). "When" starts at `loggedAtFor(date)`. The
   ticket's "hold a chip to open the sheet" was dropped in favour of T-045's correct-after-tap row.
+- **Fuel is scored weekly, not pass/fail per day** (T-049). The Fuel page has Day / Week tabs. `summarizeWeek`
+  (`lib/fuel-week.ts`) averages only **complete, logged** days: an unlogged day would average in as a fast,
+  and today is still being eaten, so both are excluded. Unlogged days are named out loud. Each
+  `FuelHistoryDay` carries the **target in force that day** (`apps/api/src/fuel-targets.ts`: the newest target
+  set before the day ended; before any target existed, `DEFAULT_TARGET`). The week compares the average against
+  the average of those, not against today's target. `useFuelWeek` uses the same key and URL as Trends'
+  adherence chart, so the two share one cache entry.
 - **Correcting a fuel entry is `PATCH /api/fuel/:id`** (T-046). It replaces label and numbers and
   keeps `loggedAt`, since the food was eaten when it was logged. POST and PATCH validate through one
   `readFuelFields`. In `FuelPanel` a row's label is the edit target, and the form reuses `FoodFields`
