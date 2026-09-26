@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TIME_ZONE, isSameDay, localDate, parseTimeZone, startOfDay, startOfDaysAgo } from "./day";
+import {
+  DEFAULT_TIME_ZONE,
+  isSameDay,
+  localDate,
+  nextLocalDate,
+  parseLocalDate,
+  parseTimeZone,
+  startOfDay,
+  startOfDaysAgo,
+  startOfLocalDate,
+} from "./day";
 
 const NEW_YORK = "America/New_York";
 const KIRITIMATI = "Pacific/Kiritimati"; // UTC+14, the far side of the date line
@@ -118,5 +128,41 @@ describe("startOfDaysAgo", () => {
 
   it("treats zero days ago as today's midnight", () => {
     expect(startOfDaysAgo(0, NEW_YORK).toISOString()).toBe(startOfDay(new Date(), NEW_YORK).toISOString());
+  });
+});
+
+describe("parseLocalDate", () => {
+  it("accepts a real calendar date", () => {
+    expect(parseLocalDate("2026-09-26")).toBe("2026-09-26");
+    expect(parseLocalDate("2028-02-29")).toBe("2028-02-29");
+  });
+
+  it("refuses a date that has the shape but does not exist", () => {
+    expect(parseLocalDate("2026-02-30")).toBeNull();
+    expect(parseLocalDate("2027-02-29")).toBeNull();
+  });
+
+  it("refuses anything that is not YYYY-MM-DD", () => {
+    expect(parseLocalDate("26/09/2026")).toBeNull();
+    expect(parseLocalDate("2026-9-26")).toBeNull();
+    expect(parseLocalDate(undefined)).toBeNull();
+  });
+});
+
+describe("startOfLocalDate", () => {
+  it("is midnight of that date in the user's zone", () => {
+    expect(startOfLocalDate("2026-09-26", NEW_YORK).toISOString()).toBe("2026-09-26T04:00:00.000Z");
+  });
+
+  it("follows the offset in force that day, not today's", () => {
+    // New York is on EST (UTC-5) in January.
+    expect(startOfLocalDate("2026-01-15", NEW_YORK).toISOString()).toBe("2026-01-15T05:00:00.000Z");
+  });
+});
+
+describe("nextLocalDate", () => {
+  it("steps across a month end and a leap day", () => {
+    expect(nextLocalDate("2026-09-30")).toBe("2026-10-01");
+    expect(nextLocalDate("2028-02-28")).toBe("2028-02-29");
   });
 });

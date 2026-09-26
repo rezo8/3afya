@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { FuelEntry, NutritionTarget, UpdateFuelEntryBody } from "@afya/shared";
+import type { FrequentFuel, FuelEntry, NutritionTarget, UpdateFuelEntryBody } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import {
@@ -17,7 +17,15 @@ import {
 } from "@/lib/fuel";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 import { CarbsAndFat, FuelMeters, QuickAddChips } from "./FuelMeters";
-import { FUEL_TODAY_KEY, quickAddsFor, useFuelToday, useLogFuel } from "./fuel-today";
+import {
+  earliestFuelDate,
+  fromDateTimeLocal,
+  localDateOf,
+  loggedAtFor,
+  toDateTimeLocal,
+  type LocalDate,
+} from "@/lib/fuel-date";
+import { FUEL_KEY, quickAddsFor, useFuelDay, useLogFuel } from "./fuel-day";
 
 const PROTEIN_STEP = 5;
 const CALORIE_STEP = 50;
@@ -26,13 +34,15 @@ const FAT_STEP = 2;
 const COLLAPSED_ENTRIES = 3;
 
 type TargetDraft = { proteinG: AmountDraft; calories: AmountDraft };
-type EntryDraft = FoodDraft & { id: string };
+/** An entry being corrected: its food, and when it was eaten as the `datetime-local` input holds it. */
+type EntryDraft = FoodDraft & { id: string; when: string };
 
 const timeOfDay = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
-export function FuelPanel() {
+/** One day's fuel. Anything logged here lands on `date`; `isToday` only changes what the page calls it. */
+export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean }) {
   const qc = useQueryClient();
-  const { data } = useFuelToday();
+  const { data } = useFuelDay(date);
   const errors = useMutationError();
   const [showCustom, setShowCustom] = useState(false);
   const [customDraft, setCustomDraft] = useState<FoodDraft>(EMPTY_FOOD_DRAFT);
@@ -40,13 +50,13 @@ export function FuelPanel() {
   const [showAllEntries, setShowAllEntries] = useState(false);
   const [entryDraft, setEntryDraft] = useState<EntryDraft | null>(null);
 
-  const invalidateToday = () => qc.invalidateQueries({ queryKey: FUEL_TODAY_KEY });
+  const invalidateFuel = () => qc.invalidateQueries({ queryKey: FUEL_KEY });
   const add = useLogFuel(errors);
   const remove = useTrackedMutation(errors, {
     mutationFn: (id: string) => api.delete<{ ok: true }>(`/api/fuel/${id}`),
     onSuccess: (_, id) => {
       setEntryDraft((draft) => (draft?.id === id ? null : draft));
-      invalidateToday();
+      invalidateFuel();
     },
   });
   const update = useTrackedMutation(errors, {
@@ -54,11 +64,7 @@ export function FuelPanel() {
     // Returning the refetch keeps `isPending` true until fresh totals are in, so closing
     // the form never reveals the row's old numbers for a round trip after "Save".
     onSuccess: async () => {
-      await Promise.all([
-        invalidateToday(),
-        // A corrected entry changes a past day's total too, which Trends scores.
-        qc.invalidateQueries({ queryKey: ["fuel", "history"] }),
-      ]);
+      await invalidateFuel();
       setEntryDraft(null);
     },
   });
@@ -66,8 +72,7 @@ export function FuelPanel() {
     mutationFn: (target: NutritionTarget) => api.put<NutritionTarget>("/api/fuel/target", target),
     onSuccess: () => {
       setTargetDraft(null);
-      invalidateToday();
-      qc.invalidateQueries({ queryKey: ["fuel", "history"] });
+      invalidateFuel();
     },
   });
 
@@ -82,7 +87,7 @@ export function FuelPanel() {
   const submitCustom = (e: FormEvent) => {
     e.preventDefault();
     if (!canAddCustom || add.isPending) return;
-    add.mutate(foodBody(customDraft));
+    add.mutate({ ...foodBody(customDraft), loggedAt: loggedAtFor(date, new Date()) });
     setCustomDraft(EMPTY_FOOD_DRAFT);
     setShowCustom(false);
   };
@@ -99,13 +104,16 @@ export function FuelPanel() {
       fatG: target.fatG,
     });
   };
-  const canSaveEntry = !!entryDraft && canLogFood(entryDraft);
+  const entryLoggedAt = entryDraft ? fromDateTimeLocal(entryDraft.when) : null;
+  const canSaveEntry = !!entryDraft && canLogFood(entryDraft) && entryLoggedAt !== null;
   const submitEntry = (e: FormEvent) => {
     e.preventDefault();
-    if (!entryDraft || !canSaveEntry || update.isPending) return;
-    update.mutate({ id: entryDraft.id, ...foodBody(entryDraft) });
+    if (!entryDraft || !entryLoggedAt || !canSaveEntry || update.isPending) return;
+    update.mutate({ id: entryDraft.id, ...foodBody(entryDraft), loggedAt: entryLoggedAt });
   };
-  const openEntryEdit = (entry: FuelEntry) => setEntryDraft({ id: entry.id, ...foodDraftFrom(entry) });
+  const openEntryEdit = (entry: FuelEntry) =>
+    setEntryDraft({ id: entry.id, ...foodDraftFrom(entry), when: toDateTimeLocal(entry.loggedAt) });
+  const logQuickAdd = (food: FrequentFuel) => add.mutate({ ...food, loggedAt: loggedAtFor(date, new Date()) });
 
   const toggleTargetEdit = () =>
     setTargetDraft((draft) =>
@@ -155,7 +163,7 @@ export function FuelPanel() {
       <FuelMeters day={data} />
       <CarbsAndFat day={data} />
 
-      <QuickAddChips foods={quickAddsFor(data)} onAdd={(food) => add.mutate(food)} disabled={add.isPending} />
+      <QuickAddChips foods={quickAddsFor(data)} onAdd={logQuickAdd} disabled={add.isPending} />
 
       {showCustom ? (
         <form className="fuel-custom" onSubmit={submitCustom}>
@@ -178,13 +186,23 @@ export function FuelPanel() {
 
       {newestFirst.length > 0 && (
         <div className="fuel-log">
-          <p className="eyebrow">Logged today</p>
+          <p className="eyebrow">{isToday ? "Logged today" : "Logged"}</p>
           <ul>
             {visibleEntries.map((entry) =>
               entryDraft?.id === entry.id ? (
                 <li key={entry.id}>
                   <form className="fuel-edit" onSubmit={submitEntry} aria-label={`Edit ${entry.label}`}>
                     <FoodFields draft={entryDraft} onChange={(food) => setEntryDraft({ ...entryDraft, ...food })} />
+                    <label className="fuel-when">
+                      <span className="fuel-field-label">Eaten</span>
+                      <input
+                        type="datetime-local"
+                        min={`${earliestFuelDate(localDateOf(new Date()))}T00:00`}
+                        max={toDateTimeLocal(new Date().toISOString())}
+                        value={entryDraft.when}
+                        onChange={(e) => setEntryDraft({ ...entryDraft, when: e.target.value })}
+                      />
+                    </label>
                     <div className="fuel-edit-actions">
                       <button type="button" className="fuel-cancel" onClick={() => setEntryDraft(null)}>
                         Cancel

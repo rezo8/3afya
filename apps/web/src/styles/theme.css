@@ -1109,6 +1109,51 @@ body {
   border-radius: var(--r-sm);
   padding: 7px 8px 7px 12px;
 }
+/* The Fuel page's heading carries the day, and the stepper beside it moves between days. */
+.fuel-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.day-step {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.day-step button {
+  appearance: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line-hi);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+}
+.day-step button:disabled {
+  color: var(--text-faint);
+  border-color: var(--line);
+  cursor: default;
+}
+.fuel-when {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.fuel-when input {
+  background: var(--surface);
+  border: 1px solid var(--line-hi);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  font-family: var(--mono);
+  font-size: 14px;
+  min-height: 44px;
+  padding: 0 10px;
+  color-scheme: dark;
+}
 .fuel-log .fuel-edit {
   margin-bottom: 0;
 }

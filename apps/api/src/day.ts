@@ -129,3 +129,28 @@ export function startOfDaysAgo(daysAgo: number, zone: string, from: Date = new D
   const target = new Date(Date.UTC(today.year, today.month - 1, today.day - daysAgo));
   return startOfCalendarDate(target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate(), zone, from);
 }
+
+/**
+ * A calendar date the caller named, as YYYY-MM-DD, if it is a real one — else null.
+ * "2026-02-30" has the right shape and is not a date, which `Date.UTC` would quietly roll
+ * into March; the round trip is what refuses it.
+ */
+export function parseLocalDate(value: unknown): string | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number) as [number, number, number];
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  const roundTrips = probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day;
+  return roundTrips ? value : null;
+}
+
+/** The instant a YYYY-MM-DD calendar date began in `zone`. Pass only what `parseLocalDate` accepted. */
+export function startOfLocalDate(date: string, zone: string): Date {
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+  return startOfCalendarDate(year, month, day, zone, new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+/** The calendar date after `date`, by calendar arithmetic rather than by adding 24 hours. */
+export function nextLocalDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+}

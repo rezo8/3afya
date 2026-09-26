@@ -219,12 +219,20 @@ records what is specific to 3afya.
 - **Session creation ref**: `SessionScreen` stores the id of any session it creates in a ref because a failed set-POST doesn't invalidate. The ref is cleared on success.
 - **`isExerciseDone` is the single source of truth**: Shared by `SessionScreen` and `StartScreen`. Don't re-inline it — the point is the two screens can't disagree.
 - **Client-side rotation advance**: `StartScreen` owns moving "NEXT UP" past a finished day because the API keeps returning today's day. If rotation ever advances server-side, delete the client rule.
-- **Fuel target invalidation**: Target editing must invalidate both `["fuel","today"]` and `["fuel","history"]` — TrendsScreen scores against `FuelHistory.target`.
+- **Fuel invalidation is by prefix**: every fuel query sits under `FUEL_KEY` (`["fuel"]`): `fuelDayKey(date)` per day, and `["fuel","history"]` for Trends. Every fuel write invalidates the whole prefix, because a logged, moved or retargeted entry can change the day it left, the day it landed on, and the week. Don't narrow an invalidation to one day.
 - **Fuel has its own tab, `/fuel`** (T-051). `screens/fuel/FuelPanel.tsx` is the full panel. Start renders
-  `FuelSummaryCard` instead: the meters, 3 quick-adds and a link. Both read `useFuelToday()` and log through
-  `useLogFuel()` in `screens/fuel/fuel-today.ts`, on one `FUEL_TODAY_KEY`, and render the same `FuelMeters` and
-  `QuickAddChips`. That shared key is why a log on either surface shows on both. Don't give the card its own query.
+  `FuelSummaryCard` instead: the meters, 3 quick-adds and a link. Both read `useFuelDay(date)` and log through
+  `useLogFuel()` in `screens/fuel/fuel-day.ts`, and render the same `FuelMeters` and `QuickAddChips`. The card
+  asks for today's date, the same key the page uses on today, which is why a log on either surface shows on
+  both. Don't give the card its own query.
   The tab bar holds six tabs at 390px with ~20px to spare; a seventh doesn't fit without changing `.tab`.
+- **Fuel is logged on any day in a 30-day window** (T-047, `FUEL_BACKDATE_DAYS` in `@afya/shared`). The page reads
+  `GET /api/fuel/day/:date` (YYYY-MM-DD in the user's zone; `/today` is gone), and POST/PATCH take an optional
+  `loggedAt`. `apps/api/src/fuel-window.ts` owns the rule: not in the future (5 min clock slack), not before the
+  window, judged on the user's calendar. PATCH **without** `loggedAt` keeps the entry's time; POST without it
+  means now. Logging while the stepper is on a past day stamps that day at the current clock time
+  (`loggedAtFor`), and the edit form's "Eaten" field retimes it. Client dates are YYYY-MM-DD strings stepped by
+  calendar arithmetic (`lib/fuel-date.ts`), never ±24 h on an instant.
 - **Correcting a fuel entry is `PATCH /api/fuel/:id`** (T-046). It replaces label and numbers and
   keeps `loggedAt`, since the food was eaten when it was logged. POST and PATCH validate through one
   `readFuelFields`. In `FuelPanel` a row's label is the edit target, and the form reuses `FoodFields`

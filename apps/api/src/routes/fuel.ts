@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import type {
   AddFuelEntryBody,
@@ -12,9 +12,10 @@ import type {
   PartialTotal,
   UpdateFuelEntryBody,
 } from "@afya/shared";
-import { localDate, startOfDay, startOfDaysAgo } from "../day";
+import { localDate, nextLocalDate, parseLocalDate, startOfDaysAgo, startOfLocalDate } from "../day";
 import { db } from "../db";
 import { fuelEntry, nutritionTarget } from "../db/schema/tracker";
+import { isFuelDate, readLoggedAt } from "../fuel-window";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
 
 const app = new Hono<AuthedEnv>();
@@ -74,15 +75,28 @@ async function frequentFor(userId: string): Promise<FrequentFuel[]> {
     .limit(FREQUENT_LIMIT);
 }
 
-/** Today's fuel: target, entries, running totals, and the user's frequent labels. */
-app.get("/today", async (c) => {
+/**
+ * One calendar day's fuel in the user's zone: target, entries, totals, and the user's
+ * frequent labels. The day is YYYY-MM-DD and must sit inside the back-dating window.
+ */
+app.get("/day/:date", async (c) => {
   const zone = c.get("timeZone");
   const userId = c.get("userId");
+  const date = parseLocalDate(c.req.param("date"));
+  if (!date || !isFuelDate(date, new Date(), zone)) {
+    return c.json({ error: "bad_request", message: "That day is outside the range fuel can be logged for." }, 400);
+  }
   const target = await targetFor(userId);
   const entries = await db
     .select()
     .from(fuelEntry)
-    .where(and(eq(fuelEntry.userId, userId), gte(fuelEntry.loggedAt, startOfDay(new Date(), zone))))
+    .where(
+      and(
+        eq(fuelEntry.userId, userId),
+        gte(fuelEntry.loggedAt, startOfLocalDate(date, zone)),
+        lt(fuelEntry.loggedAt, startOfLocalDate(nextLocalDate(date), zone)),
+      ),
+    )
     .orderBy(asc(fuelEntry.loggedAt));
   const totals = {
     proteinG: entries.reduce((sum, e) => sum + e.proteinG, 0),
@@ -91,7 +105,7 @@ app.get("/today", async (c) => {
     fat: partialTotal(entries.map((e) => e.fatG)),
   };
   return c.json({
-    date: localDate(new Date(), zone),
+    date,
     target,
     entries: entries.map(toEntry),
     totals,
@@ -123,21 +137,28 @@ function readFuelFields(body: AddFuelEntryBody | null) {
 }
 
 app.post("/", async (c) => {
-  const fields = readFuelFields(await c.req.json<AddFuelEntryBody>().catch(() => null));
+  const body = await c.req.json<AddFuelEntryBody>().catch(() => null);
+  const fields = readFuelFields(body);
   if (!fields) return c.json({ error: "bad_request", message: "A label is required." }, 400);
+  const loggedAt = readLoggedAt(body?.loggedAt, new Date(), c.get("timeZone"));
+  if (loggedAt.kind === "refused") return c.json({ error: "bad_request", message: loggedAt.message }, 400);
   const [row] = await db
     .insert(fuelEntry)
-    .values({ userId: c.get("userId"), ...fields })
+    .values({ userId: c.get("userId"), ...fields, ...(loggedAt.kind === "at" && { loggedAt: loggedAt.instant }) })
     .returning();
   return c.json(toEntry(row!), 201);
 });
 
 app.patch("/:id", async (c) => {
-  const fields = readFuelFields(await c.req.json<UpdateFuelEntryBody>().catch(() => null));
+  const body = await c.req.json<UpdateFuelEntryBody>().catch(() => null);
+  const fields = readFuelFields(body);
   if (!fields) return c.json({ error: "bad_request", message: "A label is required." }, 400);
+  // An edit that names no time keeps the one on record rather than moving the entry to now.
+  const loggedAt = body?.loggedAt === undefined ? null : readLoggedAt(body.loggedAt, new Date(), c.get("timeZone"));
+  if (loggedAt?.kind === "refused") return c.json({ error: "bad_request", message: loggedAt.message }, 400);
   const [row] = await db
     .update(fuelEntry)
-    .set(fields)
+    .set({ ...fields, ...(loggedAt?.kind === "at" && { loggedAt: loggedAt.instant }) })
     .where(and(eq(fuelEntry.id, c.req.param("id")), eq(fuelEntry.userId, c.get("userId"))))
     .returning();
   if (!row) return c.json({ error: "not_found" }, 404);

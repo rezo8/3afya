@@ -14,9 +14,9 @@
   "relatedTickets": [
     "T-046"
   ],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Resolved by T-047. Every fuel mutation (log, edit, remove, target) now invalidates the whole [\"fuel\"] prefix (FUEL_KEY in apps/web/src/screens/fuel/fuel-day.ts), which includes [\"fuel\",\"history\"]. Back-dating made a per-day invalidation wrong anyway: moving an entry changes the day it left and the day it landed on.",
+  "resolvedDate": "2026-09-26",
   "severity": "low",
-  "status": "open",
+  "status": "resolved",
   "title": "Adding or removing a fuel entry does not invalidate fuel history"
 }

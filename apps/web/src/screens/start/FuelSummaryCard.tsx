@@ -2,13 +2,14 @@ import { Link } from "@tanstack/react-router";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useMutationError } from "@/lib/query/use-mutation-error";
 import { FuelMeters, QuickAddChips } from "@/screens/fuel/FuelMeters";
-import { quickAddsFor, useFuelToday, useLogFuel } from "@/screens/fuel/fuel-today";
+import { localDateOf } from "@/lib/fuel-date";
+import { quickAddsFor, useFuelDay, useLogFuel } from "@/screens/fuel/fuel-day";
 
 const START_QUICK_ADDS = 3;
 
 /** Start's view of today's fuel: where you stand, and the three things you log most. The rest is on /fuel. */
 export function FuelSummaryCard() {
-  const { data } = useFuelToday();
+  const { data } = useFuelDay(localDateOf(new Date()));
   const errors = useMutationError();
   const add = useLogFuel(errors);
   if (!data) return null;

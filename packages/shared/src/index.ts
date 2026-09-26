@@ -406,10 +406,21 @@ export interface FuelHistory {
   days: FuelHistoryDay[];
 }
 
+/**
+ * How far back fuel can be logged or moved, in calendar days before today. Shared so the
+ * day stepper stops exactly where the API would start refusing.
+ */
+export const FUEL_BACKDATE_DAYS = 30;
+
 export interface AddFuelEntryBody extends FuelMacros {
   label: string;
+  /** When it was eaten, ISO 8601. Omit for now. No later than now, no earlier than FUEL_BACKDATE_DAYS back. */
+  loggedAt?: string;
 }
-/** Correcting an entry replaces its label and numbers. Its `loggedAt` is kept: it was eaten then. */
+/**
+ * Correcting an entry replaces its label and numbers. `loggedAt` moves it when given and
+ * is kept when omitted, since the food was still eaten when it was logged.
+ */
 export type UpdateFuelEntryBody = AddFuelEntryBody;
 
 // ---------------------------------------------------------------------------
