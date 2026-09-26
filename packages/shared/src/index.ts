@@ -290,7 +290,7 @@ export interface UpdateSetBody {
   isWarmup?: boolean;
 }
 
-/** One exercise on today's session, with last-session numbers pre-filled. */
+/** One exercise on today's session, with what the previous session did for it. */
 export interface TodayExercise {
   exerciseId: string;
   name: string;
@@ -308,12 +308,12 @@ export interface TodayExercise {
   note: string | null;
   supersetGroup: string | null;
   section: string | null;
-  /** From the most recent logged set of this exercise, or null if never done. */
-  lastWeight: number | null;
-  lastReps: number | null;
-  lastDurationSec: number | null;
-  lastDistance: number | null;
-  lastDistanceUnit: DistanceUnit | null;
+  /**
+   * The working sets of the most recent other session that logged this exercise, in set
+   * order, warm-ups excluded. Empty if it has never been done. A set is compared against
+   * the one at its own position here, not against whichever set happened to be last.
+   */
+  previousWorkingSets: SetLog[];
   /** Sets already logged in the in-progress session. */
   loggedSets: SetLog[];
 }

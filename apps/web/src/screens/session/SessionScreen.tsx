@@ -30,9 +30,25 @@ import { isExerciseDone } from "@/lib/session";
 import { pickFromAlternative, type ExercisePick } from "@/lib/exercise-pick";
 import { ExercisePicker } from "@/components/ExercisePicker";
 import { keyForSlot, newIdempotencyKey, slotId } from "@/lib/set-slot";
+import { compareToPreviousSession, matchingPreviousSet, type SetComparison, type SetEntry } from "@/lib/set-comparison";
 import { useRestTimer } from "./RestTimer";
 
-type Work = Record<string, { weight: number; reps: number; durationSec: number; distance: number; distanceUnit: DistanceUnit }>;
+type Work = Record<string, SetEntry>;
+
+/**
+ * What an exercise's entry card starts on: the previous session's set at the position the
+ * next working set fills, else its last working set, else plain defaults.
+ */
+const seedEntry = (ex: TodayExercise): SetEntry => {
+  const seed = matchingPreviousSet(ex.previousWorkingSets, ex.loggedSets) ?? ex.previousWorkingSets.at(-1);
+  return {
+    weight: seed?.weight ?? 45,
+    reps: seed?.reps ?? ex.targetReps ?? 8,
+    durationSec: seed?.durationSec ?? ex.targetDurationSec ?? 30,
+    distance: seed?.distance ?? 1,
+    distanceUnit: seed?.distanceUnit ?? "mi",
+  };
+};
 
 /** A session either works through a program day, or is freeform: whatever was actually done. */
 type SessionTarget = { kind: "day"; dayId: string } | { kind: "freeform" };
@@ -48,6 +64,30 @@ const parseNonNegative = (text: string): number | null => {
   const value = Number(text);
   return text.trim() !== "" && Number.isFinite(value) && value >= 0 ? value : null;
 };
+
+/** One line under the entry card saying how this set reads against the same set last time. */
+function ComparisonLine({ comparison }: { comparison: SetComparison }) {
+  switch (comparison.kind) {
+    case "first-time":
+      return <div className="delta flat">First time logging this</div>;
+    case "warmup":
+      return <div className="delta flat">Warm-up · not compared</div>;
+    case "no-matching-set":
+      return <div className="delta flat">No set {comparison.position} last time</div>;
+    case "different-unit":
+      return (
+        <div className="delta flat">
+          {comparison.previousUnit ? `Last time was in ${comparison.previousUnit}` : "Not comparable to last time"}
+        </div>
+      );
+    case "delta": {
+      const { delta, unit, position } = comparison;
+      if (delta > 0) return <div className="delta">{`↑ +${delta} ${unit} vs set ${position} last time`}</div>;
+      if (delta < 0) return <div className="delta down">{`↓ ${delta} ${unit} vs set ${position} last time`}</div>;
+      return <div className="delta flat">= same as set {position} last time</div>;
+    }
+  }
+}
 
 /** The entry card's headline control: − big value +, whatever the kind measures. */
 function BigStep({
@@ -176,15 +216,7 @@ function SessionView({ target }: { target: SessionTarget }) {
     setWork((prev) => {
       const next = { ...prev };
       for (const ex of data.exercises) {
-        if (!next[ex.exerciseId]) {
-          next[ex.exerciseId] = {
-            weight: ex.lastWeight ?? 45,
-            reps: ex.lastReps ?? ex.targetReps ?? 8,
-            durationSec: ex.lastDurationSec ?? ex.targetDurationSec ?? 30,
-            distance: ex.lastDistance ?? 1,
-            distanceUnit: ex.lastDistanceUnit ?? "mi",
-          };
-        }
+        if (!next[ex.exerciseId]) next[ex.exerciseId] = seedEntry(ex);
       }
       return next;
     });
@@ -276,11 +308,7 @@ function SessionView({ target }: { target: SessionTarget }) {
       note: null,
       supersetGroup: null,
       section: null,
-      lastWeight: null,
-      lastReps: null,
-      lastDurationSec: null,
-      lastDistance: null,
-      lastDistanceUnit: null,
+      previousWorkingSets: [],
       loggedSets: [],
     }));
   const exercises = [...data.exercises, ...pending];
@@ -428,52 +456,35 @@ function SessionView({ target }: { target: SessionTarget }) {
   const activeDone = active ? isExerciseDone(active) : false;
   const pipCount = active ? Math.max(active.targetSets, active.loggedSets.length + 1) : 0;
 
-  let delta: number | null = null;
-  let deltaUnit = "";
-  if (active && w) {
-    if (active.kind === "weighted" && active.lastWeight != null) {
-      delta = +(w.weight - active.lastWeight).toFixed(1);
-      deltaUnit = "lb";
-    } else if (active.kind === "reps" && active.lastReps != null) {
-      delta = w.reps - active.lastReps;
-      deltaUnit = "reps";
-    } else if (active.kind === "time" && active.lastDurationSec != null) {
-      delta = w.durationSec - active.lastDurationSec;
-      deltaUnit = "s";
-    } else if (active.kind === "distance" && active.lastDistance != null && active.lastDistanceUnit === w.distanceUnit) {
-      // Only comparable in the same unit — a cross-unit comparison is left unsaid
-      // rather than converted behind the user's back.
-      delta = +(w.distance - active.lastDistance).toFixed(2);
-      deltaUnit = w.distanceUnit;
-    }
-  }
+  const comparison =
+    active && w
+      ? compareToPreviousSession({
+          exerciseKind: active.kind,
+          entry: w,
+          isWarmup: nextIsWarmup,
+          previousWorkingSets: active.previousWorkingSets,
+          loggedSets: active.loggedSets,
+        })
+      : null;
 
   const rowMeta = (e: TodayExercise) => {
-    const ew = work[e.exerciseId];
+    const ew = work[e.exerciseId] ?? seedEntry(e);
     if (e.kind === "weighted") {
-      const wt = ew ? ew.weight : (e.lastWeight ?? "—");
-      const rp = ew ? ew.reps : e.targetReps;
       return (
         <>
-          <b>{wt}</b>lb × {rp}
+          <b>{ew.weight}</b>lb × {ew.reps}
         </>
       );
     }
     if (e.kind === "reps") {
-      const rp = ew ? ew.reps : (e.lastReps ?? e.targetReps);
       return (
         <>
-          <b>{rp}</b> reps
+          <b>{ew.reps}</b> reps
         </>
       );
     }
-    if (e.kind === "distance") {
-      const unit = ew?.distanceUnit ?? e.lastDistanceUnit ?? "mi";
-      const dist = ew ? ew.distance : (e.lastDistance ?? 0);
-      return <b>{fmtDist(dist, unit)}</b>;
-    }
-    const dur = ew ? ew.durationSec : (e.lastDurationSec ?? e.targetDurationSec ?? 0);
-    return <b>{fmtDur(dur)}</b>;
+    if (e.kind === "distance") return <b>{fmtDist(ew.distance, ew.distanceUnit)}</b>;
+    return <b>{fmtDur(ew.durationSec)}</b>;
   };
 
   return (
@@ -705,15 +716,7 @@ function SessionView({ target }: { target: SessionTarget }) {
                 )}
               </div>
 
-              <div className={`delta${delta === null ? " flat" : delta > 0 ? "" : delta < 0 ? " down" : " flat"}`}>
-                {delta === null
-                  ? "First time logging this"
-                  : delta > 0
-                    ? `↑ +${delta} ${deltaUnit} vs last time`
-                    : delta < 0
-                      ? `↓ ${delta} ${deltaUnit} vs last time`
-                      : "= same as last time"}
-              </div>
+              {comparison && <ComparisonLine comparison={comparison} />}
 
               {/* `logging` is what makes the guard legible: a tap swallowed by a request
                   already in flight would otherwise look like a dead control. */}

@@ -124,6 +124,20 @@ records what is specific to 3afya.
   convert behind the user's back. Trends is the one place that converts, server-side, and
   charts in the exercise's most recently logged unit.
 
+### "Vs last time" (set comparison)
+- **A set is compared against the same working-set position in the previous session**, never
+  against whichever set was logged last. `TodayExercise.previousWorkingSets` carries the
+  previous session's working sets in order; `lib/set-comparison.ts` owns the rule (T-004).
+  Ordering by `completedAt` alone scored a fresh set 1 against a fatigued set 4.
+- **Position counts working sets only.** A warm-up takes a set number (seeded warm-ups are
+  all `setNumber` 1), so matching raw `setNumber` would score a working set against a
+  warm-up. Warm-ups are excluded on the server and the client, and an armed warm-up is not compared.
+- **No counterpart means no number.** An extra set beyond last time's count reads "No set N
+  last time" rather than falling back to the last set. Every "say nothing" case is its own
+  `SetComparison` state, so the screen never claims "first time" for a set that has history.
+- **The entry card pre-fills once from the matching set**, falling back to last time's final
+  working set; the user's edits carry forward from there.
+
 ### Session Immutability
 - **No session-exercise join table**: Exercises belong to a session iff they have ≥1 logged set. Ad-hoc exercises are surfaced by `adhocExercises` with `fromProgram: false`. This keeps sessions immutable records and programs reusable templates.
 - **Day name snapshot**: `workoutSession.dayName` is set at creation (both paths) and read as stored snapshot → live join → null. Reading the join first would re-break history on a rename.

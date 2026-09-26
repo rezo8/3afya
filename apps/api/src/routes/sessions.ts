@@ -131,17 +131,28 @@ async function rotationState(userId: string, zone: string) {
   return { program: active, days, currentDay: days[nextIdx]!, session: null } as const;
 }
 
-async function lastSetFor(userId: string, exerciseId: string, excludeSessionId?: string) {
-  const conds = [eq(workoutSession.userId, userId), eq(setLog.exerciseId, exerciseId)];
+/**
+ * The working sets of the most recent other session that logged this exercise, in set
+ * order. Warm-ups are left out on both sides of the comparison: a warm-up occupies a set
+ * number, so matching raw set numbers would score working set 1 against a warm-up.
+ */
+async function previousWorkingSets(userId: string, exerciseId: string, excludeSessionId?: string): Promise<SetLog[]> {
+  const conds = [eq(workoutSession.userId, userId), eq(setLog.exerciseId, exerciseId), eq(setLog.isWarmup, false)];
   if (excludeSessionId) conds.push(ne(setLog.sessionId, excludeSessionId));
-  const [row] = await db
-    .select({ set: setLog })
+  const [latest] = await db
+    .select({ sessionId: workoutSession.id })
     .from(setLog)
     .innerJoin(workoutSession, eq(setLog.sessionId, workoutSession.id))
     .where(and(...conds))
-    .orderBy(desc(setLog.completedAt))
+    .orderBy(desc(workoutSession.performedAt))
     .limit(1);
-  return row?.set ?? null;
+  if (!latest) return [];
+  const rows = await db
+    .select()
+    .from(setLog)
+    .where(and(eq(setLog.sessionId, latest.sessionId), eq(setLog.exerciseId, exerciseId), eq(setLog.isWarmup, false)))
+    .orderBy(asc(setLog.setNumber));
+  return rows.map(toSet);
 }
 
 async function ownedDay(userId: string, dayId: string) {
@@ -175,15 +186,6 @@ async function todaySessionForDay(userId: string, dayId: string, zone: string) {
   return row && isToday(row.performedAt, zone) ? row : null;
 }
 
-/** What the exercise's inputs pre-fill with, from the most recent set of it. */
-const lastNumbers = (last: typeof setLog.$inferSelect | null) => ({
-  lastWeight: last?.weight ?? null,
-  lastReps: last?.reps ?? null,
-  lastDurationSec: last?.durationSec ?? null,
-  lastDistance: last?.distance ?? null,
-  lastDistanceUnit: last?.distanceUnit ?? null,
-});
-
 /**
  * The exercises a session logged that no program day planned: everything in a freeform
  * session, and anything added mid-workout to a program day. An ad-hoc exercise has no
@@ -216,7 +218,7 @@ async function adhocExercises(
         note: null,
         supersetGroup: null,
         section: null,
-        ...lastNumbers(await lastSetFor(userId, id, session?.id)),
+        previousWorkingSets: await previousWorkingSets(userId, id, session?.id),
         loggedSets,
       };
     }),
@@ -262,7 +264,6 @@ async function buildDayExercises(userId: string, dayId: string, session: typeof 
     dayExercises.map(async ({ pe, ex: planned }) => {
       const substitute = substitutes.get(pe.id);
       const ex = substitute ?? planned;
-      const last = await lastSetFor(userId, ex.id, session?.id);
       return {
         exerciseId: ex.id,
         name: ex.name,
@@ -278,7 +279,7 @@ async function buildDayExercises(userId: string, dayId: string, session: typeof 
         note: pe.note,
         supersetGroup: pe.supersetGroup,
         section: pe.section,
-        ...lastNumbers(last),
+        previousWorkingSets: await previousWorkingSets(userId, ex.id, session?.id),
         loggedSets: liveSets.filter((s) => s.exerciseId === ex.id).map(toSet),
       };
     }),
