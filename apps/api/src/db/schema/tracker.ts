@@ -203,6 +203,10 @@ export const fuelEntry = pgTable(
     label: text("label").notNull(),
     proteinG: real("protein_g").default(0).notNull(),
     calories: integer("calories").default(0).notNull(),
+    // Nullable on purpose: null is "not given", which is not the same as 0 g. Protein and
+    // calories predate the distinction and store a blank as 0.
+    carbsG: real("carbs_g"),
+    fatG: real("fat_g"),
     loggedAt: timestamp("logged_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("fuel_entry_user_logged_idx").on(t.userId, t.loggedAt)],
@@ -221,6 +225,9 @@ export const nutritionTarget = pgTable(
     userId: text("user_id").notNull(),
     proteinG: integer("protein_g").default(180).notNull(),
     calories: integer("calories").default(2600).notNull(),
+    // Null is "no target": carbs and fat are tracked without being aimed at unless asked.
+    carbsG: integer("carbs_g"),
+    fatG: integer("fat_g"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("nutrition_target_user_created_idx").on(t.userId, t.createdAt)],

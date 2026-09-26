@@ -159,6 +159,14 @@ records what is specific to 3afya.
 - **`POST /api/sessions` is find-or-create per (day, calendar day)** via `todaySessionForDay` — a second POST with the same `dayId` returns the existing row with 200 rather than inserting. It's not a concurrency guarantee.
 - **`nutritionTarget` is append-only**: `PUT /api/fuel/target` INSERTs; nothing ever updates or upserts it. This lets historical adherence be scored against the target in force *then*.
 - **`isWarmup` filtering**: `apps/api/src/records.ts` filters warm-ups internally. Every caller must include `isWarmup` in its `RecordSet`-shaped query/object or silently treat all sets as working sets. Select `recordSetColumns` (`db/record-set-columns.ts`) rather than listing columns by hand — that list is where a forgotten column stops being possible.
+- **Carbs and fat are nullable; protein and calories are not** (T-052). `fuel_entry.carbs_g`/`fat_g` hold
+  null for "not given", and 0 only when the user typed 0. Protein and calories predate the distinction and
+  store a blank as 0, which is why `foodDraftFrom` reopens a 0 protein blank but a 0 carbs as "0". A day's
+  carbs/fat total is a `PartialTotal` (`grams` + `entriesWithout`), so partial data is always labelled:
+  "+1 not given", or "—" / "none given" when no entry gave it. Never coerce null to 0 on the way in or out.
+  Nutrition-target carbs/fat null means **no target**. A macro with no target draws no bar. Anything that
+  PUTs a target must send all four fields, because a missing one is read as null and would clear it.
+  Only protein or calories can make an entry loggable (`canLogFood`); carbs and fat never gate it.
 - **Frequent fuel labels**: Derived from user's own entries only — exact match on `lower(trim(label))`, no food catalog, no fuzzy matching.
 
 ## Critical Web Implementation Rules

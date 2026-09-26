@@ -1,4 +1,4 @@
-import type { FrequentFuel, FuelDay } from "@afya/shared";
+import type { FrequentFuel, FuelDay, PartialTotal } from "@afya/shared";
 import { fuelMacroSummary } from "@/lib/fuel";
 
 const pct = (done: number, goal: number) => (goal > 0 ? Math.min(100, (done / goal) * 100) : 0);
@@ -43,6 +43,62 @@ export function FuelMeters({ day }: { day: FuelDay }) {
   );
 }
 
+/**
+ * Carbs and fat under the main meters. A macro with no target shows no bar, because an
+ * empty bar would read as "none eaten" rather than "not aimed at". Entries that did not
+ * give the macro are counted out loud, since the grams above them are then a floor.
+ */
+export function CarbsAndFat({ day }: { day: FuelDay }) {
+  return (
+    <div className="macro-minor">
+      <MinorMacro name="Carbs" kind="carbs" total={day.totals.carbs} target={day.target.carbsG} entryCount={day.entries.length} />
+      <MinorMacro name="Fat" kind="fat" total={day.totals.fat} target={day.target.fatG} entryCount={day.entries.length} />
+    </div>
+  );
+}
+
+function MinorMacro({
+  name,
+  kind,
+  total,
+  target,
+  entryCount,
+}: {
+  name: string;
+  kind: "carbs" | "fat";
+  total: PartialTotal;
+  target: number | null;
+  entryCount: number;
+}) {
+  const grams = Math.round(total.grams);
+  // Nothing logged today gave this macro: there is no number, and "0 g" would claim one.
+  const noneGiven = entryCount > 0 && total.entriesWithout === entryCount;
+  const note = noneGiven
+    ? "none given"
+    : total.entriesWithout > 0
+      ? `+${total.entriesWithout} not given`
+      : target === null
+        ? "no target"
+        : `${Math.max(0, target - grams)} g to go`;
+  return (
+    <div className="meter">
+      <div className="mtop">
+        <span className="mname">{name}</span>
+        <span className="mval">
+          <b>{noneGiven ? "—" : grams}</b>
+          {target !== null ? <span className="goal"> / {target} g</span> : noneGiven ? null : " g"}
+        </span>
+      </div>
+      {target !== null && (
+        <div className={`bar ${kind}`}>
+          <i style={{ width: `${pct(grams, target)}%` }} />
+        </div>
+      )}
+      <p className="mnote">{note}</p>
+    </div>
+  );
+}
+
 /** One tap logs one serving. Each chip states what it adds, so a tap never moves a total unseen (ISS-010). */
 export function QuickAddChips({
   foods,
@@ -57,7 +113,7 @@ export function QuickAddChips({
     <div className="quickadd">
       {foods.map((food) => (
         <button key={food.label} className="chip" onClick={() => onAdd(food)} disabled={disabled}>
-          + {food.label} {fuelMacroSummary(food.proteinG, food.calories)}
+          + {food.label} {fuelMacroSummary(food)}
         </button>
       ))}
     </div>

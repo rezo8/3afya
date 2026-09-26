@@ -3,20 +3,30 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { FuelEntry, NutritionTarget, UpdateFuelEntryBody } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
-import { amountValue, bumpAmount, canLogAmounts, fuelMacroSummary, isUsableTarget, readAmount, type AmountDraft } from "@/lib/fuel";
+import {
+  amountValue,
+  bumpAmount,
+  canLogFood,
+  EMPTY_FOOD_DRAFT,
+  foodBody,
+  foodDraftFrom,
+  fuelMacroSummary,
+  isUsableTarget,
+  type AmountDraft,
+  type FoodDraft,
+} from "@/lib/fuel";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
-import { FuelMeters, QuickAddChips } from "./FuelMeters";
+import { CarbsAndFat, FuelMeters, QuickAddChips } from "./FuelMeters";
 import { FUEL_TODAY_KEY, quickAddsFor, useFuelToday, useLogFuel } from "./fuel-today";
 
 const PROTEIN_STEP = 5;
 const CALORIE_STEP = 50;
+const CARB_STEP = 5;
+const FAT_STEP = 2;
 const COLLAPSED_ENTRIES = 3;
 
 type TargetDraft = { proteinG: AmountDraft; calories: AmountDraft };
-type EntryDraft = { id: string; label: string; proteinG: AmountDraft; calories: AmountDraft };
-
-/** A zero was a blank when it was logged (a food may declare one number), so it reopens blank. */
-const draftAmount = (value: number): AmountDraft => (value > 0 ? String(value) : "");
+type EntryDraft = FoodDraft & { id: string };
 
 const timeOfDay = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
@@ -25,9 +35,7 @@ export function FuelPanel() {
   const { data } = useFuelToday();
   const errors = useMutationError();
   const [showCustom, setShowCustom] = useState(false);
-  const [customLabel, setCustomLabel] = useState("");
-  const [customProtein, setCustomProtein] = useState<AmountDraft>("");
-  const [customCalories, setCustomCalories] = useState<AmountDraft>("");
+  const [customDraft, setCustomDraft] = useState<FoodDraft>(EMPTY_FOOD_DRAFT);
   const [targetDraft, setTargetDraft] = useState<TargetDraft | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(false);
   const [entryDraft, setEntryDraft] = useState<EntryDraft | null>(null);
@@ -70,15 +78,12 @@ export function FuelPanel() {
   const visibleEntries = showAllEntries ? newestFirst : newestFirst.slice(0, COLLAPSED_ENTRIES);
   const hiddenEntries = newestFirst.length - COLLAPSED_ENTRIES;
 
-  const canAddCustom =
-    customLabel.trim() !== "" && canLogAmounts(readAmount(customProtein), readAmount(customCalories));
+  const canAddCustom = canLogFood(customDraft);
   const submitCustom = (e: FormEvent) => {
     e.preventDefault();
     if (!canAddCustom || add.isPending) return;
-    add.mutate({ label: customLabel.trim(), proteinG: amountValue(customProtein), calories: amountValue(customCalories) });
-    setCustomLabel("");
-    setCustomProtein("");
-    setCustomCalories("");
+    add.mutate(foodBody(customDraft));
+    setCustomDraft(EMPTY_FOOD_DRAFT);
     setShowCustom(false);
   };
 
@@ -86,29 +91,21 @@ export function FuelPanel() {
   const submitTarget = (e: FormEvent) => {
     e.preventDefault();
     if (!targetDraft || !canSaveTarget || saveTarget.isPending) return;
-    saveTarget.mutate({ proteinG: amountValue(targetDraft.proteinG), calories: amountValue(targetDraft.calories) });
+    // Carbs and fat targets are carried through untouched: this form does not edit them (T-054).
+    saveTarget.mutate({
+      proteinG: amountValue(targetDraft.proteinG),
+      calories: amountValue(targetDraft.calories),
+      carbsG: target.carbsG,
+      fatG: target.fatG,
+    });
   };
-  const canSaveEntry =
-    !!entryDraft &&
-    entryDraft.label.trim() !== "" &&
-    canLogAmounts(readAmount(entryDraft.proteinG), readAmount(entryDraft.calories));
+  const canSaveEntry = !!entryDraft && canLogFood(entryDraft);
   const submitEntry = (e: FormEvent) => {
     e.preventDefault();
     if (!entryDraft || !canSaveEntry || update.isPending) return;
-    update.mutate({
-      id: entryDraft.id,
-      label: entryDraft.label.trim(),
-      proteinG: amountValue(entryDraft.proteinG),
-      calories: amountValue(entryDraft.calories),
-    });
+    update.mutate({ id: entryDraft.id, ...foodBody(entryDraft) });
   };
-  const openEntryEdit = (entry: FuelEntry) =>
-    setEntryDraft({
-      id: entry.id,
-      label: entry.label,
-      proteinG: draftAmount(entry.proteinG),
-      calories: draftAmount(entry.calories),
-    });
+  const openEntryEdit = (entry: FuelEntry) => setEntryDraft({ id: entry.id, ...foodDraftFrom(entry) });
 
   const toggleTargetEdit = () =>
     setTargetDraft((draft) =>
@@ -156,6 +153,7 @@ export function FuelPanel() {
       )}
 
       <FuelMeters day={data} />
+      <CarbsAndFat day={data} />
 
       <QuickAddChips foods={quickAddsFor(data)} onAdd={(food) => add.mutate(food)} disabled={add.isPending} />
 
@@ -167,14 +165,7 @@ export function FuelPanel() {
               Close
             </button>
           </div>
-          <FoodFields
-            label={customLabel}
-            proteinG={customProtein}
-            calories={customCalories}
-            onLabel={setCustomLabel}
-            onProtein={setCustomProtein}
-            onCalories={setCustomCalories}
-          />
+          <FoodFields draft={customDraft} onChange={setCustomDraft} />
           <button type="submit" className="fuel-save" disabled={!canAddCustom || add.isPending}>
             {add.isPending ? "…" : "Add"}
           </button>
@@ -193,14 +184,7 @@ export function FuelPanel() {
               entryDraft?.id === entry.id ? (
                 <li key={entry.id}>
                   <form className="fuel-edit" onSubmit={submitEntry} aria-label={`Edit ${entry.label}`}>
-                    <FoodFields
-                      label={entryDraft.label}
-                      proteinG={entryDraft.proteinG}
-                      calories={entryDraft.calories}
-                      onLabel={(label) => setEntryDraft({ ...entryDraft, label })}
-                      onProtein={(proteinG) => setEntryDraft({ ...entryDraft, proteinG })}
-                      onCalories={(calories) => setEntryDraft({ ...entryDraft, calories })}
-                    />
+                    <FoodFields draft={entryDraft} onChange={(food) => setEntryDraft({ ...entryDraft, ...food })} />
                     <div className="fuel-edit-actions">
                       <button type="button" className="fuel-cancel" onClick={() => setEntryDraft(null)}>
                         Cancel
@@ -216,7 +200,7 @@ export function FuelPanel() {
                   <button className="fr-open" aria-label={`Edit ${entry.label}`} onClick={() => openEntryEdit(entry)}>
                     <span className="fr-label">{entry.label}</span>
                     <span className="fr-meta">
-                      {timeOfDay(entry.loggedAt)} · {fuelMacroSummary(entry.proteinG, entry.calories)}
+                      {timeOfDay(entry.loggedAt)} · {fuelMacroSummary(entry)}
                     </span>
                   </button>
                   <button
@@ -242,33 +226,33 @@ export function FuelPanel() {
   );
 }
 
-/** A food's name and numbers: the same three fields whether it is being logged or corrected. */
-function FoodFields({
-  label,
-  proteinG,
-  calories,
-  onLabel,
-  onProtein,
-  onCalories,
-}: {
-  label: string;
-  proteinG: AmountDraft;
-  calories: AmountDraft;
-  onLabel: (next: string) => void;
-  onProtein: (next: AmountDraft) => void;
-  onCalories: (next: AmountDraft) => void;
-}) {
+/**
+ * A food's name and numbers: the same fields whether it is being logged or corrected.
+ * Carbs and fat show "—" while blank, because blank there means "not given", not zero.
+ */
+function FoodFields({ draft, onChange }: { draft: FoodDraft; onChange: (next: FoodDraft) => void }) {
+  const set = (field: keyof FoodDraft) => (value: string) => onChange({ ...draft, [field]: value });
   return (
     <>
       <input
         className="fuel-name"
-        value={label}
-        onChange={(e) => onLabel(e.target.value)}
+        value={draft.label}
+        onChange={(e) => set("label")(e.target.value)}
         placeholder="What did you eat?"
         aria-label="Food name"
       />
-      <NumberField label="Protein" unit="g" value={proteinG} step={PROTEIN_STEP} inputMode="decimal" onChange={onProtein} />
-      <NumberField label="Calories" unit="kcal" value={calories} step={CALORIE_STEP} inputMode="numeric" onChange={onCalories} />
+      <NumberField label="Protein" unit="g" value={draft.proteinG} step={PROTEIN_STEP} inputMode="decimal" onChange={set("proteinG")} />
+      <NumberField label="Calories" unit="kcal" value={draft.calories} step={CALORIE_STEP} inputMode="numeric" onChange={set("calories")} />
+      <NumberField
+        label="Carbs"
+        unit="g"
+        value={draft.carbsG}
+        step={CARB_STEP}
+        inputMode="decimal"
+        placeholder="—"
+        onChange={set("carbsG")}
+      />
+      <NumberField label="Fat" unit="g" value={draft.fatG} step={FAT_STEP} inputMode="decimal" placeholder="—" onChange={set("fatG")} />
     </>
   );
 }
@@ -279,6 +263,7 @@ function NumberField({
   value,
   step,
   inputMode,
+  placeholder = "0",
   onChange,
 }: {
   label: string;
@@ -286,6 +271,7 @@ function NumberField({
   value: AmountDraft;
   step: number;
   inputMode: "numeric" | "decimal";
+  placeholder?: string;
   onChange: (next: AmountDraft) => void;
 }) {
   return (
@@ -299,7 +285,7 @@ function NumberField({
           className="fuel-field-num"
           value={value}
           inputMode={inputMode}
-          placeholder="0"
+          placeholder={placeholder}
           aria-label={label}
           onChange={(e) => onChange(e.target.value)}
         />

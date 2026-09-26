@@ -15,7 +15,7 @@
  *  - A day holds ordered exercises with targets (sets × reps, or sets × time).
  *    No planned weight — working weight lives in logged sets and "today"
  *    pre-fills it from the last session.
- *  - Fuel is logged per entry (add/remove) against a daily protein/calorie target.
+ *  - Fuel is logged per entry against a daily target: protein and calories always, carbs and fat optionally.
  */
 
 /** Standard JSON error body returned by the API. */
@@ -335,30 +335,49 @@ export interface TodayResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Fuel (protein / calorie targets)
+// Fuel (protein, calories, carbs, fat)
 // ---------------------------------------------------------------------------
 
-export interface FuelEntry {
-  id: string;
-  label: string;
+/**
+ * Grams of a macro an entry may leave out. `null` is "not given", never zero: most labels
+ * print protein and calories, and a carb count guessed as 0 would lie in every total.
+ */
+export type OptionalGrams = number | null;
+
+/** The four numbers a food carries. Protein and calories store a blank as 0; carbs and fat keep it null. */
+export interface FuelMacros {
   proteinG: number;
   calories: number;
+  carbsG: OptionalGrams;
+  fatG: OptionalGrams;
+}
+
+export interface FuelEntry extends FuelMacros {
+  id: string;
+  label: string;
   loggedAt: string;
 }
 
+/** Protein and calories are always aimed at. Carbs and fat have no target until one is set (null). */
 export interface NutritionTarget {
   proteinG: number;
   calories: number;
+  carbsG: number | null;
+  fatG: number | null;
 }
 
 /**
  * A label the user logs often, with the portion from their most recent entry for
  * it. Derived from their own entries only — this is not a food catalog.
  */
-export interface FrequentFuel {
+export interface FrequentFuel extends FuelMacros {
   label: string;
-  proteinG: number;
-  calories: number;
+}
+
+/** A day's sum of a macro some entries may not have given, and how many did not. */
+export interface PartialTotal {
+  grams: number;
+  entriesWithout: number;
 }
 
 export interface FuelDay {
@@ -366,7 +385,7 @@ export interface FuelDay {
   date: string;
   target: NutritionTarget;
   entries: FuelEntry[];
-  totals: { proteinG: number; calories: number };
+  totals: { proteinG: number; calories: number; carbs: PartialTotal; fat: PartialTotal };
   /** Most-logged labels first, for one-tap re-adding. */
   frequent: FrequentFuel[];
 }
@@ -387,10 +406,8 @@ export interface FuelHistory {
   days: FuelHistoryDay[];
 }
 
-export interface AddFuelEntryBody {
+export interface AddFuelEntryBody extends FuelMacros {
   label: string;
-  proteinG: number;
-  calories: number;
 }
 /** Correcting an entry replaces its label and numbers. Its `loggedAt` is kept: it was eaten then. */
 export type UpdateFuelEntryBody = AddFuelEntryBody;

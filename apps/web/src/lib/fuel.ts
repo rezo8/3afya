@@ -1,3 +1,5 @@
+import type { AddFuelEntryBody, FuelEntry, FuelMacros, OptionalGrams } from "@afya/shared";
+
 /** What the user has typed into a protein or calorie field, before it means anything. */
 export type AmountDraft = string;
 
@@ -23,6 +25,18 @@ export function amountValue(draft: AmountDraft): number {
   const amount = readAmount(draft);
   return amount.state === "entered" ? amount.value : 0;
 }
+
+/**
+ * What an optional macro's draft is worth: its number, or null when the field was left
+ * blank. Carbs and fat keep "not given" apart from 0 all the way to the database.
+ */
+export function optionalAmountValue(draft: AmountDraft): OptionalGrams {
+  const amount = readAmount(draft);
+  return amount.state === "entered" ? amount.value : null;
+}
+
+/** An optional macro never gates logging, but unreadable text in it is still not a number. */
+export const isUsableOptionalAmount = (amount: Amount): boolean => amount.state !== "invalid";
 
 export function bumpAmount(draft: AmountDraft, by: number): AmountDraft {
   return String(Math.max(0, amountValue(draft) + by));
@@ -51,18 +65,68 @@ export function isUsableTarget(draft: AmountDraft): boolean {
 }
 
 /**
- * What a food is worth, for display: `30p · 200kcal`.
+ * What a food is worth, for display: `42p · 58c · 18f · 560kcal`.
  *
  * A zero is omitted rather than printed, because after a food was allowed to declare
  * only one of its numbers, `0p · 5kcal` states a fact about black coffee that reads
- * like a missing value. Both zero renders as nothing at all — the logging path won't
- * produce it (`canLogAmounts`), and an empty summary is the honest reading if it ever
- * does. Both numbers are rounded; a quick-add chip that hides one is how a tap could
- * move the calorie total without ever showing the number (ISS-010).
+ * like a missing value. Carbs and fat that were not given are omitted for the same
+ * reason. Everything empty renders as nothing at all. Every number is rounded; a
+ * quick-add chip that hides one is how a tap could move a total without ever showing
+ * the number (ISS-010).
  */
-export function fuelMacroSummary(proteinG: number, calories: number): string {
-  const protein = Math.round(proteinG);
-  const kcal = Math.round(calories);
-  const parts = [protein > 0 && `${protein}p`, kcal > 0 && `${kcal}kcal`].filter((part): part is string => Boolean(part));
-  return parts.join(" · ");
+export function fuelMacroSummary(food: FuelMacros): string {
+  const grams = (value: OptionalGrams, suffix: string) => {
+    const rounded = Math.round(value ?? 0);
+    return rounded > 0 && `${rounded}${suffix}`;
+  };
+  const parts = [grams(food.proteinG, "p"), grams(food.carbsG, "c"), grams(food.fatG, "f"), grams(food.calories, "kcal")];
+  return parts.filter((part): part is string => Boolean(part)).join(" · ");
+}
+
+/** A food as typed into the log or edit form, every number still a draft. */
+export interface FoodDraft {
+  label: string;
+  proteinG: AmountDraft;
+  calories: AmountDraft;
+  carbsG: AmountDraft;
+  fatG: AmountDraft;
+}
+
+export const EMPTY_FOOD_DRAFT: FoodDraft = { label: "", proteinG: "", calories: "", carbsG: "", fatG: "" };
+
+/** Whether a draft can be logged: it needs a name and protein or calories; carbs and fat only need to be readable. */
+export function canLogFood(draft: FoodDraft): boolean {
+  return (
+    draft.label.trim() !== "" &&
+    canLogAmounts(readAmount(draft.proteinG), readAmount(draft.calories)) &&
+    isUsableOptionalAmount(readAmount(draft.carbsG)) &&
+    isUsableOptionalAmount(readAmount(draft.fatG))
+  );
+}
+
+export function foodBody(draft: FoodDraft): AddFuelEntryBody {
+  return {
+    label: draft.label.trim(),
+    proteinG: amountValue(draft.proteinG),
+    calories: amountValue(draft.calories),
+    carbsG: optionalAmountValue(draft.carbsG),
+    fatG: optionalAmountValue(draft.fatG),
+  };
+}
+
+/**
+ * An entry reopened for correction. A stored 0 of protein or calories was a blank when it
+ * was logged, so it reopens blank. Carbs and fat kept the difference, so a 0 there reopens
+ * as 0 and only "not given" reopens blank.
+ */
+export function foodDraftFrom(entry: FuelEntry): FoodDraft {
+  const required = (value: number) => (value > 0 ? String(value) : "");
+  const optional = (value: OptionalGrams) => (value === null ? "" : String(value));
+  return {
+    label: entry.label,
+    proteinG: required(entry.proteinG),
+    calories: required(entry.calories),
+    carbsG: optional(entry.carbsG),
+    fatG: optional(entry.fatG),
+  };
 }

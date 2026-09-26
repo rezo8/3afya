@@ -18,10 +18,10 @@ export function useLogFuel(errors: MutationErrorSlot) {
 
 /** Offered until the user has logged anything of their own, so the first visit isn't empty. */
 const COLD_START_CHIPS: AddFuelEntryBody[] = [
-  { label: "Chicken breast", proteinG: 30, calories: 200 },
-  { label: "Protein shake", proteinG: 24, calories: 150 },
-  { label: "Greek yogurt", proteinG: 12, calories: 90 },
-  { label: "Rice bowl", proteinG: 8, calories: 320 },
+  { label: "Chicken breast", proteinG: 30, calories: 200, carbsG: null, fatG: null },
+  { label: "Protein shake", proteinG: 24, calories: 150, carbsG: null, fatG: null },
+  { label: "Greek yogurt", proteinG: 12, calories: 90, carbsG: null, fatG: null },
+  { label: "Rice bowl", proteinG: 8, calories: 320, carbsG: null, fatG: null },
 ];
 
 export const quickAddsFor = (day: FuelDay): FrequentFuel[] => (day.frequent.length > 0 ? day.frequent : COLD_START_CHIPS);

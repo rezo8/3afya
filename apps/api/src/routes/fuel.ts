@@ -8,6 +8,8 @@ import type {
   FuelEntry,
   FuelHistory,
   NutritionTarget,
+  OptionalGrams,
+  PartialTotal,
   UpdateFuelEntryBody,
 } from "@afya/shared";
 import { localDate, startOfDay, startOfDaysAgo } from "../day";
@@ -18,7 +20,7 @@ import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
 const app = new Hono<AuthedEnv>();
 app.use("*", requireAuth);
 
-const DEFAULT_TARGET: NutritionTarget = { proteinG: 180, calories: 2600 };
+const DEFAULT_TARGET: NutritionTarget = { proteinG: 180, calories: 2600, carbsG: null, fatG: null };
 const FREQUENT_LIMIT = 8;
 
 const toEntry = (r: typeof fuelEntry.$inferSelect): FuelEntry => ({
@@ -26,13 +28,20 @@ const toEntry = (r: typeof fuelEntry.$inferSelect): FuelEntry => ({
   label: r.label,
   proteinG: r.proteinG,
   calories: r.calories,
+  carbsG: r.carbsG,
+  fatG: r.fatG,
   loggedAt: r.loggedAt.toISOString(),
 });
 
 /** The current target is the newest row of the append-only log. */
 async function targetFor(userId: string): Promise<NutritionTarget> {
   const [current] = await db
-    .select({ proteinG: nutritionTarget.proteinG, calories: nutritionTarget.calories })
+    .select({
+      proteinG: nutritionTarget.proteinG,
+      calories: nutritionTarget.calories,
+      carbsG: nutritionTarget.carbsG,
+      fatG: nutritionTarget.fatG,
+    })
     .from(nutritionTarget)
     .where(eq(nutritionTarget.userId, userId))
     .orderBy(desc(nutritionTarget.createdAt))
@@ -55,6 +64,8 @@ async function frequentFor(userId: string): Promise<FrequentFuel[]> {
       label: newestInGroup<string>(fuelEntry.label),
       proteinG: newestInGroup<number>(fuelEntry.proteinG),
       calories: newestInGroup<number>(fuelEntry.calories),
+      carbsG: newestInGroup<OptionalGrams>(fuelEntry.carbsG),
+      fatG: newestInGroup<OptionalGrams>(fuelEntry.fatG),
     })
     .from(fuelEntry)
     .where(eq(fuelEntry.userId, userId))
@@ -73,10 +84,12 @@ app.get("/today", async (c) => {
     .from(fuelEntry)
     .where(and(eq(fuelEntry.userId, userId), gte(fuelEntry.loggedAt, startOfDay(new Date(), zone))))
     .orderBy(asc(fuelEntry.loggedAt));
-  const totals = entries.reduce(
-    (acc, e) => ({ proteinG: acc.proteinG + e.proteinG, calories: acc.calories + e.calories }),
-    { proteinG: 0, calories: 0 },
-  );
+  const totals = {
+    proteinG: entries.reduce((sum, e) => sum + e.proteinG, 0),
+    calories: entries.reduce((sum, e) => sum + e.calories, 0),
+    carbs: partialTotal(entries.map((e) => e.carbsG)),
+    fat: partialTotal(entries.map((e) => e.fatG)),
+  };
   return c.json({
     date: localDate(new Date(), zone),
     target,
@@ -86,6 +99,16 @@ app.get("/today", async (c) => {
   } satisfies FuelDay);
 });
 
+/** Sums what was given and counts what was not, so a total never passes off missing grams as zero. */
+const partialTotal = (values: OptionalGrams[]): PartialTotal => ({
+  grams: values.reduce<number>((sum, v) => sum + (v ?? 0), 0),
+  entriesWithout: values.filter((v) => v === null).length,
+});
+
+/** A number the caller gave, clamped at zero, or null when they gave none. */
+const optionalGrams = (value: unknown): OptionalGrams =>
+  typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : null;
+
 /** The editable fields of an entry, read the same way whether it is being logged or corrected. */
 function readFuelFields(body: AddFuelEntryBody | null) {
   const label = body?.label?.trim();
@@ -94,6 +117,8 @@ function readFuelFields(body: AddFuelEntryBody | null) {
     label,
     proteinG: Math.max(0, body?.proteinG ?? 0),
     calories: Math.max(0, Math.round(body?.calories ?? 0)),
+    carbsG: optionalGrams(body?.carbsG),
+    fatG: optionalGrams(body?.fatG),
   };
 }
 
@@ -133,9 +158,14 @@ app.put("/target", async (c) => {
   if (!body || typeof body.proteinG !== "number" || typeof body.calories !== "number") {
     return c.json({ error: "bad_request" }, 400);
   }
+  const carbsG = optionalGrams(body.carbsG);
+  const fatG = optionalGrams(body.fatG);
   const target: NutritionTarget = {
     proteinG: Math.max(0, Math.round(body.proteinG)),
     calories: Math.max(0, Math.round(body.calories)),
+    // A target is whole grams; a missing one is "no target", not 0 g.
+    carbsG: carbsG === null ? null : Math.round(carbsG),
+    fatG: fatG === null ? null : Math.round(fatG),
   };
   // Append-only: an edit adds a row rather than overwriting one, so the target
   // each past day was actually judged against stays on record.
