@@ -1308,17 +1308,16 @@ body {
 .fuel-log .fuel-edit {
   margin-bottom: 0;
 }
-/* The label and meta are the edit target. 44px tall, with negative margins so the row
-   stays as short as it was, the same trick as .ls-del. */
+/* The whole row opens the entry's actions. The time sits in its own column so a part of
+   the day reads down as a timeline. */
 .fr-open {
   appearance: none;
   flex: 1;
   min-width: 0;
   min-height: 44px;
-  margin: -7px 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   background: none;
   border: none;
   padding: 0;
@@ -1326,6 +1325,80 @@ body {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+.fuel-row {
+  flex-wrap: wrap;
+}
+.fuel-row.open {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.fr-time {
+  flex: none;
+  width: 58px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.fr-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fr-actions {
+  flex-basis: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 4px 4px 4px 0;
+}
+.fr-actions button {
+  appearance: none;
+  height: 44px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-hi);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fr-actions .fr-remove {
+  border-color: color-mix(in srgb, var(--alert) 45%, transparent);
+  color: var(--alert);
+}
+.fr-actions .fr-remove.armed {
+  background: color-mix(in srgb, var(--alert) 14%, transparent);
+}
+.fr-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.fuel-part + .fuel-part {
+  margin-top: 16px;
+}
+.fuel-part-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.fuel-part-total {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.fuel-part-empty {
+  margin: 8px 0 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line-hi);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  color: var(--text-faint);
 }
 .fr-open:hover .fr-label {
   color: var(--accent);
@@ -1343,38 +1416,6 @@ body {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--text-soft);
-}
-.fr-del {
-  appearance: none;
-  border: none;
-  background: none;
-  color: var(--text-faint);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 4px 4px;
-}
-.fr-del:hover {
-  color: var(--alert);
-}
-.fr-del:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.fuel-more {
-  appearance: none;
-  border: none;
-  background: none;
-  margin-top: 8px;
-  padding: 4px 0;
-  color: var(--text-soft);
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-}
-.fuel-more:hover {
-  color: var(--accent);
 }
 
 /* ---- PROGRAM BUILDER ---- */

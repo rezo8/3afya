@@ -249,6 +249,13 @@ records what is specific to 3afya.
   means now. Logging while the stepper is on a past day stamps that day at the current clock time
   (`loggedAtFor`), and the edit form's "Eaten" field retimes it. Client dates are YYYY-MM-DD strings stepped by
   calendar arithmetic (`lib/fuel-date.ts`), never ±24 h on an instant.
+- **The day's log is `FuelLog`, grouped by part of day** (T-053, `lib/fuel-log.ts`): Morning < 11:00 ≤ Midday
+  < 15:00 ≤ Afternoon < 18:00 ≤ Evening, from each entry's `loggedAt` in the browser's zone. No meal column,
+  so retiming an entry regroups it. Entries run in the order they were eaten, and empty parts are dropped
+  except the one the user is in **now, on today**, which reads "Nothing yet". (The ticket said "every part
+  still ahead"; one placeholder was chosen over three empty cards.) Tapping a row opens Edit / Log again /
+  Remove and never acts on its own. Remove is an armed two-tap confirm, disabled while pending. Log again
+  follows the page's rule of landing on the day being viewed. The three-row collapse is gone: the page is where the whole day lives.
 - **Correcting a fuel entry is `PATCH /api/fuel/:id`** (T-046). It replaces label and numbers and
   keeps `loggedAt`, since the food was eaten when it was logged. POST and PATCH validate through one
   `readFuelFields`. In `FuelPanel` a row's label is the edit target, and the form reuses `FoodFields`

@@ -2,14 +2,14 @@
   "blockedBy": [
     "T-051"
   ],
-  "completedDate": null,
+  "completedDate": "2026-09-26",
   "createdDate": "2026-09-26",
   "description": "\"Logged today\" is a flat newest-first list collapsed to three rows (FuelPanel.tsx COLLAPSED_ENTRIES), so a full day reads as \"+9 more\".\n\n- Group entries into Morning / Midday / Afternoon / Evening, derived from loggedAt in the user's local zone. No meal column and no schema change. The boundaries (proposed: before 11:00, 11–15, 15–18, 18 onward) live in one pure function in apps/web/src/lib/fuel.ts, tested beside it (fuel.test.ts). A calendar boundary belongs to the user (RULES 6).\n- Each group header shows its subtotal (protein · kcal). An empty group that is still ahead today reads \"Nothing yet\"; past empty groups are omitted.\n- Tapping a row opens it (the T-046 edit) with three 44px actions: Edit, Log again (same food and portion, now), Remove. Remove uses the armed confirm (useArmedConfirm), which closes ISS-016.\n- Drop the three-row collapse on the Fuel page: the page is the place for the whole day. The Start summary card shows no log.\n\nMockup (deleted; this text is the spec) (Main, lower half).",
   "displayId": "T-053",
   "id": "T-053",
   "order": 60,
   "phase": "fuel",
-  "status": "open",
+  "status": "complete",
   "title": "Group the day's fuel log by part of day, with per-row actions",
   "type": "task"
 }

@@ -16,9 +16,9 @@
     "T-046",
     "T-003"
   ],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Resolved by T-053. The one-tap ✕ is gone: tapping a logged entry now opens its actions, and Remove is a 44px armed two-tap confirm (useArmedConfirm), disabled while the delete is pending. See apps/web/src/screens/fuel/FuelLog.tsx.",
+  "resolvedDate": "2026-09-26",
   "severity": "low",
-  "status": "open",
+  "status": "resolved",
   "title": "Removing a fuel entry is one unconfirmed tap on a ~23px ✕"
 }
