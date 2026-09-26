@@ -1,0 +1,24 @@
+{
+  "components": [
+    "web",
+    "fuel"
+  ],
+  "discoveredDate": "2026-09-26",
+  "displayId": "ISS-016",
+  "id": "ISS-016",
+  "impact": "WHERE THE DEFECT IS\n- apps/web/src/screens/start/FuelPanel.tsx:270-277 — the `.fr-del` ✕ calls `remove.mutate(entry.id)` on the first tap, with no arming step.\n- apps/web/src/styles/theme.css `.fr-del` — 15px glyph with 4px padding, roughly a 23px target, sitting beside the new 44px `.fr-open` edit target (T-046). A miss aimed at \"edit\" lands on \"delete\".\n\nWHERE IT IS TRIGGERED FROM\n\"Logged today\" on the Start screen (FuelPanel.tsx:238 onward).\n\nTHE WORKING COUNTER-EXAMPLE\nT-003 fixed exactly this for logged sets: `components/RemoveSetButton.tsx` over `lib/use-armed-confirm.ts`, 44px box with negative margins, disabled while pending.\n\nVERIFIED vs SUSPECTED\nVerified by reading at HEAD (5abaf65); line numbers re-checked after filing. The 44px edit target was measured in Chromium during T-046. The mis-tap risk is inferred from adjacency, not reproduced. Now that an entry can be corrected, deleting is rarely the right tap, which raises the cost of a mistaken one.",
+  "location": [
+    "apps/web/src/screens/start/FuelPanel.tsx:270-277",
+    "apps/web/src/styles/theme.css"
+  ],
+  "phase": null,
+  "relatedTickets": [
+    "T-046",
+    "T-003"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "Removing a fuel entry is one unconfirmed tap on a ~23px ✕"
+}

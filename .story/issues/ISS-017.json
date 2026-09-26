@@ -1,0 +1,22 @@
+{
+  "components": [
+    "web",
+    "fuel"
+  ],
+  "discoveredDate": "2026-09-26",
+  "displayId": "ISS-017",
+  "id": "ISS-017",
+  "impact": "WHERE THE DEFECT IS\napps/web/src/screens/start/FuelPanel.tsx:42-52 — `add` and `remove` invalidate only [\"fuel\",\"today\"]. The update mutation (T-046) and the target save also invalidate [\"fuel\",\"history\"], which TrendsScreen's adherence chart reads.\n\nWHERE IT IS TRIGGERED FROM\nLogging or removing food on the Start screen, then opening Trends while a cached history query is still fresh (staleTime 10s, apps/web/src/lib/query/query-client.ts).\n\nVERIFIED vs SUSPECTED\nVerified by reading the invalidation calls at HEAD (5abaf65); line numbers re-checked after filing. The visible staleness is suspected, not reproduced: navigating to Trends refetches once staleTime has passed, so the window is short.\n\nFIX\nInvalidate [\"fuel\",\"history\"] in both onSuccess handlers, as update and saveTarget already do.",
+  "location": [
+    "apps/web/src/screens/start/FuelPanel.tsx:42-52"
+  ],
+  "phase": null,
+  "relatedTickets": [
+    "T-046"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "Adding or removing a fuel entry does not invalidate fuel history"
+}
