@@ -1,4 +1,4 @@
-import type { AddFuelEntryBody, FuelEntry, FuelMacros, OptionalGrams } from "@afya/shared";
+import type { AddFuelEntryBody, FuelEntry, FuelItem, FuelMacros, OptionalGrams, SaveFuelItemBody } from "@afya/shared";
 
 /** What the user has typed into a protein or calorie field, before it means anything. */
 export type AmountDraft = string;
@@ -119,7 +119,7 @@ export function foodBody(draft: FoodDraft): AddFuelEntryBody {
  * was logged, so it reopens blank. Carbs and fat kept the difference, so a 0 there reopens
  * as 0 and only "not given" reopens blank.
  */
-export function foodDraftFrom(entry: FuelEntry): FoodDraft {
+export function foodDraftFrom(entry: FuelMacros & { label: string }): FoodDraft {
   const required = (value: number) => (value > 0 ? String(value) : "");
   const optional = (value: OptionalGrams) => (value === null ? "" : String(value));
   return {
@@ -148,3 +148,21 @@ export function scaleFood(food: FuelMacros, portion: number): FuelMacros {
     fatG: food.fatG === null ? null : grams(food.fatG),
   };
 }
+
+/** A saved food as typed: a food's fields plus the unit its numbers are for. */
+export type ItemDraft = FoodDraft & { unit: string };
+
+export const EMPTY_ITEM_DRAFT: ItemDraft = { ...EMPTY_FOOD_DRAFT, unit: "" };
+
+/** A food can be saved when it could be logged and says what one unit of it is. */
+export const canSaveItem = (draft: ItemDraft): boolean => canLogFood(draft) && draft.unit.trim() !== "";
+
+export const itemBody = (draft: ItemDraft): SaveFuelItemBody => ({ ...foodBody(draft), unit: draft.unit.trim() });
+
+export const itemDraftFrom = (item: FuelItem): ItemDraft => ({ ...foodDraftFrom(item), unit: item.unit });
+
+/**
+ * One serving of a logged entry, for saving it as a food. An entry logged at ×2 of a
+ * quick-add holds two servings; saving it should save one.
+ */
+export const servingOf = (entry: FuelEntry): FuelMacros => scaleFood(entry, 1 / (entry.portion ?? 1));

@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { FrequentFuel, FuelEntry, UpdateFuelEntryBody } from "@afya/shared";
+import type { FuelEntry, QuickAddFood, UpdateFuelEntryBody } from "@afya/shared";
 import { api } from "@/lib/api/client";
 import { fuelMacroSummary, PORTIONS, scaleFood, type Portion } from "@/lib/fuel";
 import { loggedAtFor, type LocalDate } from "@/lib/fuel-date";
 import { useTrackedMutation, type MutationErrorSlot } from "@/lib/query/use-mutation-error";
-import { FUEL_KEY, useLogFuel } from "./fuel-day";
+import { FUEL_KEY, quickAddBody, useLogFuel } from "./fuel-day";
 
 /** How long the portion row stays up after a quick-add, restarted by every correction. */
 const PORTION_ROW_MS = 6000;
 
 /** The entry a quick-add just made, and the food it was made from, so a correction scales the original. */
-type JustLogged = { entry: FuelEntry; food: FrequentFuel; portion: Portion };
+type JustLogged = { entry: FuelEntry; food: QuickAddFood; portion: Portion };
 
 /**
  * One-tap logging, with a short-lived chance to say it was half or double. A tap logs one
@@ -22,7 +22,7 @@ type JustLogged = { entry: FuelEntry; food: FrequentFuel; portion: Portion };
  * The label is kept as it is: the frequent list groups by label, and "Chicken ×2" would
  * split one food into two chips.
  */
-export function QuickAdd({ foods, date, errors }: { foods: FrequentFuel[]; date: LocalDate; errors: MutationErrorSlot }) {
+export function QuickAdd({ foods, date, errors }: { foods: QuickAddFood[]; date: LocalDate; errors: MutationErrorSlot }) {
   const qc = useQueryClient();
   const [justLogged, setJustLogged] = useState<JustLogged | null>(null);
   const log = useLogFuel(errors);
@@ -45,9 +45,9 @@ export function QuickAdd({ foods, date, errors }: { foods: FrequentFuel[]; date:
     return () => clearTimeout(t);
   }, [justLogged]);
 
-  const logFood = (food: FrequentFuel) =>
+  const logFood = (food: QuickAddFood) =>
     log.mutate(
-      { ...food, portion: 1, loggedAt: loggedAtFor(date, new Date()) },
+      { ...quickAddBody(food, 1), loggedAt: loggedAtFor(date, new Date()) },
       { onSuccess: (entry) => setJustLogged({ entry, food, portion: 1 }) },
     );
 
@@ -65,7 +65,12 @@ export function QuickAdd({ foods, date, errors }: { foods: FrequentFuel[]; date:
     <>
       <div className="quickadd">
         {foods.map((food) => (
-          <button key={food.label} className="chip" onClick={() => logFood(food)} disabled={log.isPending}>
+          <button
+            key={food.source === "item" ? food.itemId : food.label}
+            className="chip"
+            onClick={() => logFood(food)}
+            disabled={log.isPending}
+          >
             + {food.label} {fuelMacroSummary(food)}
           </button>
         ))}

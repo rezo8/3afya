@@ -174,6 +174,15 @@ records what is specific to 3afya.
   typed by hand) is what keeps a corrected entry from redefining the chip: `frequentFor` divides the newest
   entry's numbers by it. A hand edit PATCHes without `portion`, which clears it, since typed-over numbers
   are no longer a multiple of a serving. Both surfaces use `QuickAdd`; don't reintroduce a bare chip row.
+- **Saved foods (`fuel_item`, T-050) are the user's own, never a database.** A label, the user's unit, and one
+  unit's numbers (carbs/fat nullable, as on entries). `/api/fuel/items`: GET lists active foods by use plus
+  `unsaved` frequent labels, POST creates (an **archived** label is brought back rather than refused, as for
+  exercises), PATCH edits, DELETE **archives**. Logging one still writes absolute numbers onto the entry;
+  `fuel_entry.item_id` (`on delete set null`) is only for counting and grouping. Editing a food never rewrites
+  an entry. `FuelDay.quickAdds` is a `QuickAddFood` union: saved foods first, then typed labels no saved food
+  answers to (`sameLabel`, trim + lowercase). `frequentFor` **skips** entries that have an `item_id`, so a
+  renamed food doesn't leave its old name behind as a typed chip. The queries live in `apps/api/src/fuel-queries.ts`,
+  shared by `routes/fuel.ts` and `routes/fuel-items.ts`, so neither route imports the other.
 - **Frequent fuel labels**: Derived from user's own entries only — exact match on `lower(trim(label))`, no food catalog, no fuzzy matching.
 
 ## Critical Web Implementation Rules

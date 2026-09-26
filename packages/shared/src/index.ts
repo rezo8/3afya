@@ -357,6 +357,8 @@ export interface FuelEntry extends FuelMacros {
   label: string;
   /** Servings of a quick-add this entry is (0.5, 2); null for anything typed by hand. */
   portion: number | null;
+  /** The saved food it was logged from, or null. */
+  itemId: string | null;
   loggedAt: string;
 }
 
@@ -376,6 +378,37 @@ export interface FrequentFuel extends FuelMacros {
   label: string;
 }
 
+/**
+ * A saved food: the user's own label, the unit they think in ("1 scoop", "100 g"), and one
+ * unit's numbers. Not looked up anywhere; only what the user entered.
+ */
+export interface FuelItem extends FuelMacros {
+  id: string;
+  label: string;
+  unit: string;
+  /** Entries logged from this food, for ordering by how often it is used. */
+  timesLogged: number;
+}
+
+export interface SaveFuelItemBody extends FuelMacros {
+  label: string;
+  unit: string;
+}
+
+/** The Foods screen: saved foods, and labels typed often enough to be worth saving. */
+export interface FuelItems {
+  items: FuelItem[];
+  unsaved: FrequentFuel[];
+}
+
+/**
+ * A one-tap chip. Saved foods come first and log one unit; after them, labels the user
+ * types often, at their newest serving, for anything not saved yet.
+ */
+export type QuickAddFood =
+  | (FuelMacros & { source: "item"; itemId: string; label: string; unit: string })
+  | (FuelMacros & { source: "frequent"; label: string });
+
 /** A day's sum of a macro some entries may not have given, and how many did not. */
 export interface PartialTotal {
   grams: number;
@@ -388,8 +421,8 @@ export interface FuelDay {
   target: NutritionTarget;
   entries: FuelEntry[];
   totals: { proteinG: number; calories: number; carbs: PartialTotal; fat: PartialTotal };
-  /** Most-logged labels first, for one-tap re-adding. */
-  frequent: FrequentFuel[];
+  /** Saved foods by use, then frequently typed labels not yet saved. */
+  quickAdds: QuickAddFood[];
 }
 
 /** One day of the adherence window. Zero-filled for days with nothing logged. */
@@ -422,6 +455,8 @@ export interface AddFuelEntryBody extends FuelMacros {
    * longer a multiple of anything.
    */
   portion?: number | null;
+  /** The saved food this was logged from. Its numbers are still sent; the link is for counting. Read on POST only. */
+  itemId?: string | null;
   /** When it was eaten, ISO 8601. Omit for now. No later than now, no earlier than FUEL_BACKDATE_DAYS back. */
   loggedAt?: string;
 }

@@ -155,6 +155,13 @@
       "when": 1790435952556,
       "tag": "0021_handy_skin",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790436078626,
+      "tag": "0022_careless_retro_girl",
+      "breakpoints": true
     }
   ]
 }

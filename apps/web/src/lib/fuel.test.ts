@@ -5,6 +5,10 @@ import {
   bumpAmount,
   canLogAmounts,
   canLogFood,
+  canSaveItem,
+  EMPTY_ITEM_DRAFT,
+  itemBody,
+  servingOf,
   EMPTY_FOOD_DRAFT,
   foodBody,
   foodDraftFrom,
@@ -216,6 +220,7 @@ describe("foodDraftFrom", () => {
     carbsG: 0,
     fatG: 14,
     portion: null,
+    itemId: null,
     loggedAt: "2026-09-26T12:00:00.000Z",
     ...fields,
   });
@@ -260,5 +265,46 @@ describe("scaleFood", () => {
 
   it("is the food itself at one portion", () => {
     expect(scaleFood(food(42, 560, 58, 18), 1)).toEqual(food(42, 560, 58, 18));
+  });
+});
+
+describe("canSaveItem", () => {
+  const draft = { ...EMPTY_ITEM_DRAFT, label: "Protein shake", proteinG: "24", calories: "150", unit: "1 scoop" };
+
+  it("saves a food with a name, a number and a unit", () => {
+    expect(canSaveItem(draft)).toBe(true);
+  });
+
+  it("refuses a food with no unit, since its numbers would be for nothing", () => {
+    expect(canSaveItem({ ...draft, unit: "  " })).toBe(false);
+  });
+});
+
+describe("itemBody", () => {
+  it("trims the unit and keeps carbs and fat that were not given as null", () => {
+    const body = itemBody({ ...EMPTY_ITEM_DRAFT, label: "Protein shake", proteinG: "24", calories: "150", unit: " 1 scoop " });
+    expect(body).toEqual({ label: "Protein shake", unit: "1 scoop", proteinG: 24, calories: 150, carbsG: null, fatG: null });
+  });
+});
+
+describe("servingOf", () => {
+  const entry = (portion: number | null): FuelEntry => ({
+    id: "e-1",
+    label: "Chicken & rice",
+    proteinG: 124,
+    calories: 1400,
+    carbsG: 160,
+    fatG: null,
+    portion,
+    itemId: null,
+    loggedAt: "2026-09-26T12:00:00.000Z",
+  });
+
+  it("halves an entry that was two servings", () => {
+    expect(servingOf(entry(2))).toEqual({ proteinG: 62, calories: 700, carbsG: 80, fatG: null });
+  });
+
+  it("is the entry itself when it was typed by hand", () => {
+    expect(servingOf(entry(null))).toEqual({ proteinG: 124, calories: 1400, carbsG: 160, fatG: null });
   });
 });

@@ -1,22 +1,24 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { FuelEntry, NutritionTarget, UpdateFuelEntryBody } from "@afya/shared";
+import { Link } from "@tanstack/react-router";
+import type { FuelEntry, FuelItem, NutritionTarget, UpdateFuelEntryBody } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import {
   amountValue,
-  bumpAmount,
   canLogFood,
   EMPTY_FOOD_DRAFT,
   foodBody,
   foodDraftFrom,
   fuelMacroSummary,
   isUsableTarget,
+  servingOf,
   type AmountDraft,
   type FoodDraft,
 } from "@/lib/fuel";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 import { CarbsAndFat, FuelMeters } from "./FuelMeters";
+import { CALORIE_STEP, FoodFields, NumberField, PROTEIN_STEP } from "./FoodFields";
 import { QuickAdd } from "./QuickAdd";
 import {
   earliestFuelDate,
@@ -28,15 +30,14 @@ import {
 } from "@/lib/fuel-date";
 import { FUEL_KEY, quickAddsFor, useFuelDay, useLogFuel } from "./fuel-day";
 
-const PROTEIN_STEP = 5;
-const CALORIE_STEP = 50;
-const CARB_STEP = 5;
-const FAT_STEP = 2;
 const COLLAPSED_ENTRIES = 3;
 
 type TargetDraft = { proteinG: AmountDraft; calories: AmountDraft };
 /** An entry being corrected: its food, and when it was eaten as the `datetime-local` input holds it. */
 type EntryDraft = FoodDraft & { id: string; when: string };
+
+/** The unit a logged entry is saved under until the user names a better one. */
+const SAVED_ENTRY_UNIT = "1 serving";
 
 const timeOfDay = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
@@ -68,6 +69,12 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
       await invalidateFuel();
       setEntryDraft(null);
     },
+  });
+  // Saves one serving under the entry's name, in a unit the user can rename on the Foods screen.
+  const saveAsFood = useTrackedMutation(errors, {
+    mutationFn: (entry: FuelEntry) =>
+      api.post<FuelItem>("/api/fuel/items", { label: entry.label, unit: SAVED_ENTRY_UNIT, ...servingOf(entry) }),
+    onSuccess: invalidateFuel,
   });
   const saveTarget = useTrackedMutation(errors, {
     mutationFn: (target: NutritionTarget) => api.put<NutritionTarget>("/api/fuel/target", target),
@@ -164,6 +171,9 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
       <CarbsAndFat day={data} />
 
       <QuickAdd foods={quickAddsFor(data)} date={date} errors={errors} />
+      <Link to="/fuel/foods" className="fuel-foods-link">
+        Your foods ›
+      </Link>
 
       {showCustom ? (
         <form className="fuel-custom" onSubmit={submitCustom}>
@@ -204,6 +214,16 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
                       />
                     </label>
                     <div className="fuel-edit-actions">
+                      {entry.itemId === null && (
+                        <button
+                          type="button"
+                          className="fuel-cancel"
+                          disabled={saveAsFood.isPending}
+                          onClick={() => saveAsFood.mutate(entry)}
+                        >
+                          {saveAsFood.isPending ? "…" : "Save as food"}
+                        </button>
+                      )}
                       <button type="button" className="fuel-cancel" onClick={() => setEntryDraft(null)}>
                         Cancel
                       </button>
@@ -242,77 +262,5 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
         </div>
       )}
     </section>
-  );
-}
-
-/**
- * A food's name and numbers: the same fields whether it is being logged or corrected.
- * Carbs and fat show "—" while blank, because blank there means "not given", not zero.
- */
-function FoodFields({ draft, onChange }: { draft: FoodDraft; onChange: (next: FoodDraft) => void }) {
-  const set = (field: keyof FoodDraft) => (value: string) => onChange({ ...draft, [field]: value });
-  return (
-    <>
-      <input
-        className="fuel-name"
-        value={draft.label}
-        onChange={(e) => set("label")(e.target.value)}
-        placeholder="What did you eat?"
-        aria-label="Food name"
-      />
-      <NumberField label="Protein" unit="g" value={draft.proteinG} step={PROTEIN_STEP} inputMode="decimal" onChange={set("proteinG")} />
-      <NumberField label="Calories" unit="kcal" value={draft.calories} step={CALORIE_STEP} inputMode="numeric" onChange={set("calories")} />
-      <NumberField
-        label="Carbs"
-        unit="g"
-        value={draft.carbsG}
-        step={CARB_STEP}
-        inputMode="decimal"
-        placeholder="—"
-        onChange={set("carbsG")}
-      />
-      <NumberField label="Fat" unit="g" value={draft.fatG} step={FAT_STEP} inputMode="decimal" placeholder="—" onChange={set("fatG")} />
-    </>
-  );
-}
-
-function NumberField({
-  label,
-  unit,
-  value,
-  step,
-  inputMode,
-  placeholder = "0",
-  onChange,
-}: {
-  label: string;
-  unit: string;
-  value: AmountDraft;
-  step: number;
-  inputMode: "numeric" | "decimal";
-  placeholder?: string;
-  onChange: (next: AmountDraft) => void;
-}) {
-  return (
-    <div className="fuel-field">
-      <span className="fuel-field-label">{label}</span>
-      <div className="fuel-field-ctl">
-        <button type="button" className="step small" aria-label={`Less ${label}`} onClick={() => onChange(bumpAmount(value, -step))}>
-          −
-        </button>
-        <input
-          className="fuel-field-num"
-          value={value}
-          inputMode={inputMode}
-          placeholder={placeholder}
-          aria-label={label}
-          onChange={(e) => onChange(e.target.value)}
-        />
-        <span className="fuel-field-unit">{unit}</span>
-        <button type="button" className="step small" aria-label={`More ${label}`} onClick={() => onChange(bumpAmount(value, step))}>
-          +
-        </button>
-      </div>
-    </div>
   );
 }

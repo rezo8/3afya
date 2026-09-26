@@ -10,6 +10,7 @@ import exercises from "./routes/exercises";
 import programs from "./routes/programs";
 import sessions from "./routes/sessions";
 import fuel from "./routes/fuel";
+import fuelItems from "./routes/fuel-items";
 import metrics from "./routes/metrics";
 import trends from "./routes/trends";
 import records from "./routes/records";
@@ -70,6 +71,8 @@ api.use("*", resolveTimeZone);
 api.route("/exercises", exercises);
 api.route("/programs", programs);
 api.route("/sessions", sessions);
+// Registered before /fuel so the items router owns /fuel/items outright.
+api.route("/fuel/items", fuelItems);
 api.route("/fuel", fuel);
 api.route("/metrics", metrics);
 api.route("/trends", trends);

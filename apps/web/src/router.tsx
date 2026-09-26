@@ -11,6 +11,7 @@ import { StartScreen } from "@/screens/start/StartScreen";
 import { FreeformSessionScreen, SessionScreen } from "@/screens/session/SessionScreen";
 import { ProgramScreen } from "@/screens/program/ProgramScreen";
 import { FuelScreen } from "@/screens/fuel/FuelScreen";
+import { FoodsScreen } from "@/screens/fuel/FoodsScreen";
 import { TrendsScreen } from "@/screens/trends/TrendsScreen";
 import { HistoryScreen } from "@/screens/history/HistoryScreen";
 import { SessionDetailScreen } from "@/screens/history/SessionDetailScreen";
@@ -107,6 +108,7 @@ const freeformSessionRoute = createRoute({ getParentRoute: () => appRoute, path:
 const sessionRoute = createRoute({ getParentRoute: () => appRoute, path: "/session/$dayId", component: SessionScreen });
 const programRoute = createRoute({ getParentRoute: () => appRoute, path: "/program", component: ProgramScreen });
 const fuelRoute = createRoute({ getParentRoute: () => appRoute, path: "/fuel", component: FuelScreen });
+const foodsRoute = createRoute({ getParentRoute: () => appRoute, path: "/fuel/foods", component: FoodsScreen });
 const trendsRoute = createRoute({ getParentRoute: () => appRoute, path: "/trends", component: TrendsScreen });
 const historyRoute = createRoute({ getParentRoute: () => appRoute, path: "/history", component: HistoryScreen });
 const sessionDetailRoute = createRoute({ getParentRoute: () => appRoute, path: "/history/$sessionId", component: SessionDetailScreen });
@@ -116,7 +118,7 @@ const settingsRoute = createRoute({ getParentRoute: () => appRoute, path: "/sett
 const routeTree = rootRoute.addChildren([
   signInRoute,
   signUpRoute,
-  appRoute.addChildren([startRoute, freeformSessionRoute, sessionRoute, programRoute, fuelRoute, trendsRoute, historyRoute, sessionDetailRoute, bodyRoute, settingsRoute]),
+  appRoute.addChildren([startRoute, freeformSessionRoute, sessionRoute, programRoute, fuelRoute, foodsRoute, trendsRoute, historyRoute, sessionDetailRoute, bodyRoute, settingsRoute]),
 ]);
 
 export const router = createRouter({

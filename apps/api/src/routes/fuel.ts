@@ -1,9 +1,7 @@
 import { Hono } from "hono";
-import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
-import type { PgColumn } from "drizzle-orm/pg-core";
+import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import type {
   AddFuelEntryBody,
-  FrequentFuel,
   FuelDay,
   FuelEntry,
   FuelHistory,
@@ -14,15 +12,15 @@ import type {
 } from "@afya/shared";
 import { localDate, nextLocalDate, parseLocalDate, startOfDaysAgo, startOfLocalDate } from "../day";
 import { db } from "../db";
-import { fuelEntry, nutritionTarget } from "../db/schema/tracker";
+import { fuelEntry, fuelItem, nutritionTarget } from "../db/schema/tracker";
 import { isFuelDate, readLoggedAt } from "../fuel-window";
+import { optionalGrams, quickAddsFor } from "../fuel-queries";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
 
 const app = new Hono<AuthedEnv>();
 app.use("*", requireAuth);
 
 const DEFAULT_TARGET: NutritionTarget = { proteinG: 180, calories: 2600, carbsG: null, fatG: null };
-const FREQUENT_LIMIT = 8;
 
 const toEntry = (r: typeof fuelEntry.$inferSelect): FuelEntry => ({
   id: r.id,
@@ -32,6 +30,7 @@ const toEntry = (r: typeof fuelEntry.$inferSelect): FuelEntry => ({
   carbsG: r.carbsG,
   fatG: r.fatG,
   portion: r.portion,
+  itemId: r.itemId,
   loggedAt: r.loggedAt.toISOString(),
 });
 
@@ -49,36 +48,6 @@ async function targetFor(userId: string): Promise<NutritionTarget> {
     .orderBy(desc(nutritionTarget.createdAt))
     .limit(1);
   return current ?? DEFAULT_TARGET;
-}
-
-/**
- * One serving's worth of a column, from the group's newest entry — a fresh portion beats an
- * average of stale ones. Divided by the entry's portion, so logging a quick-add at ×0.5 or ×2
- * doesn't turn the chip into half or double a serving next time.
- */
-const newestServing = <T>(column: PgColumn) =>
-  sql<T>`(array_agg(${column} / coalesce(${fuelEntry.portion}, 1) order by ${fuelEntry.loggedAt} desc))[1]`;
-
-/**
- * The labels this user logs most often, for one-tap re-adding. Derived strictly
- * from their own entries — no food catalog and no fuzzy matching, just an
- * exact match on the trimmed, lowercased label.
- */
-async function frequentFor(userId: string): Promise<FrequentFuel[]> {
-  return db
-    .select({
-      label: sql<string>`(array_agg(${fuelEntry.label} order by ${fuelEntry.loggedAt} desc))[1]`,
-      proteinG: newestServing<number>(fuelEntry.proteinG),
-      // Calories are whole numbers everywhere else; a divided serving is rounded back to one.
-      calories: sql<number>`round((array_agg(${fuelEntry.calories} / coalesce(${fuelEntry.portion}, 1) order by ${fuelEntry.loggedAt} desc))[1])::int`,
-      carbsG: newestServing<OptionalGrams>(fuelEntry.carbsG),
-      fatG: newestServing<OptionalGrams>(fuelEntry.fatG),
-    })
-    .from(fuelEntry)
-    .where(eq(fuelEntry.userId, userId))
-    .groupBy(sql`lower(trim(${fuelEntry.label}))`)
-    .orderBy(desc(sql`count(*)`), desc(sql`max(${fuelEntry.loggedAt})`))
-    .limit(FREQUENT_LIMIT);
 }
 
 /**
@@ -115,7 +84,7 @@ app.get("/day/:date", async (c) => {
     target,
     entries: entries.map(toEntry),
     totals,
-    frequent: await frequentFor(userId),
+    quickAdds: await quickAddsFor(userId),
   } satisfies FuelDay);
 });
 
@@ -124,10 +93,6 @@ const partialTotal = (values: OptionalGrams[]): PartialTotal => ({
   grams: values.reduce<number>((sum, v) => sum + (v ?? 0), 0),
   entriesWithout: values.filter((v) => v === null).length,
 });
-
-/** A number the caller gave, clamped at zero, or null when they gave none. */
-const optionalGrams = (value: unknown): OptionalGrams =>
-  typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : null;
 
 /** Servings of a quick-add. Anything else — zero, negative, absurd — is not a portion of anything. */
 const MAX_PORTION = 20;
@@ -148,15 +113,37 @@ function readFuelFields(body: AddFuelEntryBody | null) {
   };
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The saved food an entry names, if it is the caller's; "unknown" when it names one that isn't. */
+async function ownedItemId(userId: string, value: unknown): Promise<string | null | "unknown"> {
+  if (value === undefined || value === null) return null;
+  // Checked before the query: Postgres rejects a malformed uuid with an error, not a miss.
+  if (typeof value !== "string" || !UUID.test(value)) return "unknown";
+  const [row] = await db
+    .select({ id: fuelItem.id })
+    .from(fuelItem)
+    .where(and(eq(fuelItem.id, value), eq(fuelItem.userId, userId)))
+    .limit(1);
+  return row?.id ?? "unknown";
+}
+
 app.post("/", async (c) => {
   const body = await c.req.json<AddFuelEntryBody>().catch(() => null);
   const fields = readFuelFields(body);
   if (!fields) return c.json({ error: "bad_request", message: "A label is required." }, 400);
   const loggedAt = readLoggedAt(body?.loggedAt, new Date(), c.get("timeZone"));
   if (loggedAt.kind === "refused") return c.json({ error: "bad_request", message: loggedAt.message }, 400);
+  const itemId = await ownedItemId(c.get("userId"), body?.itemId);
+  if (itemId === "unknown") return c.json({ error: "bad_request", message: "Unknown saved food." }, 400);
   const [row] = await db
     .insert(fuelEntry)
-    .values({ userId: c.get("userId"), ...fields, ...(loggedAt.kind === "at" && { loggedAt: loggedAt.instant }) })
+    .values({
+      userId: c.get("userId"),
+      ...fields,
+      itemId,
+      ...(loggedAt.kind === "at" && { loggedAt: loggedAt.instant }),
+    })
     .returning();
   return c.json(toEntry(row!), 201);
 });

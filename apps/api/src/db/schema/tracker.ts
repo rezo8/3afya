@@ -195,6 +195,28 @@ export const sessionSubstitution = pgTable(
 
 // --- Fuel (protein / calorie targets) --------------------------------------
 
+/**
+ * The user's own saved foods: a label, the unit they think in ("1 scoop", "100 g"), and one
+ * unit's numbers. Not a food database — nothing here is imported or looked up. Logging one
+ * still writes absolute numbers onto the entry, so editing a food never rewrites history.
+ */
+export const fuelItem = pgTable(
+  "fuel_item",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull(),
+    label: text("label").notNull(),
+    unit: text("unit").notNull(),
+    proteinG: real("protein_g").default(0).notNull(),
+    calories: integer("calories").default(0).notNull(),
+    carbsG: real("carbs_g"),
+    fatG: real("fat_g"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("fuel_item_user_label_idx").on(t.userId, t.label)],
+);
+
 export const fuelEntry = pgTable(
   "fuel_entry",
   {
@@ -210,6 +232,9 @@ export const fuelEntry = pgTable(
     // How many servings of a quick-add this entry is (0.5, 2). Null for anything typed by
     // hand. The frequent list divides by it, so halving one entry doesn't halve the chip.
     portion: real("portion"),
+    // The saved food this was logged from, if any. Only for counting and grouping: the
+    // entry's own numbers are the record, so archiving or editing the food changes nothing here.
+    itemId: uuid("item_id").references(() => fuelItem.id, { onDelete: "set null" }),
     loggedAt: timestamp("logged_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("fuel_entry_user_logged_idx").on(t.userId, t.loggedAt)],
