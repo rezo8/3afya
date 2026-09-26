@@ -1,17 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AddFuelEntryBody, FuelDay, FuelEntry, NutritionTarget, UpdateFuelEntryBody } from "@afya/shared";
+import { useQueryClient } from "@tanstack/react-query";
+import type { FuelEntry, NutritionTarget, UpdateFuelEntryBody } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import { amountValue, bumpAmount, canLogAmounts, fuelMacroSummary, isUsableTarget, readAmount, type AmountDraft } from "@/lib/fuel";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
-
-const COLD_START_CHIPS: AddFuelEntryBody[] = [
-  { label: "Chicken breast", proteinG: 30, calories: 200 },
-  { label: "Protein shake", proteinG: 24, calories: 150 },
-  { label: "Greek yogurt", proteinG: 12, calories: 90 },
-  { label: "Rice bowl", proteinG: 8, calories: 320 },
-];
+import { FuelMeters, QuickAddChips } from "./FuelMeters";
+import { FUEL_TODAY_KEY, quickAddsFor, useFuelToday, useLogFuel } from "./fuel-today";
 
 const PROTEIN_STEP = 5;
 const CALORIE_STEP = 50;
@@ -23,12 +18,11 @@ type EntryDraft = { id: string; label: string; proteinG: AmountDraft; calories: 
 /** A zero was a blank when it was logged (a food may declare one number), so it reopens blank. */
 const draftAmount = (value: number): AmountDraft => (value > 0 ? String(value) : "");
 
-const pct = (done: number, goal: number) => (goal > 0 ? Math.min(100, (done / goal) * 100) : 0);
 const timeOfDay = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
 export function FuelPanel() {
   const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ["fuel", "today"], queryFn: () => api.get<FuelDay>("/api/fuel/today") });
+  const { data } = useFuelToday();
   const errors = useMutationError();
   const [showCustom, setShowCustom] = useState(false);
   const [customLabel, setCustomLabel] = useState("");
@@ -38,11 +32,8 @@ export function FuelPanel() {
   const [showAllEntries, setShowAllEntries] = useState(false);
   const [entryDraft, setEntryDraft] = useState<EntryDraft | null>(null);
 
-  const invalidateToday = () => qc.invalidateQueries({ queryKey: ["fuel", "today"] });
-  const add = useTrackedMutation(errors, {
-    mutationFn: (body: AddFuelEntryBody) => api.post<FuelEntry>("/api/fuel", body),
-    onSuccess: () => invalidateToday(),
-  });
+  const invalidateToday = () => qc.invalidateQueries({ queryKey: FUEL_TODAY_KEY });
+  const add = useLogFuel(errors);
   const remove = useTrackedMutation(errors, {
     mutationFn: (id: string) => api.delete<{ ok: true }>(`/api/fuel/${id}`),
     onSuccess: (_, id) => {
@@ -73,16 +64,8 @@ export function FuelPanel() {
   });
 
   if (!data) return null;
-  const { target, totals, entries } = data;
+  const { target, entries } = data;
 
-  const proteinDone = Math.round(totals.proteinG);
-  const caloriesDone = Math.round(totals.calories);
-  const proteinLeft = target.proteinG - proteinDone;
-  const caloriesLeft = target.calories - caloriesDone;
-  const proteinNote = proteinLeft > 0 ? `${proteinLeft} g to go` : proteinLeft < 0 ? `hit · +${-proteinLeft} g` : "hit";
-  const calorieNote = caloriesLeft > 0 ? `${caloriesLeft} kcal left` : caloriesLeft < 0 ? `over by ${-caloriesLeft}` : "hit";
-
-  const quickAdds = data.frequent.length > 0 ? data.frequent : COLD_START_CHIPS;
   const newestFirst = [...entries].reverse();
   const visibleEntries = showAllEntries ? newestFirst : newestFirst.slice(0, COLLAPSED_ENTRIES);
   const hiddenEntries = newestFirst.length - COLLAPSED_ENTRIES;
@@ -135,7 +118,7 @@ export function FuelPanel() {
   return (
     <section className="eating">
       <div className="eating-head">
-        <p className="eyebrow">Fuel</p>
+        <p className="eyebrow">Totals</p>
         <button className="kcap fuel-target-open" aria-expanded={!!targetDraft} onClick={toggleTargetEdit}>
           targets · today
         </button>
@@ -172,40 +155,9 @@ export function FuelPanel() {
         </form>
       )}
 
-      <div className="meters">
-        <div className="meter">
-          <div className="mtop">
-            <span className="mname">Protein</span>
-            <span className="mval">
-              <b>{proteinDone}</b> / <span className="goal">{target.proteinG} g</span>
-            </span>
-          </div>
-          <div className="bar protein">
-            <i style={{ width: `${pct(proteinDone, target.proteinG)}%` }} />
-          </div>
-          <p className="mnote">{proteinNote}</p>
-        </div>
-        <div className="meter">
-          <div className="mtop">
-            <span className="mname">Calories</span>
-            <span className="mval">
-              <b>{caloriesDone}</b> / <span className="goal">{target.calories} kcal</span>
-            </span>
-          </div>
-          <div className={`bar cal${caloriesLeft < 0 ? " over" : ""}`}>
-            <i style={{ width: `${pct(caloriesDone, target.calories)}%` }} />
-          </div>
-          <p className="mnote">{calorieNote}</p>
-        </div>
-      </div>
+      <FuelMeters day={data} />
 
-      <div className="quickadd">
-        {quickAdds.map((food) => (
-          <button key={food.label} className="chip" onClick={() => add.mutate(food)} disabled={add.isPending}>
-            + {food.label} {fuelMacroSummary(food.proteinG, food.calories)}
-          </button>
-        ))}
-      </div>
+      <QuickAddChips foods={quickAddsFor(data)} onAdd={(food) => add.mutate(food)} disabled={add.isPending} />
 
       {showCustom ? (
         <form className="fuel-custom" onSubmit={submitCustom}>

@@ -269,6 +269,7 @@ Global error handler catches unhandled exceptions and returns standardized error
 /session/$dayId (SessionScreen - Active workout)
 /session/freeform (FreeformSessionScreen - Off-program workout)
 /program (ProgramScreen - Program builder)
+/fuel (FuelScreen - Nutrition: today's totals, quick-adds, log)
 /trends (TrendsScreen - Progress charts)
 /history (HistoryScreen - Session list)
 /history/$sessionId (SessionDetailScreen - Past session)
@@ -285,6 +286,8 @@ AppLayout (Authenticated shell)
 ├── Tab Bar (Navigation)
 └── Outlet (Route content)
     ├── StartScreen
+    │   └── FuelSummaryCard (meters + 3 quick-adds, links to /fuel)
+    ├── FuelScreen
     │   └── FuelPanel
     ├── SessionScreen
     │   └── RestTimer (Context provider)

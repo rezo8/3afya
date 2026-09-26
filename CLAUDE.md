@@ -212,6 +212,11 @@ records what is specific to 3afya.
 - **`isExerciseDone` is the single source of truth**: Shared by `SessionScreen` and `StartScreen`. Don't re-inline it — the point is the two screens can't disagree.
 - **Client-side rotation advance**: `StartScreen` owns moving "NEXT UP" past a finished day because the API keeps returning today's day. If rotation ever advances server-side, delete the client rule.
 - **Fuel target invalidation**: Target editing must invalidate both `["fuel","today"]` and `["fuel","history"]` — TrendsScreen scores against `FuelHistory.target`.
+- **Fuel has its own tab, `/fuel`** (T-051). `screens/fuel/FuelPanel.tsx` is the full panel. Start renders
+  `FuelSummaryCard` instead: the meters, 3 quick-adds and a link. Both read `useFuelToday()` and log through
+  `useLogFuel()` in `screens/fuel/fuel-today.ts`, on one `FUEL_TODAY_KEY`, and render the same `FuelMeters` and
+  `QuickAddChips`. That shared key is why a log on either surface shows on both. Don't give the card its own query.
+  The tab bar holds six tabs at 390px with ~20px to spare; a seventh doesn't fit without changing `.tab`.
 - **Correcting a fuel entry is `PATCH /api/fuel/:id`** (T-046). It replaces label and numbers and
   keeps `loggedAt`, since the food was eaten when it was logged. POST and PATCH validate through one
   `readFuelFields`. In `FuelPanel` a row's label is the edit target, and the form reuses `FoodFields`

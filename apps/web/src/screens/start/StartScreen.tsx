@@ -3,14 +3,14 @@ import { Link } from "@tanstack/react-router";
 import type { Program, SessionDetail, TodayResponse } from "@afya/shared";
 import { api } from "@/lib/api/client";
 import { isExerciseDone } from "@/lib/session";
-import { FuelPanel } from "@/screens/start/FuelPanel";
+import { FuelSummaryCard } from "@/screens/start/FuelSummaryCard";
 
 /** The way into a session that belongs to no program day — always available, program or not. */
 function FreeformEntry() {
   return (
     <Link to="/session/freeform" className="freeform-entry">
-      <span className="fe-name">＋ Log something else</span>
-      <span className="fe-meta">a ride, a run, a class, anything off-program</span>
+      <span className="fe-name">＋ Log a workout off-program</span>
+      <span className="fe-meta">a ride, a run, a class</span>
     </Link>
   );
 }
@@ -145,7 +145,7 @@ export function StartScreen() {
 
       <FreeformEntry />
 
-      <FuelPanel />
+      <FuelSummaryCard />
     </>
   );
 }

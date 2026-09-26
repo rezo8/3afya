@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 const TABS = [
   { to: "/", label: "Start", exact: true },
   { to: "/program", label: "Program", exact: false },
+  { to: "/fuel", label: "Fuel", exact: false },
   { to: "/trends", label: "Trends", exact: false },
   { to: "/history", label: "History", exact: false },
   { to: "/body", label: "Body", exact: false },
