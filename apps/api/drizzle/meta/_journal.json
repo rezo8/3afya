@@ -120,6 +120,27 @@
       "when": 1789863671864,
       "tag": "0016_fresh_black_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790431587700,
+      "tag": "0017_abandoned_sumo",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790431593835,
+      "tag": "0018_backfill_set_log_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790431605621,
+      "tag": "0019_harsh_wonder_man",
+      "breakpoints": true
     }
   ]
 }

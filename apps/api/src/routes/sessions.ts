@@ -61,21 +61,24 @@ async function exerciseMeta(userId: string, ids: string[]): Promise<Map<string, 
   return map;
 }
 
-function groupSets(
-  rows: (typeof setLog.$inferSelect)[],
-  meta: Map<string, ExMeta>,
-  programIds: Set<string>,
-): SessionExercise[] {
+/**
+ * A performed session's sets, one group per exercise. Kind and plannedness come from the
+ * snapshots on the rows, never from the program as it stands now: removing an exercise
+ * from a day must not rewrite what history says was planned.
+ */
+function groupSets(rows: (typeof setLog.$inferSelect)[], names: Map<string, ExMeta>): SessionExercise[] {
   const ordered = [...rows].sort((a, b) => a.completedAt.getTime() - b.completedAt.getTime());
   const groups = new Map<string, SessionExercise>();
   for (const r of ordered) {
-    const m = meta.get(r.exerciseId);
+    const m = names.get(r.exerciseId);
     if (!m) continue;
     let g = groups.get(r.exerciseId);
     if (!g) {
-      g = { exerciseId: r.exerciseId, name: m.name, kind: m.kind, fromProgram: programIds.has(r.exerciseId), sets: [] };
+      g = { exerciseId: r.exerciseId, name: m.name, kind: r.exerciseKind, fromProgram: false, sets: [] };
       groups.set(r.exerciseId, g);
     }
+    // Planned if any of its sets was: a swap undone mid-session leaves both kinds of row.
+    g.fromProgram ||= r.fromProgram;
     g.sets.push(toSet(r));
   }
   for (const g of groups.values()) g.sets.sort((a, b) => a.setNumber - b.setNumber);
@@ -241,6 +244,22 @@ async function substitutesForSession(
   return map;
 }
 
+/** The exercises a program day is performed with this session: each slot's substitute, else its own. */
+const performedExerciseIds = (
+  slots: { slotId: string; exerciseId: string }[],
+  substitutes: Map<string, typeof exercise.$inferSelect>,
+): Set<string> => new Set(slots.map((slot) => substitutes.get(slot.slotId)?.id ?? slot.exerciseId));
+
+/** Whether a set of this exercise, logged now, fills a slot of the session's program day. */
+async function isPlannedInSession(userId: string, session: typeof workoutSession.$inferSelect, exerciseId: string) {
+  if (!session.dayId) return false;
+  const slots = await db
+    .select({ slotId: programExercise.id, exerciseId: programExercise.exerciseId })
+    .from(programExercise)
+    .where(eq(programExercise.dayId, session.dayId));
+  return performedExerciseIds(slots, await substitutesForSession(userId, session)).has(exerciseId);
+}
+
 async function buildDayExercises(userId: string, dayId: string, session: typeof workoutSession.$inferSelect | null) {
   const dayExercises = await db
     .select({ pe: programExercise, ex: exercise })
@@ -258,7 +277,10 @@ async function buildDayExercises(userId: string, dayId: string, session: typeof 
   // A substituted slot is performed as the substitute, so the planned exercise's own id
   // is no longer "planned": sets logged against it before the swap surface as ad-hoc,
   // which is honest — they were performed.
-  const programIds = new Set(dayExercises.map(({ pe, ex }) => substitutes.get(pe.id)?.id ?? ex.id));
+  const programIds = performedExerciseIds(
+    dayExercises.map(({ pe, ex }) => ({ slotId: pe.id, exerciseId: ex.id })),
+    substitutes,
+  );
 
   const planned = await Promise.all(
     dayExercises.map(async ({ pe, ex: planned }) => {
@@ -506,6 +528,8 @@ app.post("/:id/sets", async (c) => {
       // guessing at miles.
       distanceUnit: parseDistanceUnit(body.distanceUnit),
       isWarmup: body.isWarmup ?? false,
+      fromProgram: await isPlannedInSession(userId, session, ex.id),
+      exerciseKind: ex.kind,
       idempotencyKey,
     })
     .onConflictDoNothing({ target: [setLog.sessionId, setLog.idempotencyKey] })
@@ -601,21 +625,6 @@ app.delete("/:id/sets/:setId", async (c) => {
   return c.json({ ok: true });
 });
 
-async function programIdsForDays(dayIds: string[]): Promise<Map<string, Set<string>>> {
-  const byDay = new Map<string, Set<string>>();
-  if (!dayIds.length) return byDay;
-  const rows = await db
-    .select({ dayId: programExercise.dayId, exerciseId: programExercise.exerciseId })
-    .from(programExercise)
-    .where(inArray(programExercise.dayId, dayIds));
-  for (const r of rows) {
-    let set = byDay.get(r.dayId);
-    if (!set) byDay.set(r.dayId, (set = new Set()));
-    set.add(r.exerciseId);
-  }
-  return byDay;
-}
-
 app.get("/", async (c) => {
   const userId = c.get("userId");
   const limit = Math.min(90, Math.max(1, Number(c.req.query("limit")) || 30));
@@ -628,8 +637,6 @@ app.get("/", async (c) => {
 
   const allExerciseIds = [...new Set(sessions.flatMap((s) => s.sets.map((r) => r.exerciseId)))];
   const meta = await exerciseMeta(userId, allExerciseIds);
-  const dayIds = [...new Set(sessions.map((s) => s.dayId).filter((id): id is string => !!id))];
-  const programByDay = await programIdsForDays(dayIds);
 
   const out: SessionDetail[] = sessions.map((s) => ({
     id: s.id,
@@ -638,7 +645,7 @@ app.get("/", async (c) => {
     dayName: s.dayName ?? s.day?.name ?? null,
     performedAt: s.performedAt.toISOString(),
     note: s.note,
-    exercises: groupSets(s.sets, meta, (s.dayId && programByDay.get(s.dayId)) || new Set()),
+    exercises: groupSets(s.sets, meta),
   }));
   return c.json(out);
 });
@@ -654,8 +661,6 @@ app.get("/:id", async (c) => {
 
   const sets = await db.select().from(setLog).where(eq(setLog.sessionId, session.id));
   const meta = await exerciseMeta(userId, [...new Set(sets.map((r) => r.exerciseId))]);
-  const programByDay = session.dayId ? await programIdsForDays([session.dayId]) : new Map();
-  const programIds: Set<string> = (session.dayId && programByDay.get(session.dayId)) || new Set();
 
   // Snapshot first: a renamed or deleted program day must not rewrite history.
   // The live join is only a fallback for sessions written before the snapshot existed.
@@ -690,7 +695,7 @@ app.get("/:id", async (c) => {
     dayName,
     performedAt: session.performedAt.toISOString(),
     note: session.note,
-    exercises: groupSets(sets, meta, programIds),
+    exercises: groupSets(sets, meta),
     records,
   } satisfies SessionDetail);
 });

@@ -146,6 +146,11 @@ export const setLog = pgTable(
     // Records and trends convert to metres to compare across units.
     distanceUnit: text("distance_unit").$type<DistanceUnit>(),
     isWarmup: boolean("is_warmup").default(false).notNull(),
+    // Snapshots of what the set was at write time, so history never reads them live
+    // (RULES 1): whether the session's program day planned this exercise, counting a
+    // mid-workout swap as planned, and the kind that decides which columns above are real.
+    fromProgram: boolean("from_program").notNull(),
+    exerciseKind: text("exercise_kind").$type<ExerciseKind>().notNull(),
     // One set-completion's identity, supplied by the client. Nullable on purpose: every
     // row that predates this column, and every request that sends no key, still inserts.
     idempotencyKey: text("idempotency_key"),

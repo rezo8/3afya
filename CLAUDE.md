@@ -140,6 +140,15 @@ records what is specific to 3afya.
 
 ### Session Immutability
 - **No session-exercise join table**: Exercises belong to a session iff they have ≥1 logged set. Ad-hoc exercises are surfaced by `adhocExercises` with `fromProgram: false`. This keeps sessions immutable records and programs reusable templates.
+- **Set snapshots (`set_log.from_program`, `set_log.exercise_kind`)**: written at insert by
+  `POST /sessions/:id/sets`, decided server-side by `isPlannedInSession` (the day's slots with
+  this session's substitutions applied, via `performedExerciseIds`, the same rule
+  `buildDayExercises` uses). History (`GET /sessions`, `GET /sessions/:id`) reads only these,
+  so removing an exercise from a day no longer rewrites what was planned (T-006). The **live
+  session screen still derives plannedness live**. That is deliberate, because the mid-workout
+  swap rules depend on it. Rows before `0018` were backfilled from the program as it stood
+  then: best effort, identical to the old live join. Records and trends still read
+  `exercise.kind` live; that is safe only while kind is not editable (RULES 4).
 - **Day name snapshot**: `workoutSession.dayName` is set at creation (both paths) and read as stored snapshot → live join → null. Reading the join first would re-break history on a rename.
 - **Two latest-session queries**: `rotationState` runs both `latestSession` (for resume) and `latestSessionWithSets` (with sets, for rotation); both are restricted to sessions that have a `dayId`. Empty sessions must not advance rotation, and neither must freeform ones.
 - **Empty session deletion**: `DELETE /api/sessions/:id` refuses once the session has any `set_log` row.

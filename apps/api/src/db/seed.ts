@@ -141,6 +141,9 @@ async function main() {
           weight: s.kind === "weighted" ? val : 0,
           reps: s.kind === "weighted" ? (s.reps ?? 0) : s.kind === "reps" ? val : 0,
           durationSec: s.kind === "time" ? val : 0,
+          // Every seeded set is one of its day's planned exercises.
+          fromProgram: true,
+          exerciseKind: s.kind,
           completedAt,
         });
       }
