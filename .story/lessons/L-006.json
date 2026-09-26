@@ -1,0 +1,17 @@
+{
+  "content": "The local afya database holds more than one user. When a runtime check seeds rows with SQL, take the user id from something created through the API as the signed-in account (POST an entry, read its user_id, delete it), not from `select user_id from program limit 1`. Seed rows that land on another user make the feature under test look broken.",
+  "context": "T-048: the expenditure check seeded 28 days of intake and 14 weigh-ins, and the API still reported \"0 so far\". Two users own programs in the local DB, and `limit 1` picked the other one. The script also crashed before cleanup, leaving the seeded rows behind. They were found and deleted by label and value. Rerun with the id taken from an API-created entry, it gave exactly the expected 2,450 kcal/day.",
+  "createdDate": "2026-09-26",
+  "id": "L-006",
+  "lastValidated": "2026-09-26",
+  "reinforcements": 0,
+  "source": "postmortem",
+  "status": "active",
+  "supersedes": null,
+  "tags": [
+    "testing",
+    "database"
+  ],
+  "title": "Seed test rows onto the signed-in user's id, never onto `limit 1` of some table",
+  "updatedDate": "2026-09-26"
+}

@@ -1,0 +1,17 @@
+{
+  "content": "Before shipping a feature that changes stored values (a portion correction, an edit, a rescale), find every derived value that reads those rows, such as \"newest entry's numbers\" or \"most frequent label\", and check what the correction does to it. If the derivation can't tell a corrected row from a normal one, store the fact that distinguishes them (here `fuel_entry.portion`) rather than special-casing the reader.",
+  "context": "T-045: correcting a quick-add to ×0.5 PATCHed the entry's numbers, and the frequent list takes the newest entry per label. So the chip itself became half a serving from then on. Only the browser screenshot showed it; the unit tests and the API checks passed. The fix was a nullable `portion` column that frequentFor divides by, so one serving stays one serving whatever the last entry was.",
+  "createdDate": "2026-09-26",
+  "id": "L-007",
+  "lastValidated": "2026-09-26",
+  "reinforcements": 0,
+  "source": "review",
+  "status": "active",
+  "supersedes": null,
+  "tags": [
+    "domain-model",
+    "planning"
+  ],
+  "title": "A way to correct data can quietly redefine every default derived from it",
+  "updatedDate": "2026-09-26"
+}

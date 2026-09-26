@@ -1,0 +1,18 @@
+{
+  "content": "In a browser check against a TanStack Query app, a read made right after a mutation or a route change sees the cached data while the refetch is still in flight. Wait on the expected value (`waitForFunction(() => el.textContent.includes(\"300\"))`) or a heading unique to the new route, never on the element merely existing. Only then decide it's a bug.",
+  "context": "Fuel page session, 2026-09-26: four separate \"failures\" were this exact race and not defects. /fuel still showed Start's h1 (T-051), the foods list read 0 \"Save it\" rows (T-050), the first chip was still the old one after saving a food (T-050), and the Day view showed \"no target\" just after carbs were set to 300 g (T-054). One real defect looked the same and wasn't the race: the fuel row showing old numbers right after \"Save\" (T-046). That one was fixed by awaiting the refetch in onSuccess. The way to tell them apart is to wait for the value; if it never arrives, it's real.",
+  "createdDate": "2026-09-26",
+  "id": "L-005",
+  "lastValidated": "2026-09-26",
+  "reinforcements": 0,
+  "source": "postmortem",
+  "status": "active",
+  "supersedes": null,
+  "tags": [
+    "testing",
+    "playwright",
+    "tanstack-query"
+  ],
+  "title": "After a write, wait for the value you expect — don't read the page right after navigating",
+  "updatedDate": "2026-09-26"
+}
