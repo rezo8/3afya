@@ -1400,6 +1400,48 @@ body {
 .fuel-week-note b {
   color: var(--text);
 }
+.expenditure {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.expenditure-lead {
+  margin: 0;
+  font-size: 15px;
+}
+.expenditure-needs {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  color: var(--text-soft);
+}
+.expenditure-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.expenditure-actions button {
+  appearance: none;
+  height: 48px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-hi);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.expenditure-actions button.lean {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.expenditure-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
 .fuel-targets {
   display: flex;
   flex-direction: column;

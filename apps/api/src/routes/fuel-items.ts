@@ -53,7 +53,8 @@ app.post("/", async (c) => {
   const [row] = existing
     ? await db.update(fuelItem).set({ ...fields, archivedAt: null }).where(eq(fuelItem.id, existing.id)).returning()
     : await db.insert(fuelItem).values({ userId, ...fields }).returning();
-  return c.json(toItem(row!, await timesLoggedOf(row!.id)), existing ? 200 : 201);
+  if (!row) throw new Error(`Saving fuel item "${fields.label}" returned no row`);
+  return c.json(toItem(row, await timesLoggedOf(row.id)), existing ? 200 : 201);
 });
 
 /** Change a food from now on. Entries already logged from it keep their own numbers. */

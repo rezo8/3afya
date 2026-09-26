@@ -3,7 +3,7 @@ import {
   DEFAULT_TIME_ZONE,
   isSameDay,
   localDate,
-  nextLocalDate,
+  shiftLocalDate,
   parseLocalDate,
   parseTimeZone,
   startOfDay,
@@ -160,9 +160,13 @@ describe("startOfLocalDate", () => {
   });
 });
 
-describe("nextLocalDate", () => {
+describe("shiftLocalDate", () => {
   it("steps across a month end and a leap day", () => {
-    expect(nextLocalDate("2026-09-30")).toBe("2026-10-01");
-    expect(nextLocalDate("2028-02-28")).toBe("2028-02-29");
+    expect(shiftLocalDate("2026-09-30", 1)).toBe("2026-10-01");
+    expect(shiftLocalDate("2028-02-28", 1)).toBe("2028-02-29");
+  });
+
+  it("steps back across a year end", () => {
+    expect(shiftLocalDate("2027-01-01", -1)).toBe("2026-12-31");
   });
 });

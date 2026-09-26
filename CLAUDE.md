@@ -274,6 +274,13 @@ records what is specific to 3afya.
   is refused like any zero target. `targetBody` always sends all four fields. `GET /api/fuel/targets` reads the
   append-only log as periods (`targetPeriods`: last edit per day wins, and a save that changed nothing merges).
   The Day view no longer edits targets.
+- **Expenditure is estimated from energy balance, never a formula** (T-048, `apps/api/src/expenditure.ts`, pure and
+  tested). Over the 28 complete days before today: average intake on logged days, minus the weight trend ×
+  `ENERGY_PER_LB` (3500, in `@afya/shared`; weight is logged in lb). The trend is a **least-squares slope**, not
+  the exponential average the ticket named, because an EWMA lags the change at the window's end. It needs ≥14
+  logged days and ≥8 weigh-ins spanning ≥2 weeks, and an estimate outside 1200–6000 kcal is reported as missing
+  data. Otherwise the reasons say what is missing, and that state is designed, not an afterthought. It never
+  moves a target: Maintain / Lean gain (+250) PUT a new target with protein/carbs/fat unchanged.
 - **Correcting a fuel entry is `PATCH /api/fuel/:id`** (T-046). It replaces label and numbers and
   keeps `loggedAt`, since the food was eaten when it was logged. POST and PATCH validate through one
   `readFuelFields`. In `FuelPanel` a row's label is the edit target, and the form reuses `FoodFields`

@@ -130,27 +130,45 @@ export function startOfDaysAgo(daysAgo: number, zone: string, from: Date = new D
   return startOfCalendarDate(target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate(), zone, from);
 }
 
+type CalendarParts = { year: number; month: number; day: number };
+
+/** The numbers in a YYYY-MM-DD string, or null when it isn't one. Says nothing about whether the date exists. */
+function calendarParts(value: string): CalendarParts | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+}
+
+/** For dates `parseLocalDate` already accepted; anything else here is a bug in the caller. */
+function knownCalendarParts(date: string): CalendarParts {
+  const parts = calendarParts(date);
+  if (!parts) throw new Error(`Expected a YYYY-MM-DD date, got ${JSON.stringify(date)}`);
+  return parts;
+}
+
 /**
  * A calendar date the caller named, as YYYY-MM-DD, if it is a real one — else null.
  * "2026-02-30" has the right shape and is not a date, which `Date.UTC` would quietly roll
  * into March; the round trip is what refuses it.
  */
 export function parseLocalDate(value: unknown): string | null {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const [year, month, day] = value.split("-").map(Number) as [number, number, number];
-  const probe = new Date(Date.UTC(year, month - 1, day));
-  const roundTrips = probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day;
+  if (typeof value !== "string") return null;
+  const parts = calendarParts(value);
+  if (!parts) return null;
+  const probe = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  const roundTrips =
+    probe.getUTCFullYear() === parts.year && probe.getUTCMonth() === parts.month - 1 && probe.getUTCDate() === parts.day;
   return roundTrips ? value : null;
 }
 
 /** The instant a YYYY-MM-DD calendar date began in `zone`. Pass only what `parseLocalDate` accepted. */
 export function startOfLocalDate(date: string, zone: string): Date {
-  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+  const { year, month, day } = knownCalendarParts(date);
   return startOfCalendarDate(year, month, day, zone, new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
-/** The calendar date after `date`, by calendar arithmetic rather than by adding 24 hours. */
-export function nextLocalDate(date: string): string {
-  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
-  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+/** The calendar date `days` after `date` (negative for before), by calendar arithmetic rather than by 24-hour steps. */
+export function shiftLocalDate(date: string, days: number): string {
+  const { year, month, day } = knownCalendarParts(date);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }

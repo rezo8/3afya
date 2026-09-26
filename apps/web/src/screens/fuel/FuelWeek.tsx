@@ -4,6 +4,7 @@ import { summarizeWeek, type WeekSummary } from "@/lib/fuel-week";
 import { useMutationError } from "@/lib/query/use-mutation-error";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useFuelWeek } from "./fuel-day";
+import { FuelExpenditure } from "./FuelExpenditure";
 import { FuelTargets } from "./FuelTargets";
 
 const WEEKDAY = ["S", "M", "T", "W", "T", "F", "S"];
@@ -63,6 +64,7 @@ export function FuelWeek({ today }: { today: LocalDate }) {
       </p>
 
       {errors.failure && <ErrorBanner message={errors.failure.message} onRetry={errors.failure.retry} />}
+      <FuelExpenditure target={data.target} errors={errors} />
       <FuelTargets target={data.target} errors={errors} />
     </section>
   );

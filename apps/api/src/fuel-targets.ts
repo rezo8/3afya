@@ -1,5 +1,5 @@
 import type { NutritionTarget, TargetPeriod } from "@afya/shared";
-import { localDate } from "./day";
+import { localDate, shiftLocalDate } from "./day";
 
 /** A target as stored: append-only, so each row says when it started applying. */
 export type TargetRow = NutritionTarget & { createdAt: Date };
@@ -21,11 +21,6 @@ export function targetInForce(rows: TargetRow[], dayEnd: Date, fallback: Nutriti
 const sameTarget = (a: NutritionTarget, b: NutritionTarget) =>
   a.proteinG === b.proteinG && a.calories === b.calories && a.carbsG === b.carbsG && a.fatG === b.fatG;
 
-const dayBefore = (date: string) => {
-  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
-};
-
 /**
  * The append-only target log read as periods, newest first: "Sep 3 → now". Several edits
  * on one day collapse into the last of them, since a day is judged against the target it
@@ -40,8 +35,16 @@ export function targetPeriods(rows: TargetRow[], zone: string): TargetPeriod[] {
     if (last && last.from === from) last.target = target;
     else byDay.push({ from, target });
   }
-  const merged = byDay.filter((p, i) => i === 0 || !sameTarget(p.target, byDay[i - 1]!.target));
-  return merged
-    .map((p, i) => ({ from: p.from, to: merged[i + 1] ? dayBefore(merged[i + 1]!.from) : null, target: p.target }))
-    .reverse();
+  const merged: { from: string; target: NutritionTarget }[] = [];
+  for (const period of byDay) {
+    const previous = merged.at(-1);
+    if (previous && sameTarget(previous.target, period.target)) continue;
+    merged.push(period);
+  }
+  const periods: TargetPeriod[] = [];
+  merged.forEach((period, i) => {
+    const next = merged[i + 1];
+    periods.push({ from: period.from, to: next ? shiftLocalDate(next.from, -1) : null, target: period.target });
+  });
+  return periods.reverse();
 }

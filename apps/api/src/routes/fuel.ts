@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 import type {
   AddFuelEntryBody,
+  Expenditure,
   FuelDay,
   FuelEntry,
   FuelHistory,
@@ -11,12 +12,13 @@ import type {
   TargetPeriod,
   UpdateFuelEntryBody,
 } from "@afya/shared";
-import { localDate, nextLocalDate, parseLocalDate, startOfDaysAgo, startOfLocalDate } from "../day";
+import { localDate, shiftLocalDate, parseLocalDate, startOfDaysAgo, startOfLocalDate } from "../day";
 import { db } from "../db";
-import { fuelEntry, fuelItem, nutritionTarget } from "../db/schema/tracker";
+import { bodyMetric, fuelEntry, fuelItem, nutritionTarget } from "../db/schema/tracker";
 import { isFuelDate, readLoggedAt } from "../fuel-window";
 import { optionalGrams, quickAddsFor } from "../fuel-queries";
 import { targetInForce, targetPeriods } from "../fuel-targets";
+import { estimateExpenditure, EXPENDITURE_WINDOW_DAYS } from "../expenditure";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
 
 const app = new Hono<AuthedEnv>();
@@ -71,7 +73,7 @@ app.get("/day/:date", async (c) => {
       and(
         eq(fuelEntry.userId, userId),
         gte(fuelEntry.loggedAt, startOfLocalDate(date, zone)),
-        lt(fuelEntry.loggedAt, startOfLocalDate(nextLocalDate(date), zone)),
+        lt(fuelEntry.loggedAt, startOfLocalDate(shiftLocalDate(date, 1), zone)),
       ),
     )
     .orderBy(asc(fuelEntry.loggedAt));
@@ -195,6 +197,56 @@ app.put("/target", async (c) => {
   return c.json(target);
 });
 
+/**
+ * Estimated expenditure over the 28 complete days before today, from logged intake and the
+ * weight trend. Read-only: it proposes, and only a PUT to /target — the user's tap — changes anything.
+ */
+app.get("/expenditure", async (c) => {
+  const userId = c.get("userId");
+  const zone = c.get("timeZone");
+  const today = localDate(new Date(), zone);
+  const start = startOfLocalDate(shiftLocalDate(today, -EXPENDITURE_WINDOW_DAYS), zone);
+  const end = startOfLocalDate(today, zone);
+
+  const entries = await db
+    .select({ calories: fuelEntry.calories, loggedAt: fuelEntry.loggedAt })
+    .from(fuelEntry)
+    .where(and(eq(fuelEntry.userId, userId), gte(fuelEntry.loggedAt, start), lt(fuelEntry.loggedAt, end)));
+  const weights = await db
+    .select({ value: bodyMetric.value, measuredAt: bodyMetric.measuredAt })
+    .from(bodyMetric)
+    .where(
+      and(
+        eq(bodyMetric.userId, userId),
+        eq(bodyMetric.kind, "weight"),
+        gte(bodyMetric.measuredAt, start),
+        lt(bodyMetric.measuredAt, end),
+      ),
+    );
+
+  const intakeByDay = new Map<string, number>();
+  for (const e of entries) {
+    const day = localDate(e.loggedAt, zone);
+    intakeByDay.set(day, (intakeByDay.get(day) ?? 0) + e.calories);
+  }
+  // Two weigh-ins on one day are one reading of that day, not two points on the trend.
+  const weightsByDay = new Map<string, number[]>();
+  for (const w of weights) {
+    const day = localDate(w.measuredAt, zone);
+    weightsByDay.set(day, [...(weightsByDay.get(day) ?? []), w.value]);
+  }
+
+  return c.json(
+    estimateExpenditure({
+      intake: [...intakeByDay].map(([date, calories]) => ({ date, calories })),
+      weighIns: [...weightsByDay].map(([date, values]) => ({
+        date,
+        weight: values.reduce((sum, v) => sum + v, 0) / values.length,
+      })),
+    }) satisfies Expenditure,
+  );
+});
+
 /** Every target the user has had, as periods newest first. Nothing is ever overwritten, so this is complete. */
 app.get("/targets", async (c) => {
   const rows = await db
@@ -254,7 +306,7 @@ app.get("/history", async (c) => {
       date,
       ...day,
       // Before the first target was ever set, the default was what the day was measured against.
-      target: targetInForce(targets, startOfLocalDate(nextLocalDate(date), zone), DEFAULT_TARGET),
+      target: targetInForce(targets, startOfLocalDate(shiftLocalDate(date, 1), zone), DEFAULT_TARGET),
     })),
   } satisfies FuelHistory);
 });

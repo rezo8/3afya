@@ -370,6 +370,29 @@ export interface NutritionTarget {
   fatG: number | null;
 }
 
+/** Energy stored in a pound of body mass, the usual working figure. Body weight is logged in lb. */
+export const ENERGY_PER_LB = 3500;
+
+/**
+ * Energy expenditure estimated from what the user ate and what their weight did, never from
+ * a formula of age and height. An estimate is only offered once there is enough of both to
+ * mean something; until then, the reasons say what is missing.
+ */
+export type Expenditure =
+  | { state: "insufficient"; reasons: string[]; loggedDays: number; weighIns: number; windowDays: number }
+  | {
+      state: "estimate";
+      kcalPerDay: number;
+      confidence: "low" | "moderate" | "good";
+      /** Average calories over the days that were logged. */
+      intakePerDay: number;
+      /** Weight trend over the window, in lb per week. */
+      trendLbPerWeek: number;
+      loggedDays: number;
+      weighIns: number;
+      windowDays: number;
+    };
+
 /** A stretch of days one target applied to. `to` is null for the target in force now. */
 export interface TargetPeriod {
   from: string;
