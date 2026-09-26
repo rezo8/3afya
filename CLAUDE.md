@@ -212,6 +212,12 @@ records what is specific to 3afya.
 - **`isExerciseDone` is the single source of truth**: Shared by `SessionScreen` and `StartScreen`. Don't re-inline it — the point is the two screens can't disagree.
 - **Client-side rotation advance**: `StartScreen` owns moving "NEXT UP" past a finished day because the API keeps returning today's day. If rotation ever advances server-side, delete the client rule.
 - **Fuel target invalidation**: Target editing must invalidate both `["fuel","today"]` and `["fuel","history"]` — TrendsScreen scores against `FuelHistory.target`.
+- **Correcting a fuel entry is `PATCH /api/fuel/:id`** (T-046). It replaces label and numbers and
+  keeps `loggedAt`, since the food was eaten when it was logged. POST and PATCH validate through one
+  `readFuelFields`. In `FuelPanel` a row's label is the edit target, and the form reuses `FoodFields`
+  with "Log something else". A stored 0 reopens **blank**, because a food may declare only one number.
+  The update's `onSuccess` **awaits** the refetch before closing the form. Closing first flashed the
+  row's old numbers for a round trip after "Save", and the browser check caught it.
 - **Day letters**: Use index in `program.days` (`String.fromCharCode(65 + i)`), never `programDay.position` (not re-packed on delete).
 - **Armed confirm pattern**: two taps within `DELETE_ARM_MS` (4s), via `useArmedConfirm` in
   `lib/use-armed-confirm.ts` — one armed target at a time, self-disarming. Used for delete day,

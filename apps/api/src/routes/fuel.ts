@@ -8,6 +8,7 @@ import type {
   FuelEntry,
   FuelHistory,
   NutritionTarget,
+  UpdateFuelEntryBody,
 } from "@afya/shared";
 import { localDate, startOfDay, startOfDaysAgo } from "../day";
 import { db } from "../db";
@@ -85,20 +86,37 @@ app.get("/today", async (c) => {
   } satisfies FuelDay);
 });
 
-app.post("/", async (c) => {
-  const body = await c.req.json<AddFuelEntryBody>().catch(() => null);
+/** The editable fields of an entry, read the same way whether it is being logged or corrected. */
+function readFuelFields(body: AddFuelEntryBody | null) {
   const label = body?.label?.trim();
-  if (!label) return c.json({ error: "bad_request", message: "A label is required." }, 400);
+  if (!label) return null;
+  return {
+    label,
+    proteinG: Math.max(0, body?.proteinG ?? 0),
+    calories: Math.max(0, Math.round(body?.calories ?? 0)),
+  };
+}
+
+app.post("/", async (c) => {
+  const fields = readFuelFields(await c.req.json<AddFuelEntryBody>().catch(() => null));
+  if (!fields) return c.json({ error: "bad_request", message: "A label is required." }, 400);
   const [row] = await db
     .insert(fuelEntry)
-    .values({
-      userId: c.get("userId"),
-      label,
-      proteinG: Math.max(0, body?.proteinG ?? 0),
-      calories: Math.max(0, Math.round(body?.calories ?? 0)),
-    })
+    .values({ userId: c.get("userId"), ...fields })
     .returning();
   return c.json(toEntry(row!), 201);
+});
+
+app.patch("/:id", async (c) => {
+  const fields = readFuelFields(await c.req.json<UpdateFuelEntryBody>().catch(() => null));
+  if (!fields) return c.json({ error: "bad_request", message: "A label is required." }, 400);
+  const [row] = await db
+    .update(fuelEntry)
+    .set(fields)
+    .where(and(eq(fuelEntry.id, c.req.param("id")), eq(fuelEntry.userId, c.get("userId"))))
+    .returning();
+  if (!row) return c.json({ error: "not_found" }, 404);
+  return c.json(toEntry(row));
 });
 
 app.delete("/:id", async (c) => {

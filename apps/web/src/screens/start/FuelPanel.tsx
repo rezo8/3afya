@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AddFuelEntryBody, FuelDay, FuelEntry, NutritionTarget } from "@afya/shared";
+import type { AddFuelEntryBody, FuelDay, FuelEntry, NutritionTarget, UpdateFuelEntryBody } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import { amountValue, bumpAmount, canLogAmounts, fuelMacroSummary, isUsableTarget, readAmount, type AmountDraft } from "@/lib/fuel";
@@ -18,6 +18,10 @@ const CALORIE_STEP = 50;
 const COLLAPSED_ENTRIES = 3;
 
 type TargetDraft = { proteinG: AmountDraft; calories: AmountDraft };
+type EntryDraft = { id: string; label: string; proteinG: AmountDraft; calories: AmountDraft };
+
+/** A zero was a blank when it was logged (a food may declare one number), so it reopens blank. */
+const draftAmount = (value: number): AmountDraft => (value > 0 ? String(value) : "");
 
 const pct = (done: number, goal: number) => (goal > 0 ? Math.min(100, (done / goal) * 100) : 0);
 const timeOfDay = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
@@ -32,6 +36,7 @@ export function FuelPanel() {
   const [customCalories, setCustomCalories] = useState<AmountDraft>("");
   const [targetDraft, setTargetDraft] = useState<TargetDraft | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(false);
+  const [entryDraft, setEntryDraft] = useState<EntryDraft | null>(null);
 
   const invalidateToday = () => qc.invalidateQueries({ queryKey: ["fuel", "today"] });
   const add = useTrackedMutation(errors, {
@@ -40,7 +45,23 @@ export function FuelPanel() {
   });
   const remove = useTrackedMutation(errors, {
     mutationFn: (id: string) => api.delete<{ ok: true }>(`/api/fuel/${id}`),
-    onSuccess: () => invalidateToday(),
+    onSuccess: (_, id) => {
+      setEntryDraft((draft) => (draft?.id === id ? null : draft));
+      invalidateToday();
+    },
+  });
+  const update = useTrackedMutation(errors, {
+    mutationFn: ({ id, ...body }: UpdateFuelEntryBody & { id: string }) => api.patch<FuelEntry>(`/api/fuel/${id}`, body),
+    // Returning the refetch keeps `isPending` true until fresh totals are in, so closing
+    // the form never reveals the row's old numbers for a round trip after "Save".
+    onSuccess: async () => {
+      await Promise.all([
+        invalidateToday(),
+        // A corrected entry changes a past day's total too, which Trends scores.
+        qc.invalidateQueries({ queryKey: ["fuel", "history"] }),
+      ]);
+      setEntryDraft(null);
+    },
   });
   const saveTarget = useTrackedMutation(errors, {
     mutationFn: (target: NutritionTarget) => api.put<NutritionTarget>("/api/fuel/target", target),
@@ -84,6 +105,28 @@ export function FuelPanel() {
     if (!targetDraft || !canSaveTarget || saveTarget.isPending) return;
     saveTarget.mutate({ proteinG: amountValue(targetDraft.proteinG), calories: amountValue(targetDraft.calories) });
   };
+  const canSaveEntry =
+    !!entryDraft &&
+    entryDraft.label.trim() !== "" &&
+    canLogAmounts(readAmount(entryDraft.proteinG), readAmount(entryDraft.calories));
+  const submitEntry = (e: FormEvent) => {
+    e.preventDefault();
+    if (!entryDraft || !canSaveEntry || update.isPending) return;
+    update.mutate({
+      id: entryDraft.id,
+      label: entryDraft.label.trim(),
+      proteinG: amountValue(entryDraft.proteinG),
+      calories: amountValue(entryDraft.calories),
+    });
+  };
+  const openEntryEdit = (entry: FuelEntry) =>
+    setEntryDraft({
+      id: entry.id,
+      label: entry.label,
+      proteinG: draftAmount(entry.proteinG),
+      calories: draftAmount(entry.calories),
+    });
+
   const toggleTargetEdit = () =>
     setTargetDraft((draft) =>
       draft ? null : { proteinG: String(target.proteinG), calories: String(target.calories) },
@@ -172,28 +215,13 @@ export function FuelPanel() {
               Close
             </button>
           </div>
-          <input
-            className="fuel-name"
-            value={customLabel}
-            onChange={(e) => setCustomLabel(e.target.value)}
-            placeholder="What did you eat?"
-            aria-label="Food name"
-          />
-          <NumberField
-            label="Protein"
-            unit="g"
-            value={customProtein}
-            step={PROTEIN_STEP}
-            inputMode="decimal"
-            onChange={setCustomProtein}
-          />
-          <NumberField
-            label="Calories"
-            unit="kcal"
-            value={customCalories}
-            step={CALORIE_STEP}
-            inputMode="numeric"
-            onChange={setCustomCalories}
+          <FoodFields
+            label={customLabel}
+            proteinG={customProtein}
+            calories={customCalories}
+            onLabel={setCustomLabel}
+            onProtein={setCustomProtein}
+            onCalories={setCustomCalories}
           />
           <button type="submit" className="fuel-save" disabled={!canAddCustom || add.isPending}>
             {add.isPending ? "…" : "Add"}
@@ -209,22 +237,47 @@ export function FuelPanel() {
         <div className="fuel-log">
           <p className="eyebrow">Logged today</p>
           <ul>
-            {visibleEntries.map((entry) => (
-              <li key={entry.id} className="fuel-row">
-                <span className="fr-label">{entry.label}</span>
-                <span className="fr-meta">
-                  {timeOfDay(entry.loggedAt)} · {fuelMacroSummary(entry.proteinG, entry.calories)}
-                </span>
-                <button
-                  className="fr-del"
-                  aria-label={`Remove ${entry.label}`}
-                  onClick={() => remove.mutate(entry.id)}
-                  disabled={remove.isPending}
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
+            {visibleEntries.map((entry) =>
+              entryDraft?.id === entry.id ? (
+                <li key={entry.id}>
+                  <form className="fuel-edit" onSubmit={submitEntry} aria-label={`Edit ${entry.label}`}>
+                    <FoodFields
+                      label={entryDraft.label}
+                      proteinG={entryDraft.proteinG}
+                      calories={entryDraft.calories}
+                      onLabel={(label) => setEntryDraft({ ...entryDraft, label })}
+                      onProtein={(proteinG) => setEntryDraft({ ...entryDraft, proteinG })}
+                      onCalories={(calories) => setEntryDraft({ ...entryDraft, calories })}
+                    />
+                    <div className="fuel-edit-actions">
+                      <button type="button" className="fuel-cancel" onClick={() => setEntryDraft(null)}>
+                        Cancel
+                      </button>
+                      <button type="submit" className="fuel-save" disabled={!canSaveEntry || update.isPending}>
+                        {update.isPending ? "…" : "Save"}
+                      </button>
+                    </div>
+                  </form>
+                </li>
+              ) : (
+                <li key={entry.id} className="fuel-row">
+                  <button className="fr-open" aria-label={`Edit ${entry.label}`} onClick={() => openEntryEdit(entry)}>
+                    <span className="fr-label">{entry.label}</span>
+                    <span className="fr-meta">
+                      {timeOfDay(entry.loggedAt)} · {fuelMacroSummary(entry.proteinG, entry.calories)}
+                    </span>
+                  </button>
+                  <button
+                    className="fr-del"
+                    aria-label={`Remove ${entry.label}`}
+                    onClick={() => remove.mutate(entry.id)}
+                    disabled={remove.isPending}
+                  >
+                    ✕
+                  </button>
+                </li>
+              ),
+            )}
           </ul>
           {hiddenEntries > 0 && (
             <button className="fuel-more" aria-expanded={showAllEntries} onClick={() => setShowAllEntries((v) => !v)}>
@@ -234,6 +287,37 @@ export function FuelPanel() {
         </div>
       )}
     </section>
+  );
+}
+
+/** A food's name and numbers: the same three fields whether it is being logged or corrected. */
+function FoodFields({
+  label,
+  proteinG,
+  calories,
+  onLabel,
+  onProtein,
+  onCalories,
+}: {
+  label: string;
+  proteinG: AmountDraft;
+  calories: AmountDraft;
+  onLabel: (next: string) => void;
+  onProtein: (next: AmountDraft) => void;
+  onCalories: (next: AmountDraft) => void;
+}) {
+  return (
+    <>
+      <input
+        className="fuel-name"
+        value={label}
+        onChange={(e) => onLabel(e.target.value)}
+        placeholder="What did you eat?"
+        aria-label="Food name"
+      />
+      <NumberField label="Protein" unit="g" value={proteinG} step={PROTEIN_STEP} inputMode="decimal" onChange={onProtein} />
+      <NumberField label="Calories" unit="kcal" value={calories} step={CALORIE_STEP} inputMode="numeric" onChange={onCalories} />
+    </>
   );
 }
 

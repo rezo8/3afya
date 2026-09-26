@@ -392,6 +392,8 @@ export interface AddFuelEntryBody {
   proteinG: number;
   calories: number;
 }
+/** Correcting an entry replaces its label and numbers. Its `loggedAt` is kept: it was eaten then. */
+export type UpdateFuelEntryBody = AddFuelEntryBody;
 
 // ---------------------------------------------------------------------------
 // Body metrics + trends
