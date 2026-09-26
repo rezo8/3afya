@@ -1,7 +1,10 @@
 import { BarChart } from "@/components/charts/BarChart";
 import type { LocalDate } from "@/lib/fuel-date";
 import { summarizeWeek, type WeekSummary } from "@/lib/fuel-week";
+import { useMutationError } from "@/lib/query/use-mutation-error";
+import { ErrorBanner } from "@/components/ErrorBanner";
 import { useFuelWeek } from "./fuel-day";
+import { FuelTargets } from "./FuelTargets";
 
 const WEEKDAY = ["S", "M", "T", "W", "T", "F", "S"];
 const weekdayLetter = (date: LocalDate) => WEEKDAY[new Date(`${date}T12:00:00Z`).getUTCDay()] ?? "";
@@ -15,6 +18,7 @@ const listOf = (names: string[]) =>
 /** The last seven days scored as a week: an average against the targets those days had. */
 export function FuelWeek({ today }: { today: LocalDate }) {
   const { data } = useFuelWeek();
+  const errors = useMutationError();
   if (!data) return null;
   const summary = summarizeWeek(data.days, today);
   const unlogged = data.days.filter((d) => d.entryCount === 0 && d.date !== today);
@@ -44,13 +48,22 @@ export function FuelWeek({ today }: { today: LocalDate }) {
       />
 
       <p className="fuel-week-note">
-        <b>
-          {summary.daysLogged} of {summary.daysInWindow} days logged.
-        </b>{" "}
-        {unlogged.length > 0 &&
-          `${listOf(unlogged.map((d) => weekdayName(d.date)))} ${unlogged.length === 1 ? "has" : "have"} no entries, so ${unlogged.length === 1 ? "it is" : "they are"} left out rather than counted as a fast. `}
-        Today counts once it is over.
+        {summary.daysLogged === 0 ? (
+          <b>Nothing logged in the last {summary.daysInWindow} days.</b>
+        ) : (
+          <>
+            <b>
+              {summary.daysLogged} of {summary.daysInWindow} days logged.
+            </b>{" "}
+            {unlogged.length > 0 &&
+              `${listOf(unlogged.map((d) => weekdayName(d.date)))} ${unlogged.length === 1 ? "has" : "have"} no entries, so ${unlogged.length === 1 ? "it is" : "they are"} left out rather than counted as a fast. `}
+            Today counts once it is over.
+          </>
+        )}
       </p>
+
+      {errors.failure && <ErrorBanner message={errors.failure.message} onRetry={errors.failure.retry} />}
+      <FuelTargets target={data.target} errors={errors} />
     </section>
   );
 }

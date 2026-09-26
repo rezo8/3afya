@@ -6,6 +6,9 @@ import {
   canLogAmounts,
   canLogFood,
   canSaveItem,
+  canSaveTargets,
+  targetBody,
+  targetDraftFrom,
   EMPTY_ITEM_DRAFT,
   itemBody,
   servingOf,
@@ -326,5 +329,29 @@ describe("stepPortion", () => {
 
   it("snaps an off-grid portion back onto quarters", () => {
     expect(stepPortion(1.1, 1)).toBe(1.25);
+  });
+});
+
+describe("targets", () => {
+  const current = { proteinG: 185, calories: 2850, carbsG: 300, fatG: null };
+
+  it("reopens a macro with no target as blank", () => {
+    expect(targetDraftFrom(current)).toEqual({ proteinG: "185", calories: "2850", carbsG: "300", fatG: "" });
+  });
+
+  it("round-trips a target through the form unchanged", () => {
+    expect(targetBody(targetDraftFrom(current))).toEqual(current);
+  });
+
+  it("saves with carbs or fat left blank, which means no target", () => {
+    expect(canSaveTargets({ proteinG: "185", calories: "2850", carbsG: "", fatG: "" })).toBe(true);
+  });
+
+  it("refuses a zero target for carbs or fat, the same as for protein", () => {
+    expect(canSaveTargets({ proteinG: "185", calories: "2850", carbsG: "0", fatG: "" })).toBe(false);
+  });
+
+  it("refuses a blank protein or calorie target", () => {
+    expect(canSaveTargets({ proteinG: "", calories: "2850", carbsG: "", fatG: "" })).toBe(false);
   });
 });

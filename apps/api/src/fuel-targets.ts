@@ -1,4 +1,5 @@
-import type { NutritionTarget } from "@afya/shared";
+import type { NutritionTarget, TargetPeriod } from "@afya/shared";
+import { localDate } from "./day";
 
 /** A target as stored: append-only, so each row says when it started applying. */
 export type TargetRow = NutritionTarget & { createdAt: Date };
@@ -15,4 +16,32 @@ export function targetInForce(rows: TargetRow[], dayEnd: Date, fallback: Nutriti
   }
   if (!inForce) return fallback;
   return { proteinG: inForce.proteinG, calories: inForce.calories, carbsG: inForce.carbsG, fatG: inForce.fatG };
+}
+
+const sameTarget = (a: NutritionTarget, b: NutritionTarget) =>
+  a.proteinG === b.proteinG && a.calories === b.calories && a.carbsG === b.carbsG && a.fatG === b.fatG;
+
+const dayBefore = (date: string) => {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+};
+
+/**
+ * The append-only target log read as periods, newest first: "Sep 3 → now". Several edits
+ * on one day collapse into the last of them, since a day is judged against the target it
+ * ended with (`targetInForce`). A save that changed nothing merges into the period before it.
+ */
+export function targetPeriods(rows: TargetRow[], zone: string): TargetPeriod[] {
+  const byDay: { from: string; target: NutritionTarget }[] = [];
+  for (const row of [...rows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
+    const from = localDate(row.createdAt, zone);
+    const target = { proteinG: row.proteinG, calories: row.calories, carbsG: row.carbsG, fatG: row.fatG };
+    const last = byDay.at(-1);
+    if (last && last.from === from) last.target = target;
+    else byDay.push({ from, target });
+  }
+  const merged = byDay.filter((p, i) => i === 0 || !sameTarget(p.target, byDay[i - 1]!.target));
+  return merged
+    .map((p, i) => ({ from: p.from, to: merged[i + 1] ? dayBefore(merged[i + 1]!.from) : null, target: p.target }))
+    .reverse();
 }

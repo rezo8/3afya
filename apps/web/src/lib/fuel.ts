@@ -1,4 +1,12 @@
-import type { AddFuelEntryBody, FuelEntry, FuelItem, FuelMacros, OptionalGrams, SaveFuelItemBody } from "@afya/shared";
+import type {
+  AddFuelEntryBody,
+  FuelEntry,
+  FuelItem,
+  FuelMacros,
+  NutritionTarget,
+  OptionalGrams,
+  SaveFuelItemBody,
+} from "@afya/shared";
 
 /** What the user has typed into a protein or calorie field, before it means anything. */
 export type AmountDraft = string;
@@ -176,3 +184,35 @@ export function stepPortion(portion: number, direction: 1 | -1): number {
   const next = Math.round((portion + direction * PORTION_STEP) / PORTION_STEP) * PORTION_STEP;
   return Math.min(MAX_PORTION, Math.max(MIN_PORTION, next));
 }
+
+/** The four targets as typed. A blank carbs or fat means no target; protein and calories are always aimed at. */
+export interface TargetDraft {
+  proteinG: AmountDraft;
+  calories: AmountDraft;
+  carbsG: AmountDraft;
+  fatG: AmountDraft;
+}
+
+export const targetDraftFrom = (target: NutritionTarget): TargetDraft => ({
+  proteinG: String(target.proteinG),
+  calories: String(target.calories),
+  carbsG: target.carbsG === null ? "" : String(target.carbsG),
+  fatG: target.fatG === null ? "" : String(target.fatG),
+});
+
+/** An optional target is either not set (blank) or a real one — a target of zero is still a mistake. */
+const isUsableOptionalTarget = (draft: AmountDraft) => readAmount(draft).state === "blank" || isUsableTarget(draft);
+
+export const canSaveTargets = (draft: TargetDraft): boolean =>
+  isUsableTarget(draft.proteinG) &&
+  isUsableTarget(draft.calories) &&
+  isUsableOptionalTarget(draft.carbsG) &&
+  isUsableOptionalTarget(draft.fatG);
+
+/** All four fields, always: a PUT that omitted carbs or fat would clear that target. */
+export const targetBody = (draft: TargetDraft): NutritionTarget => ({
+  proteinG: amountValue(draft.proteinG),
+  calories: amountValue(draft.calories),
+  carbsG: optionalAmountValue(draft.carbsG),
+  fatG: optionalAmountValue(draft.fatG),
+});

@@ -8,6 +8,7 @@ import type {
   NutritionTarget,
   OptionalGrams,
   PartialTotal,
+  TargetPeriod,
   UpdateFuelEntryBody,
 } from "@afya/shared";
 import { localDate, nextLocalDate, parseLocalDate, startOfDaysAgo, startOfLocalDate } from "../day";
@@ -15,7 +16,7 @@ import { db } from "../db";
 import { fuelEntry, fuelItem, nutritionTarget } from "../db/schema/tracker";
 import { isFuelDate, readLoggedAt } from "../fuel-window";
 import { optionalGrams, quickAddsFor } from "../fuel-queries";
-import { targetInForce } from "../fuel-targets";
+import { targetInForce, targetPeriods } from "../fuel-targets";
 import { requireAuth, type AuthedEnv } from "../middleware/require-auth";
 
 const app = new Hono<AuthedEnv>();
@@ -192,6 +193,21 @@ app.put("/target", async (c) => {
   // each past day was actually judged against stays on record.
   await db.insert(nutritionTarget).values({ userId: c.get("userId"), ...target });
   return c.json(target);
+});
+
+/** Every target the user has had, as periods newest first. Nothing is ever overwritten, so this is complete. */
+app.get("/targets", async (c) => {
+  const rows = await db
+    .select({
+      proteinG: nutritionTarget.proteinG,
+      calories: nutritionTarget.calories,
+      carbsG: nutritionTarget.carbsG,
+      fatG: nutritionTarget.fatG,
+      createdAt: nutritionTarget.createdAt,
+    })
+    .from(nutritionTarget)
+    .where(eq(nutritionTarget.userId, c.get("userId")));
+  return c.json(targetPeriods(rows, c.get("timeZone")) satisfies TargetPeriod[]);
 });
 
 /** Daily protein/calorie totals over the last N days — powers the adherence chart. */

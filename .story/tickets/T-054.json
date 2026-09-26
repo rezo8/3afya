@@ -2,14 +2,14 @@
   "blockedBy": [
     "T-052"
   ],
-  "completedDate": null,
+  "completedDate": "2026-09-26",
   "createdDate": "2026-09-26",
   "description": "Targets are edited through a small inline form behind the 14px \"targets · today\" text button (FuelPanel.tsx:96-98, 103-130), and only for protein and calories. PUT /api/fuel/target appends a row (fuel.ts, \"Append-only\"), so every past target is already on record, but nothing ever shows it.\n\n- A Targets section on the Fuel Week view: four tiles. Carbs and fat can be set to \"No target\", which sends null (T-052). The edit control is a 44px target, not the 14px text button.\n- GET /api/fuel/targets returns the append-only rows collapsed into ranges (\"Sep 3 → now · 2,850 kcal · 185 g\"). The page lists them under the tiles and says each past day is scored against the target it had, which is already true of GET /history.\n- Saving still invalidates [\"fuel\",\"today\"] and [\"fuel\",\"history\"] (CLAUDE.md \"Fuel target invalidation\").\n\nMockup (deleted; this text is the spec) (Week, Targets).",
   "displayId": "T-054",
   "id": "T-054",
   "order": 80,
   "phase": "fuel",
-  "status": "open",
+  "status": "complete",
   "title": "Edit all four targets, with \"no target\" for carbs and fat, and show target history",
   "type": "task"
 }

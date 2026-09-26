@@ -370,6 +370,13 @@ export interface NutritionTarget {
   fatG: number | null;
 }
 
+/** A stretch of days one target applied to. `to` is null for the target in force now. */
+export interface TargetPeriod {
+  from: string;
+  to: string | null;
+  target: NutritionTarget;
+}
+
 /**
  * A label the user logs often, with the portion from their most recent entry for
  * it. Derived from their own entries only — this is not a food catalog.

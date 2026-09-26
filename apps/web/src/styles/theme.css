@@ -1006,18 +1006,6 @@ body {
   font-size: 11px;
   color: var(--text-soft);
 }
-.fuel-target-open {
-  appearance: none;
-  border: none;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  text-decoration: underline dotted;
-  text-underline-offset: 3px;
-}
-.fuel-target-open:hover {
-  color: var(--accent);
-}
 .eating .error-banner {
   margin-bottom: 16px;
 }
@@ -1410,6 +1398,69 @@ body {
   color: var(--text-soft);
 }
 .fuel-week-note b {
+  color: var(--text);
+}
+.fuel-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.targets-edit {
+  appearance: none;
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.target-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.target-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+.target-tile.unset {
+  border-style: dashed;
+  border-color: var(--line-hi);
+}
+.target-tile-name {
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.target-tile b {
+  font-size: 17px;
+}
+.target-tile.protein b {
+  color: var(--good);
+}
+.target-tile.unset b {
+  color: var(--text-soft);
+}
+.target-history ul {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-soft);
+}
+.target-history li.current {
   color: var(--text);
 }
 .fuel-foods-link {
