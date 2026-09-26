@@ -130,3 +130,21 @@ export function foodDraftFrom(entry: FuelEntry): FoodDraft {
     fatG: optional(entry.fatG),
   };
 }
+
+/** The portions a just-logged quick-add can be corrected to. */
+export const PORTIONS = [0.5, 1, 1.5, 2] as const;
+export type Portion = (typeof PORTIONS)[number];
+
+/**
+ * A food's numbers at a portion of it. Carbs and fat that were not given stay not given:
+ * half of "unknown" is still unknown, not zero. Calories stay whole, as the API stores them.
+ */
+export function scaleFood(food: FuelMacros, portion: number): FuelMacros {
+  const grams = (value: number) => Math.round(value * portion * 10) / 10;
+  return {
+    proteinG: grams(food.proteinG),
+    calories: Math.round(food.calories * portion),
+    carbsG: food.carbsG === null ? null : grams(food.carbsG),
+    fatG: food.fatG === null ? null : grams(food.fatG),
+  };
+}

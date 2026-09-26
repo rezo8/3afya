@@ -355,6 +355,8 @@ export interface FuelMacros {
 export interface FuelEntry extends FuelMacros {
   id: string;
   label: string;
+  /** Servings of a quick-add this entry is (0.5, 2); null for anything typed by hand. */
+  portion: number | null;
   loggedAt: string;
 }
 
@@ -414,6 +416,12 @@ export const FUEL_BACKDATE_DAYS = 30;
 
 export interface AddFuelEntryBody extends FuelMacros {
   label: string;
+  /**
+   * Servings of a quick-add, when the numbers are that many of one serving. Omit for a
+   * hand-typed entry. On PATCH, omitting it clears it: numbers typed over a portion are no
+   * longer a multiple of anything.
+   */
+  portion?: number | null;
   /** When it was eaten, ISO 8601. Omit for now. No later than now, no earlier than FUEL_BACKDATE_DAYS back. */
   loggedAt?: string;
 }

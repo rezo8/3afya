@@ -167,6 +167,13 @@ records what is specific to 3afya.
   Nutrition-target carbs/fat null means **no target**. A macro with no target draws no bar. Anything that
   PUTs a target must send all four fields, because a missing one is read as null and would clear it.
   Only protein or calories can make an entry loggable (`canLogFood`); carbs and fat never gate it.
+- **Quick-add portions are corrected after the tap, not chosen before it** (T-045, `screens/fuel/QuickAdd.tsx`).
+  A chip logs ×1 at once, then a "Logged …" row offers ×0.5 ×1 ×1.5 ×2 and Undo for 6 s. A correction scales
+  the **chip's food**, not the entry, so ×2 then ×0.5 is half a serving, and PATCHes `portion` alongside the numbers.
+  The label never gains "×2", because the frequent list groups by label. `fuel_entry.portion` (nullable, null =
+  typed by hand) is what keeps a corrected entry from redefining the chip: `frequentFor` divides the newest
+  entry's numbers by it. A hand edit PATCHes without `portion`, which clears it, since typed-over numbers
+  are no longer a multiple of a serving. Both surfaces use `QuickAdd`; don't reintroduce a bare chip row.
 - **Frequent fuel labels**: Derived from user's own entries only — exact match on `lower(trim(label))`, no food catalog, no fuzzy matching.
 
 ## Critical Web Implementation Rules

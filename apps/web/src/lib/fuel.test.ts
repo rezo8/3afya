@@ -13,6 +13,7 @@ import {
   isUsableTarget,
   optionalAmountValue,
   readAmount,
+  scaleFood,
 } from "./fuel";
 
 describe("readAmount", () => {
@@ -214,6 +215,7 @@ describe("foodDraftFrom", () => {
     calories: 120,
     carbsG: 0,
     fatG: 14,
+    portion: null,
     loggedAt: "2026-09-26T12:00:00.000Z",
     ...fields,
   });
@@ -240,5 +242,23 @@ describe("foodDraftFrom", () => {
       carbsG: original.carbsG,
       fatG: original.fatG,
     });
+  });
+});
+
+describe("scaleFood", () => {
+  it("doubles every number for a double portion", () => {
+    expect(scaleFood(food(62, 700, 80, 14), 2)).toEqual(food(124, 1400, 160, 28));
+  });
+
+  it("keeps carbs and fat that were not given as not given", () => {
+    expect(scaleFood(food(30, 200), 1.5)).toEqual(food(45, 300, null, null));
+  });
+
+  it("rounds grams to a tenth and calories to a whole number", () => {
+    expect(scaleFood(food(24.3, 155, 6.7, 2.1), 0.5)).toEqual(food(12.2, 78, 3.4, 1.1));
+  });
+
+  it("is the food itself at one portion", () => {
+    expect(scaleFood(food(42, 560, 58, 18), 1)).toEqual(food(42, 560, 58, 18));
   });
 });

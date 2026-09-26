@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { FrequentFuel, FuelEntry, NutritionTarget, UpdateFuelEntryBody } from "@afya/shared";
+import type { FuelEntry, NutritionTarget, UpdateFuelEntryBody } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import {
@@ -16,7 +16,8 @@ import {
   type FoodDraft,
 } from "@/lib/fuel";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
-import { CarbsAndFat, FuelMeters, QuickAddChips } from "./FuelMeters";
+import { CarbsAndFat, FuelMeters } from "./FuelMeters";
+import { QuickAdd } from "./QuickAdd";
 import {
   earliestFuelDate,
   fromDateTimeLocal,
@@ -113,7 +114,6 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
   };
   const openEntryEdit = (entry: FuelEntry) =>
     setEntryDraft({ id: entry.id, ...foodDraftFrom(entry), when: toDateTimeLocal(entry.loggedAt) });
-  const logQuickAdd = (food: FrequentFuel) => add.mutate({ ...food, loggedAt: loggedAtFor(date, new Date()) });
 
   const toggleTargetEdit = () =>
     setTargetDraft((draft) =>
@@ -163,7 +163,7 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
       <FuelMeters day={data} />
       <CarbsAndFat day={data} />
 
-      <QuickAddChips foods={quickAddsFor(data)} onAdd={logQuickAdd} disabled={add.isPending} />
+      <QuickAdd foods={quickAddsFor(data)} date={date} errors={errors} />
 
       {showCustom ? (
         <form className="fuel-custom" onSubmit={submitCustom}>
@@ -218,7 +218,8 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
                   <button className="fr-open" aria-label={`Edit ${entry.label}`} onClick={() => openEntryEdit(entry)}>
                     <span className="fr-label">{entry.label}</span>
                     <span className="fr-meta">
-                      {timeOfDay(entry.loggedAt)} · {fuelMacroSummary(entry)}
+                      {timeOfDay(entry.loggedAt)} · {entry.portion !== null && entry.portion !== 1 && `×${entry.portion} · `}
+                      {fuelMacroSummary(entry)}
                     </span>
                   </button>
                   <button

@@ -1,0 +1,1 @@
+ALTER TABLE "fuel_entry" ADD COLUMN "portion" real;

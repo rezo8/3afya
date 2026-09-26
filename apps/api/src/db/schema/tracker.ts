@@ -207,6 +207,9 @@ export const fuelEntry = pgTable(
     // calories predate the distinction and store a blank as 0.
     carbsG: real("carbs_g"),
     fatG: real("fat_g"),
+    // How many servings of a quick-add this entry is (0.5, 2). Null for anything typed by
+    // hand. The frequent list divides by it, so halving one entry doesn't halve the chip.
+    portion: real("portion"),
     loggedAt: timestamp("logged_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("fuel_entry_user_logged_idx").on(t.userId, t.loggedAt)],

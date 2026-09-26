@@ -1,5 +1,4 @@
-import type { FrequentFuel, FuelDay, PartialTotal } from "@afya/shared";
-import { fuelMacroSummary } from "@/lib/fuel";
+import type { FuelDay, PartialTotal } from "@afya/shared";
 
 const pct = (done: number, goal: number) => (goal > 0 ? Math.min(100, (done / goal) * 100) : 0);
 
@@ -95,27 +94,6 @@ function MinorMacro({
         </div>
       )}
       <p className="mnote">{note}</p>
-    </div>
-  );
-}
-
-/** One tap logs one serving. Each chip states what it adds, so a tap never moves a total unseen (ISS-010). */
-export function QuickAddChips({
-  foods,
-  onAdd,
-  disabled,
-}: {
-  foods: FrequentFuel[];
-  onAdd: (food: FrequentFuel) => void;
-  disabled: boolean;
-}) {
-  return (
-    <div className="quickadd">
-      {foods.map((food) => (
-        <button key={food.label} className="chip" onClick={() => onAdd(food)} disabled={disabled}>
-          + {food.label} {fuelMacroSummary(food)}
-        </button>
-      ))}
     </div>
   );
 }

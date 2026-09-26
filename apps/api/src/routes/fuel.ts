@@ -31,6 +31,7 @@ const toEntry = (r: typeof fuelEntry.$inferSelect): FuelEntry => ({
   calories: r.calories,
   carbsG: r.carbsG,
   fatG: r.fatG,
+  portion: r.portion,
   loggedAt: r.loggedAt.toISOString(),
 });
 
@@ -50,9 +51,13 @@ async function targetFor(userId: string): Promise<NutritionTarget> {
   return current ?? DEFAULT_TARGET;
 }
 
-/** The column's value from the group's newest entry — a fresh portion beats an average of stale ones. */
-const newestInGroup = <T>(column: PgColumn) =>
-  sql<T>`(array_agg(${column} order by ${fuelEntry.loggedAt} desc))[1]`;
+/**
+ * One serving's worth of a column, from the group's newest entry — a fresh portion beats an
+ * average of stale ones. Divided by the entry's portion, so logging a quick-add at ×0.5 or ×2
+ * doesn't turn the chip into half or double a serving next time.
+ */
+const newestServing = <T>(column: PgColumn) =>
+  sql<T>`(array_agg(${column} / coalesce(${fuelEntry.portion}, 1) order by ${fuelEntry.loggedAt} desc))[1]`;
 
 /**
  * The labels this user logs most often, for one-tap re-adding. Derived strictly
@@ -62,11 +67,12 @@ const newestInGroup = <T>(column: PgColumn) =>
 async function frequentFor(userId: string): Promise<FrequentFuel[]> {
   return db
     .select({
-      label: newestInGroup<string>(fuelEntry.label),
-      proteinG: newestInGroup<number>(fuelEntry.proteinG),
-      calories: newestInGroup<number>(fuelEntry.calories),
-      carbsG: newestInGroup<OptionalGrams>(fuelEntry.carbsG),
-      fatG: newestInGroup<OptionalGrams>(fuelEntry.fatG),
+      label: sql<string>`(array_agg(${fuelEntry.label} order by ${fuelEntry.loggedAt} desc))[1]`,
+      proteinG: newestServing<number>(fuelEntry.proteinG),
+      // Calories are whole numbers everywhere else; a divided serving is rounded back to one.
+      calories: sql<number>`round((array_agg(${fuelEntry.calories} / coalesce(${fuelEntry.portion}, 1) order by ${fuelEntry.loggedAt} desc))[1])::int`,
+      carbsG: newestServing<OptionalGrams>(fuelEntry.carbsG),
+      fatG: newestServing<OptionalGrams>(fuelEntry.fatG),
     })
     .from(fuelEntry)
     .where(eq(fuelEntry.userId, userId))
@@ -123,6 +129,11 @@ const partialTotal = (values: OptionalGrams[]): PartialTotal => ({
 const optionalGrams = (value: unknown): OptionalGrams =>
   typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : null;
 
+/** Servings of a quick-add. Anything else — zero, negative, absurd — is not a portion of anything. */
+const MAX_PORTION = 20;
+const readPortion = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 && value <= MAX_PORTION ? value : null;
+
 /** The editable fields of an entry, read the same way whether it is being logged or corrected. */
 function readFuelFields(body: AddFuelEntryBody | null) {
   const label = body?.label?.trim();
@@ -133,6 +144,7 @@ function readFuelFields(body: AddFuelEntryBody | null) {
     calories: Math.max(0, Math.round(body?.calories ?? 0)),
     carbsG: optionalGrams(body?.carbsG),
     fatG: optionalGrams(body?.fatG),
+    portion: readPortion(body?.portion),
   };
 }
 

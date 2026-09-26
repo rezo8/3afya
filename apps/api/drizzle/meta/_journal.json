@@ -148,6 +148,13 @@
       "when": 1790435076998,
       "tag": "0020_loud_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790435952556,
+      "tag": "0021_handy_skin",
+      "breakpoints": true
     }
   ]
 }

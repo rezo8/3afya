@@ -942,6 +942,64 @@ body {
 .chip:active {
   transform: scale(0.94);
 }
+/* The few seconds after a quick-add: what was logged, a portion to correct it to, and undo. */
+.just-logged {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--r-md);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.jl-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.jl-text b {
+  color: var(--text);
+}
+.jl-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.jl-portions {
+  display: flex;
+  gap: 6px;
+}
+.jl-portion,
+.jl-undo {
+  appearance: none;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-hi);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--mono);
+  font-size: 13px;
+  cursor: pointer;
+}
+.jl-portion.on {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-mute);
+}
+.jl-undo {
+  border-color: transparent;
+  background: none;
+  color: var(--accent);
+}
+.jl-portion:disabled,
+.jl-undo:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .mnote {
   margin: 6px 0 0;
   font-family: var(--mono);
