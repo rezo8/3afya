@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { CatalogExercise, Exercise, ExerciseKind } from "@afya/shared";
 import { TaxonomyTags } from "@/components/TaxonomyTags";
-import { buildPickerOptions, isNewName, matchesQuery, queryTokens, type ExercisePick } from "@/lib/exercise-pick";
+import { buildPickerOptions, isNewName, type ExercisePick } from "@/lib/exercise-pick";
+import { matchesQuery, queryTokens } from "@/lib/search";
 
 /** Long enough to browse, short enough to scan. Past it, the query does the narrowing. */
 const RESULT_LIMIT = 12;

@@ -18,6 +18,7 @@ import {
   optionalAmountValue,
   readAmount,
   scaleFood,
+  stepPortion,
 } from "./fuel";
 
 describe("readAmount", () => {
@@ -306,5 +307,24 @@ describe("servingOf", () => {
 
   it("is the entry itself when it was typed by hand", () => {
     expect(servingOf(entry(null))).toEqual({ proteinG: 124, calories: 1400, carbsG: 160, fatG: null });
+  });
+});
+
+describe("stepPortion", () => {
+  it("moves a quarter at a time", () => {
+    expect(stepPortion(1, 1)).toBe(1.25);
+    expect(stepPortion(1.5, -1)).toBe(1.25);
+  });
+
+  it("never goes below a quarter", () => {
+    expect(stepPortion(0.25, -1)).toBe(0.25);
+  });
+
+  it("stops at the API's ceiling of twenty", () => {
+    expect(stepPortion(20, 1)).toBe(20);
+  });
+
+  it("snaps an off-grid portion back onto quarters", () => {
+    expect(stepPortion(1.1, 1)).toBe(1.25);
   });
 });

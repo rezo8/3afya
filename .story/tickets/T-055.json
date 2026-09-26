@@ -5,14 +5,14 @@
     "T-047",
     "T-052"
   ],
-  "completedDate": null,
+  "completedDate": "2026-09-26",
   "createdDate": "2026-09-26",
   "description": "Logging today has two unconnected paths: fixed-portion chips and the \"Log something else\" form (FuelPanel.tsx:167-206), which takes a label and two numbers and remembers nothing it wasn't told. This ticket is the single entry point the other fuel tickets feed into.\n\n- A bottom sheet opened by \"+ Log food\" on the Fuel page and the Start card. Two tabs:\n  - \"Your foods\": search over saved items (T-050), substring plus token matching like ExercisePicker's matchesQuery, never fuzzy. Pick one, then set the portion with ×0.5 ×1 ×1.5 ×2 chips and a ±0.25 stepper (T-045). A live preview shows all four macros scaled. The CTA says exactly what gets logged (\"Log 1.5 × Chicken breast\"). Creating a food is an explicit last row (\"+ New food \"chick…\"\"), shown only when nothing matches: the same rule that fixed ISS-008 for exercises.\n  - \"Just numbers\": label plus four fields, carbs and fat optional (\"not given\"), and a \"Save as one of my foods\" checkbox.\n- \"When\" row: defaults to now on today, or to the day the Fuel page's stepper is on. Changing it stamps loggedAt (T-047).\n- The entry still stores absolute numbers. Editing a saved food later never rewrites entries already logged (RULES 1).\n- Chips keep one-tap logging at ×1. Holding a chip opens this sheet on that food.\n\nMockup (deleted; this text is the spec) (Log, interactive: pick a food and a portion).",
   "displayId": "T-055",
   "id": "T-055",
   "order": 70,
   "phase": "fuel",
-  "status": "open",
+  "status": "complete",
   "title": "One \"Log food\" sheet: pick a saved food, set a portion and a time, or just type numbers",
   "type": "feature"
 }

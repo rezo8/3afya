@@ -166,3 +166,13 @@ export const itemDraftFrom = (item: FuelItem): ItemDraft => ({ ...foodDraftFrom(
  * quick-add holds two servings; saving it should save one.
  */
 export const servingOf = (entry: FuelEntry): FuelMacros => scaleFood(entry, 1 / (entry.portion ?? 1));
+
+/** A portion typed with the stepper moves in quarters, between a quarter and the API's ceiling. */
+export const PORTION_STEP = 0.25;
+const MIN_PORTION = 0.25;
+const MAX_PORTION = 20;
+
+export function stepPortion(portion: number, direction: 1 | -1): number {
+  const next = Math.round((portion + direction * PORTION_STEP) / PORTION_STEP) * PORTION_STEP;
+  return Math.min(MAX_PORTION, Math.max(MIN_PORTION, next));
+}

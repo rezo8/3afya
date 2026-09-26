@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AddFuelEntryBody, FuelDay, FuelEntry, QuickAddFood } from "@afya/shared";
+import type { AddFuelEntryBody, FuelDay, FuelEntry, FuelItems, QuickAddFood } from "@afya/shared";
 import { api } from "@/lib/api/client";
 import type { LocalDate } from "@/lib/fuel-date";
 import { useTrackedMutation, type MutationErrorSlot } from "@/lib/query/use-mutation-error";
@@ -16,6 +16,11 @@ export const fuelDayKey = (date: LocalDate) => [...FUEL_KEY, "day", date] as con
 /** One day's fuel. The Fuel page and Start's card read the same key for today, so a log on either shows on both. */
 export const useFuelDay = (date: LocalDate) =>
   useQuery({ queryKey: fuelDayKey(date), queryFn: () => api.get<FuelDay>(`/api/fuel/day/${date}`) });
+
+export const FUEL_ITEMS_KEY = [...FUEL_KEY, "items"] as const;
+
+/** Saved foods, and typed labels worth saving. Read by the Foods screen and the Log food sheet. */
+export const useFuelItems = () => useQuery({ queryKey: FUEL_ITEMS_KEY, queryFn: () => api.get<FuelItems>("/api/fuel/items") });
 
 export function useLogFuel(errors: MutationErrorSlot) {
   const qc = useQueryClient();

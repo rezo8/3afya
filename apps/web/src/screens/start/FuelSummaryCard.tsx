@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { useMutationError } from "@/lib/query/use-mutation-error";
 import { FuelMeters } from "@/screens/fuel/FuelMeters";
+import { LogFoodSheet } from "@/screens/fuel/LogFoodSheet";
 import { QuickAdd } from "@/screens/fuel/QuickAdd";
 import { localDateOf } from "@/lib/fuel-date";
 import { quickAddsFor, useFuelDay } from "@/screens/fuel/fuel-day";
@@ -13,6 +15,7 @@ export function FuelSummaryCard() {
   const today = localDateOf(new Date());
   const { data } = useFuelDay(today);
   const errors = useMutationError();
+  const [logging, setLogging] = useState(false);
   if (!data) return null;
 
   return (
@@ -26,6 +29,10 @@ export function FuelSummaryCard() {
       {errors.failure && <ErrorBanner message={errors.failure.message} onRetry={errors.failure.retry} />}
       <FuelMeters day={data} />
       <QuickAdd foods={quickAddsFor(data).slice(0, START_QUICK_ADDS)} date={today} errors={errors} />
+      <button className="fuel-custom-open" onClick={() => setLogging(true)}>
+        ＋ Log food
+      </button>
+      <LogFoodSheet open={logging} onClose={() => setLogging(false)} date={today} errors={errors} />
     </section>
   );
 }

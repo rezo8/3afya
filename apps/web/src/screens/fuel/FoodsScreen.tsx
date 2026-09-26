@@ -1,16 +1,14 @@
 import { useState, type FormEvent } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import type { FrequentFuel, FuelItem, FuelItems, SaveFuelItemBody } from "@afya/shared";
+import type { FrequentFuel, FuelItem, SaveFuelItemBody } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
 import { canSaveItem, EMPTY_ITEM_DRAFT, fuelMacroSummary, itemBody, itemDraftFrom, type ItemDraft } from "@/lib/fuel";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
 import { useArmedConfirm } from "@/lib/use-armed-confirm";
-import { FUEL_KEY } from "./fuel-day";
+import { FUEL_KEY, useFuelItems } from "./fuel-day";
 import { FoodFields } from "./FoodFields";
-
-export const FUEL_ITEMS_KEY = [...FUEL_KEY, "items"] as const;
 
 /** A frequently typed label saved as-is gets this unit until the user names a better one. */
 const DEFAULT_UNIT = "1 serving";
@@ -25,7 +23,7 @@ type Editing = { kind: "new" } | { kind: "item"; id: string };
 export function FoodsScreen() {
   const qc = useQueryClient();
   const errors = useMutationError();
-  const { data } = useQuery({ queryKey: FUEL_ITEMS_KEY, queryFn: () => api.get<FuelItems>("/api/fuel/items") });
+  const { data } = useFuelItems();
   const [editing, setEditing] = useState<Editing | null>(null);
   const [draft, setDraft] = useState<ItemDraft>(EMPTY_ITEM_DRAFT);
   const archiveConfirm = useArmedConfirm<string>();

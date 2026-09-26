@@ -256,6 +256,13 @@ records what is specific to 3afya.
   still ahead"; one placeholder was chosen over three empty cards.) Tapping a row opens Edit / Log again /
   Remove and never acts on its own. Remove is an armed two-tap confirm, disabled while pending. Log again
   follows the page's rule of landing on the day being viewed. The three-row collapse is gone: the page is where the whole day lives.
+- **Anything that isn't a one-tap chip is logged through `LogFoodSheet`** (T-055), a native `<dialog>` opened from
+  "＋ Log food" on the Fuel page and the Start card. "Your foods" searches saved foods plus typed-but-unsaved
+  labels with `lib/search.ts` (the same substring-and-token rule as `ExercisePicker`; it moved there from
+  `exercise-pick.ts` so both share one rule). Creating is an explicit last row, shown only when nothing
+  matches. "Just numbers" can save the food as it logs it. The saved food is kept in a ref, so a Retry
+  after the entry failed doesn't POST the food twice (409). "When" starts at `loggedAtFor(date)`. The
+  ticket's "hold a chip to open the sheet" was dropped in favour of T-045's correct-after-tap row.
 - **Correcting a fuel entry is `PATCH /api/fuel/:id`** (T-046). It replaces label and numbers and
   keeps `loggedAt`, since the food was eaten when it was logged. POST and PATCH validate through one
   `readFuelFields`. In `FuelPanel` a row's label is the edit target, and the form reuses `FoodFields`

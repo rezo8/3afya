@@ -4,13 +4,14 @@ import { Link } from "@tanstack/react-router";
 import type { NutritionTarget } from "@afya/shared";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { api } from "@/lib/api/client";
-import { amountValue, canLogFood, EMPTY_FOOD_DRAFT, foodBody, isUsableTarget, type AmountDraft, type FoodDraft } from "@/lib/fuel";
-import { loggedAtFor, type LocalDate } from "@/lib/fuel-date";
+import { amountValue, isUsableTarget, type AmountDraft } from "@/lib/fuel";
+import type { LocalDate } from "@/lib/fuel-date";
 import { useMutationError, useTrackedMutation } from "@/lib/query/use-mutation-error";
-import { FUEL_KEY, quickAddsFor, useFuelDay, useLogFuel } from "./fuel-day";
+import { FUEL_KEY, quickAddsFor, useFuelDay } from "./fuel-day";
 import { FuelLog } from "./FuelLog";
 import { CarbsAndFat, FuelMeters } from "./FuelMeters";
-import { CALORIE_STEP, FoodFields, NumberField, PROTEIN_STEP } from "./FoodFields";
+import { CALORIE_STEP, NumberField, PROTEIN_STEP } from "./FoodFields";
+import { LogFoodSheet } from "./LogFoodSheet";
 import { QuickAdd } from "./QuickAdd";
 
 type TargetDraft = { proteinG: AmountDraft; calories: AmountDraft };
@@ -20,12 +21,10 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
   const qc = useQueryClient();
   const { data } = useFuelDay(date);
   const errors = useMutationError();
-  const [showCustom, setShowCustom] = useState(false);
-  const [customDraft, setCustomDraft] = useState<FoodDraft>(EMPTY_FOOD_DRAFT);
+  const [logging, setLogging] = useState(false);
   const [targetDraft, setTargetDraft] = useState<TargetDraft | null>(null);
 
   const invalidateFuel = () => qc.invalidateQueries({ queryKey: FUEL_KEY });
-  const add = useLogFuel(errors);
   const saveTarget = useTrackedMutation(errors, {
     mutationFn: (target: NutritionTarget) => api.put<NutritionTarget>("/api/fuel/target", target),
     onSuccess: () => {
@@ -36,15 +35,6 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
 
   if (!data) return null;
   const { target } = data;
-
-  const canAddCustom = canLogFood(customDraft);
-  const submitCustom = (e: FormEvent) => {
-    e.preventDefault();
-    if (!canAddCustom || add.isPending) return;
-    add.mutate({ ...foodBody(customDraft), loggedAt: loggedAtFor(date, new Date()) });
-    setCustomDraft(EMPTY_FOOD_DRAFT);
-    setShowCustom(false);
-  };
 
   const canSaveTarget = !!targetDraft && isUsableTarget(targetDraft.proteinG) && isUsableTarget(targetDraft.calories);
   const submitTarget = (e: FormEvent) => {
@@ -111,24 +101,10 @@ export function FuelPanel({ date, isToday }: { date: LocalDate; isToday: boolean
         Your foods ›
       </Link>
 
-      {showCustom ? (
-        <form className="fuel-custom" onSubmit={submitCustom}>
-          <div className="fuel-custom-head">
-            <p className="eyebrow">Log something else</p>
-            <button type="button" className="fuel-cancel" onClick={() => setShowCustom(false)}>
-              Close
-            </button>
-          </div>
-          <FoodFields draft={customDraft} onChange={setCustomDraft} />
-          <button type="submit" className="fuel-save" disabled={!canAddCustom || add.isPending}>
-            {add.isPending ? "…" : "Add"}
-          </button>
-        </form>
-      ) : (
-        <button className="fuel-custom-open" onClick={() => setShowCustom(true)}>
-          ＋ Log something else
-        </button>
-      )}
+      <button className="fuel-custom-open" onClick={() => setLogging(true)}>
+        ＋ Log food
+      </button>
+      <LogFoodSheet open={logging} onClose={() => setLogging(false)} date={date} errors={errors} />
 
       <FuelLog entries={data.entries} date={date} isToday={isToday} errors={errors} />
     </section>

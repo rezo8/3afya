@@ -24,20 +24,6 @@ export interface PickerOption {
   badge: "new" | "in this day" | null;
 }
 
-/** The query split into the tokens every match has to contain. */
-export const queryTokens = (query: string): string[] => query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-
-/**
- * Every token must appear somewhere in the name, in any order, so "press inc" finds
- * "Incline Dumbbell Press" — substring and token, never exact. It is deliberately not
- * fuzzy: an abbreviation the name does not contain ("db") does not match, for the same
- * reason the catalog never guesses at a name it doesn't know.
- */
-export const matchesQuery = (name: string, tokens: string[]): boolean => {
-  const lower = name.toLowerCase();
-  return tokens.every((token) => lower.includes(token));
-};
-
 /**
  * The pickable universe, ranked: the user's own library first (names they train and
  * have history for), then what the day already holds, then curated catalog names they
